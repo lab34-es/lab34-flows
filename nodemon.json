@@ -1,0 +1,8 @@
+{
+  "watch": [
+    "**.js",
+    "flows/**",
+    "applications/*/*.js"
+  ],
+  "script": "src/index.js"
+}

@@ -1,0 +1,55 @@
+{
+  "name": "flows",
+  "version": "0.0.3",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "concurrently \"npm run serve:webapp\" \"npm run serve:api\"",
+    "serve:webapp": "cd src/app; ng serve",
+    "serve:api": "nodemon src/api",
+    "test": "jest"
+  },
+  "bin": {
+    "lab34-flows": "./src/cli.js"
+  },
+  "author": "Jose Constela <jose@lab34.es>",
+  "license": "MIT",
+  "description": "UI/Cli tool for testing flows",
+  "dependencies": {
+    "@faker-js/faker": "^9.5.0",
+    "@serenity-js/assertions": "^3.16.0",
+    "@serenity-js/core": "^3.16.0",
+    "@serenity-js/rest": "^3.16.0",
+    "@serenity-js/serenity-bdd": "^3.16.0",
+    "ajv": "^8.17.1",
+    "cli-highlight": "^2.1.11",
+    "colors": "^1.4.0",
+    "cors": "^2.8.5",
+    "debug": "^4.4.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "handlebars": "^4.7.8",
+    "https-proxy-agent": "^7.0.6",
+    "is-wsl": "^2.2.0",
+    "mqtt": "^5.10.4",
+    "pg": "^8.13.3",
+    "playwright": "^1.50.1",
+    "rimraf": "^5.0.5",
+    "socket.io": "^4.8.1",
+    "uuid": "^11.1.0",
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "jest": "^29.5.0",
+    "supertest": "^6.3.3"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/jest.setup.js"
+    ]
+  }
+}
