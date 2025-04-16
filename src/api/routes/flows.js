@@ -20,6 +20,11 @@ router.get('/user', (req, res) => {
     .then(list => res.send(list))
 });
 
+router.post('/create/ai', (req, res) => {
+  flows.createAI(req.body)
+    .then(flow => res.send(flow))
+});
+
 router.post('/start', (req, res) => {
   flows.start(req.body, {
     io: req.app.get('io')
