@@ -1,6 +1,6 @@
 {
   "name": "lab34-flows",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "type": "commonjs",
   "scripts": {
     "dev": "concurrently \"npm run serve:webapp\" \"npm run serve:api\"",
