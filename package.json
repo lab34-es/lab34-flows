@@ -16,10 +16,6 @@
   "description": "UI/Cli tool for testing flows",
   "dependencies": {
     "@faker-js/faker": "^9.5.0",
-    "@serenity-js/assertions": "^3.16.0",
-    "@serenity-js/core": "^3.16.0",
-    "@serenity-js/rest": "^3.16.0",
-    "@serenity-js/serenity-bdd": "^3.16.0",
     "ajv": "^8.17.1",
     "cli-highlight": "^2.1.11",
     "colors": "^1.4.0",
