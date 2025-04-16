@@ -1,5 +1,5 @@
 {
-  "name": "lab34-flows",
+  "name": "@lab34/flows",
   "version": "0.0.6",
   "type": "commonjs",
   "scripts": {
