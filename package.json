@@ -17,6 +17,7 @@
   "dependencies": {
     "@faker-js/faker": "^9.5.0",
     "ajv": "^8.17.1",
+    "axios": "^1.8.4",
     "cli-highlight": "^2.1.11",
     "colors": "^1.4.0",
     "cors": "^2.8.5",
