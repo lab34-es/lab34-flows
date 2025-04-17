@@ -3,6 +3,8 @@ const fs = require('fs');
 const dotenv = require('dotenv');
 const YAML = require('yaml');
 const os = require('os');
+const temp = require('temp');
+temp.track(); // Automatically track and clean up temp files at exit
 
 const paths = require('./paths');
 
@@ -64,7 +66,8 @@ const loadAll = () => {
     return Promise.resolve(applications);
   }
 
-  return parseApplications()
+  return privatizeApplications()
+    .then(tempDir => parseApplications(tempDir))
     .then(apps => {
       return apps.reduce((acc, app) => {
         const indexPath = path.join(app.path, 'index.js');
@@ -104,7 +107,7 @@ const listEnvFiles = pathToSearch => {
  * present of all applications
  */
 const allPossibleEnvironments = () => {
-  return this.parseApplications()
+  return parseApplications()
     .then(apps => {
       const envs = apps.map(app => app.envFiles.map(env => env.name));
       return [...new Set(envs.flat())];
@@ -180,7 +183,7 @@ module.exports.updateEnvFile = (envPath, key, value) => {
 }
 
 const yamlSummary = () => {
-  return this.parseApplications()
+  return parseApplications()
     .then(apps => {
       return apps.map(app => {
         return {
@@ -196,8 +199,77 @@ const yamlSummary = () => {
 
 module.exports.yamlSummary = yamlSummary;
 
+const privatizeApplications = async () => {
+  const appsPath = await paths.fromHome(['applications']);
+  const tempDir = await new Promise((resolve, reject) => {
+    temp.mkdir('lab34-flows-apps', (err, dirPath) => {
+      if (err) return reject(err);
+      resolve(dirPath);
+    });
+  });
+  
+  // Copy all applications to the temp directory
+  const applications = fs.readdirSync(appsPath).filter(file => {
+    return fs.statSync(path.join(appsPath, file)).isDirectory();
+  });
+  
+  // Create applications directory in temp folder
+  await new Promise((resolve, reject) => {
+    fs.mkdir(path.join(tempDir, 'applications'), { recursive: true }, (err) => {
+      if (err) return reject(err);
+      resolve();
+    });
+  });
+  
+  // Copy each application to the temp directory
+  for (const app of applications) {
+    const srcPath = path.join(appsPath, app);
+    const destPath = path.join(tempDir, 'applications', app);
+    
+    // Create the destination directory
+    await new Promise((resolve, reject) => {
+      fs.mkdir(destPath, { recursive: true }, (err) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+    
+    // Copy all files and directories recursively
+    const copyRecursive = async (src, dest) => {
+      const stats = fs.statSync(src);
+      if (stats.isDirectory()) {
+        const files = fs.readdirSync(src);
+        for (const file of files) {
+          await copyRecursive(path.join(src, file), path.join(dest, file));
+        }
+      } else {
+        // Create parent directory if it doesn't exist
+        await new Promise((resolve, reject) => {
+          fs.mkdir(path.dirname(dest), { recursive: true }, (err) => {
+            if (err) return reject(err);
+            resolve();
+          });
+        });
+        
+        // Copy the file
+        await new Promise((resolve, reject) => {
+          fs.copyFile(src, dest, (err) => {
+            if (err) return reject(err);
+            resolve();
+          });
+        });
+      }
+    };
+    
+    await copyRecursive(srcPath, destPath);
+  }
+  
+  return tempDir;
+}
+
 /**
  * Returns the list of applications and .env files for each
+ * @param {string} source - Optional source directory to load applications from
  * @returns {Array[Object]} 
  * {
  *  application: string,
@@ -208,8 +280,16 @@ module.exports.yamlSummary = yamlSummary;
  *  }
  * }
  */
-const parseApplications = async () => {
-  const appsPath = await paths.fromHome(['applications']);
+const parseApplications = async (source) => {
+  let appsPath;
+  
+  if (source) {
+    // If source is provided, use it as the base path for applications
+    appsPath = path.join(source, 'applications');
+  } else {
+    // Otherwise use the default path
+    appsPath = await paths.fromHome(['applications']);
+  }
   
   const applications = fs.readdirSync(appsPath).filter(file => {
     return fs.statSync(path.join(appsPath, file)).isDirectory();
