@@ -4,7 +4,7 @@ const dotenv = require('dotenv');
 const YAML = require('yaml');
 const os = require('os');
 const temp = require('temp');
-temp.track(); // Automatically track and clean up temp files at exit
+// temp.track(); // Automatically track and clean up temp files at exit
 
 const paths = require('./paths');
 
@@ -262,6 +262,17 @@ const privatizeApplications = async () => {
     };
     
     await copyRecursive(srcPath, destPath);
+
+    // Reemplazar en index.js: '@lab34/flows' por __dirname (sin comillas)
+    const indexFile = path.join(destPath, 'index.js');
+    if (fs.existsSync(indexFile)) {
+      let content = fs.readFileSync(indexFile, 'utf8');
+      // Handle both single and double quotes by replacing the entire require statement
+      content = content.replace(/require\(['"]@lab34\/flows['"]\)/g, 'require(__dirname)');
+      console.log('Replaced @lab34/flows with __dirname in', indexFile);
+
+      fs.writeFileSync(indexFile, content, 'utf8');
+    }
   }
   
   return tempDir;
