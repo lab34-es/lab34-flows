@@ -85,18 +85,47 @@ steps:
 
 ## Usage
 
-After defining the flow to execute and having ensured environment variables are set, run the tool by executing:
+The Lab34 Flows CLI tool provides a professional command-line interface for running flow definitions from YAML files.
+
+### Usage
 
 ```bash
-node src/index.js -- --file flows/myflow.yml --env uat
+node src/cli.js --file <path-to-yaml-file> --env <environment> [--debug] [--help]
 ```
 
-Parameters are:
+### Options
 
 |Parameter|Description|
 |-|-|
-|`--file`|The path to the flow file to execute.|
-|`--env`|The environment to run the flow on.|
+|`--file`|Path to the YAML flow definition file (required)|
+|`--env`|Environment to run the flow in (required)|
+|`--debug`|Print debug information including environment variables and Node.js variables|
+|`--help`|Show help information|
+
+### Examples
+
+Display help information:
+```bash
+node src/cli.js --help
+```
+
+Run a flow with debug information:
+```bash
+node src/cli.js --file flows/my-flow.yaml --env production --debug
+```
+
+### Debug Mode
+
+When the `--debug` flag is used, the CLI tool will print detailed information about:
+
+1. All environment variables
+2. Node.js variables including:
+   - `__dirname`: The directory name of the current module
+   - `__filename`: The file name of the current module
+   - `process.cwd()`: The current working directory
+   - `process.argv`: The command line arguments
+
+This information is useful for troubleshooting and understanding the execution environment.
 
 ## Replacers
 

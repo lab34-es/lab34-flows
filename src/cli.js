@@ -1,75 +1,232 @@
 #!/usr/bin/env node
+
+/**
+ * Lab34 Flows CLI Tool
+ * 
+ * A command-line interface for running flow definitions from YAML files.
+ * 
+ * Usage:
+ *   node cli.js --file <path-to-yaml-file> --env <environment> [--debug] [--help]
+ * 
+ * Options:
+ *   --file     Path to the YAML flow definition file (required)
+ *   --env      Environment to run the flow in (required)
+ *   --debug    Print debug information including environment variables
+ *   --help     Show this help message
+ * 
+ * Example:
+ *   node cli.js --file flows/my-flow.yaml --env production
+ */
+
+'use strict';
+
+// Disable HTTP/2 to avoid potential issues
 process.env.NODE_NO_HTTP2 = '1';
 
+// Core dependencies
 const fs = require('fs');
 const path = require('path');
 const YAML = require('yaml');
 
-const package = require('../package.json');
+// Local dependencies
+const packageJson = require('../package.json');
 const cli = require('./helpers/cli');
 const preparation = require('./helpers/preparation');
 const reporter = require('./helpers/reporter');
 
-// file must be provided, be yaml and exist
-const filePath = process.argv[process.argv.indexOf('--file') + 1];
-const hasFile = !!filePath
-const fileIsYaml = ['yaml', 'yml'].some(ext => filePath.endsWith(`.${ext}`));
-const fileExists = fs.existsSync(filePath);
-
-if (!hasFile) {
-  console.log(`${fileFlag} is not a valid file`);
-  process.exit(1);
+/**
+ * Print error message and exit with error code
+ * @param {string} message - Error message to display
+ * @param {number} [exitCode=1] - Process exit code
+ */
+function exitWithError(message, exitCode = 1) {
+  console.error(`ERROR: ${message}`);
+  process.exit(exitCode);
 }
 
-if (!fileExists) {
-  console.log(`File ${filePath} does not exist`);
-  process.exit(1);
+/**
+ * Display help information
+ */
+function showHelp() {
+  console.log(`
+Lab34 Flows CLI Tool v${packageJson.version}
+
+Usage:
+  node cli.js --file <path-to-yaml-file> --env <environment> [--debug] [--help]
+
+Options:
+  --file     Path to the YAML flow definition file (required)
+  --env      Environment to run the flow in (required)
+  --debug    Print debug information including environment variables
+  --help     Show this help message
+
+Example:
+  node cli.js --file flows/my-flow.yaml --env production
+  `);
+  process.exit(0);
 }
 
-if (!fileIsYaml) {
-  console.log('File must be a .yaml file');
-  process.exit(1);
+/**
+ * Print debug information
+ */
+function printDebugInfo() {
+  console.log('\n=== DEBUG INFORMATION ===');
+  console.log('\nEnvironment Variables:');
+  Object.keys(process.env).sort().forEach(key => {
+    console.log(`${key}=${process.env[key]}`);
+  });
+  
+  console.log('\nNode.js Variables:');
+  console.log(`__dirname: ${__dirname}`);
+  console.log(`__filename: ${__filename}`);
+  console.log(`process.cwd(): ${process.cwd()}`);
+  console.log(`process.argv: ${JSON.stringify(process.argv, null, 2)}`);
+  console.log('\n=========================\n');
 }
 
-// Must have passed a --env value in the cli command
-const hasEnvFlag = process.argv.indexOf('--env') > -1;
-const environment = hasEnvFlag && process.argv[process.argv.indexOf('--env') + 1];
-if (!environment) {
-  console.log('No environment provided');
-  process.exit(1);
-}
+/**
+ * Parse command line arguments
+ * @returns {Object} Parsed arguments
+ */
+function parseArguments() {
+  const args = {
+    file: null,
+    env: null,
+    debug: false,
+    help: false
+  };
 
-let asJson = {};
-
-try {
-  const content = fs.readFileSync(filePath, 'utf8');
-  asJson = YAML.parse(content);
-} catch (e) {
-  console.log('Error parsing yaml file');
-  console.log(e);
-  process.exit(1);
-}
-
-const opts = {
-  environment,
-  reporter: reporter.get({cli: true}),
-  cli: true
-}
-
-;(async () => {
-  await preparation.run();
-
-  cli.logo(package.version);
-  cli.wisdom();
-
-  const runnerVersion = asJson.version || '1';
-
-  if (process.env.IS_NODEMON) {
-    setTimeout(() => {
-      require(`./helpers/runner/v${runnerVersion}`).run(asJson, opts);
-    }, 1000);
+  // Check for help flag
+  if (process.argv.includes('--help')) {
+    args.help = true;
+    return args;
   }
-  else {
-    require(`./helpers/runner/v${runnerVersion}`).run(asJson, opts);
+
+  // Check for debug flag
+  if (process.argv.includes('--debug')) {
+    args.debug = true;
   }
-})();
+
+  // Get file path
+  const fileIndex = process.argv.indexOf('--file');
+  if (fileIndex > -1 && fileIndex + 1 < process.argv.length) {
+    args.file = process.argv[fileIndex + 1];
+  }
+
+  // Get environment
+  const envIndex = process.argv.indexOf('--env');
+  if (envIndex > -1 && envIndex + 1 < process.argv.length) {
+    args.env = process.argv[envIndex + 1];
+  }
+
+  return args;
+}
+
+/**
+ * Validate the YAML file path
+ * @param {string} filePath - Path to the YAML file
+ * @returns {boolean} True if valid, otherwise exits with error
+ */
+function validateFilePath(filePath) {
+  if (!filePath) {
+    exitWithError('No file specified. Use --file <path-to-yaml-file>');
+  }
+
+  if (!fs.existsSync(filePath)) {
+    exitWithError(`File not found: ${filePath}`);
+  }
+
+  const isYaml = ['yaml', 'yml'].some(ext => filePath.toLowerCase().endsWith(`.${ext}`));
+  if (!isYaml) {
+    exitWithError('File must be a .yaml or .yml file');
+  }
+
+  return true;
+}
+
+/**
+ * Parse YAML file content
+ * @param {string} filePath - Path to the YAML file
+ * @returns {Object} Parsed YAML content
+ */
+function parseYamlFile(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    return YAML.parse(content);
+  } catch (error) {
+    exitWithError(`Error parsing YAML file: ${error.message}`);
+  }
+}
+
+/**
+ * Run the flow with the specified options
+ * @param {Object} flowConfig - Flow configuration from YAML
+ * @param {Object} options - Runtime options
+ */
+async function runFlow(flowConfig, options) {
+  try {
+    await preparation.run();
+
+    cli.logo(packageJson.version);
+    cli.wisdom();
+
+    const runnerVersion = flowConfig.version || '1';
+    const runner = require(`./helpers/runner/v${runnerVersion}`);
+
+    if (process.env.IS_NODEMON) {
+      setTimeout(() => {
+        runner.run(flowConfig, options);
+      }, 1000);
+    } else {
+      runner.run(flowConfig, options);
+    }
+  } catch (error) {
+    exitWithError(`Error running flow: ${error.message}`);
+  }
+}
+
+/**
+ * Main function to execute the CLI
+ */
+async function main() {
+  // Parse command line arguments
+  const args = parseArguments();
+
+  // Show help if requested
+  if (args.help) {
+    showHelp();
+    return;
+  }
+
+  // Show debug information if requested
+  if (args.debug) {
+    printDebugInfo();
+  }
+
+  // Validate file path
+  validateFilePath(args.file);
+
+  // Validate environment
+  if (!args.env) {
+    exitWithError('No environment specified. Use --env <environment>');
+  }
+
+  // Parse YAML file
+  const flowConfig = parseYamlFile(args.file);
+
+  // Set up options
+  const options = {
+    environment: args.env,
+    reporter: reporter.get({ cli: true }),
+    cli: true,
+    debug: args.debug
+  };
+
+  // Run the flow
+  await runFlow(flowConfig, options);
+}
+
+// Execute the main function
+main().catch(error => {
+  exitWithError(`Unhandled error: ${error.message}`);
+});
