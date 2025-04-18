@@ -80,8 +80,10 @@ steps:
 
 ## Setup
 
-1. Clone this repository.
-2. Install the dependencies by running `npm install`.
+1. Install this repository, globally: `npm install -g lab34-flows-cli`.
+2. Extend NODE_PATH to npm's root, so your application scripts can access the library:
+   - On Linux / MacOS: `export NODE_PATH=$(npm root -g)`.
+   - On Windows: `set NODE_PATH=%AppData%\npm\node_modules`.
 
 ## Usage
 
@@ -90,7 +92,7 @@ The Lab34 Flows CLI tool provides a professional command-line interface for runn
 ### Usage
 
 ```bash
-node src/cli.js --file <path-to-yaml-file> --env <environment> [--debug] [--help]
+lab34-flows --file <path-to-yaml-file> --env <environment> [--debug] [--help]
 ```
 
 ### Options
@@ -106,12 +108,12 @@ node src/cli.js --file <path-to-yaml-file> --env <environment> [--debug] [--help
 
 Display help information:
 ```bash
-node src/cli.js --help
+lab34-flows --help
 ```
 
 Run a flow with debug information:
 ```bash
-node src/cli.js --file flows/my-flow.yaml --env production --debug
+lab34-flows --file flows/my-flow.yaml --env production --debug
 ```
 
 ### Debug Mode
