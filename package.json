@@ -2,6 +2,7 @@
   "name": "@lab34/flows",
   "version": "0.2.0",
   "type": "commonjs",
+  "main": "src/index.js",
   "scripts": {
     "dev": "concurrently \"npm run serve:webapp\" \"npm run serve:api\"",
     "serve:webapp": "cd src/app; ng serve",

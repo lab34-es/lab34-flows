@@ -66,8 +66,7 @@ const loadAll = () => {
     return Promise.resolve(applications);
   }
 
-  return privatizeApplications()
-    .then(tempDir => parseApplications(tempDir))
+  return parseApplications(tempDir)
     .then(apps => {
       return apps.reduce((acc, app) => {
         const indexPath = path.join(app.path, 'index.js');
@@ -198,85 +197,6 @@ const yamlSummary = () => {
 };
 
 module.exports.yamlSummary = yamlSummary;
-
-const privatizeApplications = async () => {
-  const appsPath = await paths.fromHome(['applications']);
-  const tempDir = await new Promise((resolve, reject) => {
-    temp.mkdir('lab34-flows-apps', (err, dirPath) => {
-      if (err) return reject(err);
-      resolve(dirPath);
-    });
-  });
-  
-  // Copy all applications to the temp directory
-  const applications = fs.readdirSync(appsPath).filter(file => {
-    return fs.statSync(path.join(appsPath, file)).isDirectory();
-  });
-  
-  // Create applications directory in temp folder
-  await new Promise((resolve, reject) => {
-    fs.mkdir(path.join(tempDir, 'applications'), { recursive: true }, (err) => {
-      if (err) return reject(err);
-      resolve();
-    });
-  });
-  
-  // Copy each application to the temp directory
-  for (const app of applications) {
-    const srcPath = path.join(appsPath, app);
-    const destPath = path.join(tempDir, 'applications', app);
-    
-    // Create the destination directory
-    await new Promise((resolve, reject) => {
-      fs.mkdir(destPath, { recursive: true }, (err) => {
-        if (err) return reject(err);
-        resolve();
-      });
-    });
-    
-    // Copy all files and directories recursively
-    const copyRecursive = async (src, dest) => {
-      const stats = fs.statSync(src);
-      if (stats.isDirectory()) {
-        const files = fs.readdirSync(src);
-        for (const file of files) {
-          await copyRecursive(path.join(src, file), path.join(dest, file));
-        }
-      } else {
-        // Create parent directory if it doesn't exist
-        await new Promise((resolve, reject) => {
-          fs.mkdir(path.dirname(dest), { recursive: true }, (err) => {
-            if (err) return reject(err);
-            resolve();
-          });
-        });
-        
-        // Copy the file
-        await new Promise((resolve, reject) => {
-          fs.copyFile(src, dest, (err) => {
-            if (err) return reject(err);
-            resolve();
-          });
-        });
-      }
-    };
-    
-    await copyRecursive(srcPath, destPath);
-
-    // Reemplazar en index.js: '@lab34/flows' por __dirname (sin comillas)
-    const indexFile = path.join(destPath, 'index.js');
-    if (fs.existsSync(indexFile)) {
-      let content = fs.readFileSync(indexFile, 'utf8');
-      // Handle both single and double quotes by replacing the entire require statement
-      content = content.replace(/require\(['"]@lab34\/flows['"]\)/g, 'require(__dirname)');
-      console.log('Replaced @lab34/flows with __dirname in', indexFile);
-
-      fs.writeFileSync(indexFile, content, 'utf8');
-    }
-  }
-  
-  return tempDir;
-}
 
 /**
  * Returns the list of applications and .env files for each
