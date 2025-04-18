@@ -70,8 +70,10 @@ Example:
  * Print debug information
  */
 function printDebugInfo() {
+
+
   console.log('\n=== DEBUG INFORMATION ===');
-  console.log('\nEnvironment Variables:');
+  console.log('\nPackage Information:');
 
   // Print package info
 
@@ -86,16 +88,25 @@ function printDebugInfo() {
   console.log(`Current User: ${process.env.USER || process.env.USERNAME}`);
   console.log(`Current Directory: ${process.cwd()}`);
 
+  console.log('');
+  console.log('');
+  console.log('');
+
+  console.log('\nEnvironment Variables:');
+
   Object.keys(process.env).sort().forEach(key => {
     console.log(`${key}=${process.env[key]}`);
   });
+
+  console.log('');
+  console.log('');
+  console.log('');
   
   console.log('\nNode.js Variables:');
   console.log(`__dirname: ${__dirname}`);
   console.log(`__filename: ${__filename}`);
   console.log(`process.cwd(): ${process.cwd()}`);
   console.log(`process.argv: ${JSON.stringify(process.argv, null, 2)}`);
-  console.log('\n=========================\n');
 }
 
 /**
