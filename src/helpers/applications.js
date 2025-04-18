@@ -66,7 +66,7 @@ const loadAll = () => {
     return Promise.resolve(applications);
   }
 
-  return parseApplications(tempDir)
+  return parseApplications()
     .then(apps => {
       return apps.reduce((acc, app) => {
         const indexPath = path.join(app.path, 'index.js');
