@@ -3,10 +3,9 @@
   "version": "0.4.1",
   "type": "commonjs",
   "main": "src/index.js",
+  "homepage": "https://github.com/lab34-es/lab34-flows",
   "scripts": {
-    "dev": "concurrently \"npm run serve:webapp\" \"npm run serve:api\"",
-    "serve:webapp": "cd src/app; ng serve",
-    "serve:api": "nodemon src/api",
+    "dev": "nodemon src/api",
     "test": "jest"
   },
   "bin": {
