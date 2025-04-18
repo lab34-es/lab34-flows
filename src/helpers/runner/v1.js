@@ -339,8 +339,6 @@ const run = async (flow, opts) => {
   const { server } = opts.reporter;
   flow.reporter = reporterHelper.get({flow, cli, server});
 
-  console.log('REPORTER', flow.reporter);
-
   // Initialize basis of execution information
   flow.execution = {
     id: executionId,

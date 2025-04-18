@@ -25,7 +25,6 @@ process.env.NODE_NO_HTTP2 = '1';
 
 // Core dependencies
 const fs = require('fs');
-const path = require('path');
 const YAML = require('yaml');
 
 // Local dependencies
@@ -70,8 +69,6 @@ Example:
  * Print debug information
  */
 function printDebugInfo() {
-
-
   console.log('\n=== DEBUG INFORMATION ===');
   console.log('\nPackage Information:');
 
@@ -214,6 +211,12 @@ async function runFlow(flowConfig, options) {
  * Main function to execute the CLI
  */
 async function main() {
+
+  // NODE_PATH must be set
+  if (!process.env.NODE_PATH) {
+    exitWithError('NODE_PATH environment variable is not set. Please set it to the path of your node_modules directory.');
+  }
+
   // Parse command line arguments
   const args = parseArguments();
 
