@@ -276,7 +276,10 @@ const processor = async (flow, opts) => {
 
         index++;
       } catch (stepError) {
-        console.error(stepError);
+        
+        // Uncomment this for extra debugging
+        // console.error(stepError);
+
         flow.steps[index].execution.status = 'error';
         
         flow.steps[index].execution.error = {
