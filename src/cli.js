@@ -72,6 +72,20 @@ Example:
 function printDebugInfo() {
   console.log('\n=== DEBUG INFORMATION ===');
   console.log('\nEnvironment Variables:');
+
+  // Print package info
+
+  console.log(`Package Name: ${packageJson.name}`);
+  console.log(`Package Version: ${packageJson.version}`);
+  console.log(`Node Version: ${process.version}`);
+  console.log(`Platform: ${process.platform}`);
+  console.log(`Architecture: ${process.arch}`);
+  console.log(`Process ID: ${process.pid}`);
+  console.log(`Process Title: ${process.title}`);
+  console.log(`Process Uptime: ${process.uptime()} seconds`);
+  console.log(`Current User: ${process.env.USER || process.env.USERNAME}`);
+  console.log(`Current Directory: ${process.cwd()}`);
+
   Object.keys(process.env).sort().forEach(key => {
     console.log(`${key}=${process.env[key]}`);
   });
