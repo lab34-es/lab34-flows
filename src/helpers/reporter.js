@@ -19,7 +19,15 @@ const sensitive = (input) => {
     const result = {};
     for (let key in input) {
       if (keysToHide.some(k => key.toLowerCase().includes(k))) {
-        result[key] = '<hidden potential sensitive data>';
+
+        // Show only 4 first and 4 last characters
+        const value = input[key];
+        const valueLength = value.length;
+        if (valueLength > 4) {
+          result[key] = value.slice(0, 4).replace(/./g, '*') + value.slice(-4);
+        } else {
+          result[key] = value.replace(/./g, '*');
+        }
       } else {
         result[key] = sensitive(input[key]);
       }
@@ -375,7 +383,15 @@ const playwrigthStep = (ctx, method, parameters) => {
   const sensitive = JSON.stringify(parameters||{}).toLowerCase().includes('password') || key.toLowerCase().includes('token');
   
   if (sensitive) {
-    value = '<hidden potential sensitive data>';
+    // Show only 4 first and 4 last characters
+    const valueLength = value.length;
+
+    if (valueLength > 4) {
+      value = value.slice(0, 4).replace(/./g, '*') + value.slice(-4);
+    }
+    else {
+      value = value.replace(/./g, '*');
+    }
   }
 
   console.log([
