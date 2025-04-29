@@ -93,18 +93,55 @@ const belgianCitiesEn = [
 ];
 
 /**
+ * Parses a barcode mask string into parts
+ * 
+ * @param {string} mask - Barcode mask string (e.g., "3232_[4]_247")
+ * @returns {Array} - Array of parts (strings and numbers) for barcode generation
+ */
+const parseBarcodePattern = (mask) => {
+  if (!mask) return [];
+  
+  const parts = [];
+  const regex = /(\[\d+\])|([^_]+)/g;
+  let match;
+  
+  while ((match = regex.exec(mask)) !== null) {
+    const part = match[0];
+    if (part.startsWith('[') && part.endsWith(']')) {
+      // Extract the number of digits from [n]
+      const digitCount = parseInt(part.substring(1, part.length - 1), 10);
+      if (!isNaN(digitCount)) {
+        parts.push(digitCount);
+      }
+    } else {
+      parts.push(part);
+    }
+  }
+  
+  return parts;
+};
+
+/**
  * Generates a barcode by combining static and random parts
  * 
- * @param {Array} parts - Array of strings and numbers, where numbers will be replaced with random digits
+ * @param {Array|string} parts - Array of strings and numbers, where numbers will be replaced with random digits,
+ *                              or a string mask like "3232_[4]_247"
  * @returns {string} - Generated barcode string
  */
 const barcode = (parts) => {
+  // If parts is a string, parse it as a barcode pattern
+  if (typeof parts === 'string') {
+    parts = parseBarcodePattern(parts);
+  }
+  
   return parts.map(part => {
     if (typeof part === 'number') return Array.from({length: part}, () => Math.floor(Math.random() * 10)).join('');
     if (typeof part === 'string') return part;
     return part;
   }).join('');
 }
+
+module.exports.barcode = barcode;
 
 /**
  * Generates an object with default values including timestamps, random integers, and other random data.
@@ -168,7 +205,10 @@ const values = () => {
     randomEmail: faker.internet.email(),
     randomName: `${faker.person.firstName()} ${faker.person.lastName()}`,
 
+    // Barcodes
     randomBarcode: barcode(['ABC', 10]),
+    // Example of using the new string mask format
+    randomMaskedBarcode: barcode('3232_[4]_247'),
 
     // Companies
     randomCompanyName: faker.company.name(),
