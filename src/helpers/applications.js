@@ -110,18 +110,6 @@ const listEnvFiles = pathToSearch => {
 const allPossibleEnvironments = (lookFor) => {
   return parseApplications()
     .then(apps => {
-      // If lookFor is provided, check if all applications have it
-      if (lookFor) {
-        const missingApps = apps.filter(app => 
-          !app.envFiles.some(env => env.name === lookFor)
-        );
-        
-        if (missingApps.length > 0) {
-          const missingAppNames = missingApps.map(app => app.name).join(', ');
-          throw new Error(`Environment '${lookFor}' not found in the following applications: ${missingAppNames}`);
-        }
-      }
-      
       const envs = apps.map(app => app.envFiles.map(env => env.name));
       return [...new Set(envs.flat())];
     })
