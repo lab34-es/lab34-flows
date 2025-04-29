@@ -6,6 +6,8 @@ const os = require('os');
 
 const paths = require('./paths');
 
+// NODE_PATH=$(npm root -g)
+
 const applications = {};
 
 module.exports.applications = applications;
@@ -209,6 +211,23 @@ module.exports.yamlSummary = yamlSummary;
  * }
  */
 const parseApplications = async () => {
+
+  const libraryPath = '@lab34/flows'
+
+  // Check if NODE_PATH is set
+  // If not, set it to the output of `npm root -g`
+  if (!process.env.NODE_PATH) {
+    const npmRoot = await new Promise((resolve, reject) => {
+      require('child_process').exec('npm root -g', (err, stdout) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(stdout.trim());
+      });
+    });
+    process.env.NODE_PATH = npmRoot;
+  }
+
   const appsPath = await paths.fromHome(['applications']);
   
   const applications = fs.readdirSync(appsPath).filter(file => {
@@ -240,10 +259,22 @@ const parseApplications = async () => {
     let errors = [];
     if (fs.existsSync(path.join(appPath, 'index.js'))) {
       try {
+
+        // Replace "require('@lab34/flows') with "require('`${libraryPath}`')"
+        // in the index.js file
+        const indexPath = path.join(appPath, 'index.js');
+        const indexFile = fs.readFileSync(indexPath, 'utf8');
+        const modifiedIndexFile = indexFile.replace(/require\('@lab34\/flows'\)/g, `require('${libraryPath}')`);
+        fs.writeFileSync(indexPath, modifiedIndexFile, 'utf8');
+
         const lib = require(appPath);
         methods = Object.keys(lib).map(method => {
           return lib[method]('describe')
         });
+
+        // Revert back the require statement
+        const revertedIndexFile = modifiedIndexFile.replace(/require\('@lab34\/flows'\)/g, `require('${libraryPath}')`);
+        fs.writeFileSync(indexPath, revertedIndexFile, 'utf8');
       }
       catch (ex) {
         errors.push({
@@ -252,6 +283,15 @@ const parseApplications = async () => {
         });
       }
     }
+
+    console.log({
+      name: applicationName,
+      slug: applicationName,
+      path: appPath,
+      envFiles: envFilesWithPaths,
+      methods,
+      errors,
+    })
 
     return {
       name: applicationName,

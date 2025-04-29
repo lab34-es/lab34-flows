@@ -6,7 +6,7 @@ const paths = require('./paths');
 const apps = require('./applications');
 const configHelper = require('./config');
 
-const ollama = require('ollama');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const ALLOWED_FILE_FORMATS = ['yaml', 'yml'];
 
@@ -55,63 +55,35 @@ module.exports.createAI = async (body) => {
   // Send message parts to the AI
   const finalPrompt = messageParts.join('\n');
 
+  console.log(finalPrompt)
+
   // Load AI config
   const aiConfig = await configHelper.load('ai');
 
-  const oo = new ollama.Ollama({
-    host: aiConfig.ollama.host,
+  // Initialize the Gemini API with the API key
+  const genAI = new GoogleGenerativeAI(aiConfig.gemini.apiKey);
+
+  // Get the Gemini model
+  const model = genAI.getGenerativeModel({
+    model: aiConfig.gemini.model || 'gemini-pro',
   });
 
-  // const tools = [{
-  //   type: 'function',
-  //   function: {
-  //     name: 'get_current_date',
-  //     description: 'Get the current date in the format YYYY-MM-DD',
-  //   }
-  // }]
-
-  // Interate with the AI and attend tool function calling
-  let response = await oo.chat({
-    model: aiConfig.ollama.model || 'llama3',
-    messages: [{ role: 'user', content: finalPrompt }],
-    // tools: tools,
-    stream: false
+  // Create a chat session
+  const chat = model.startChat({
+    generationConfig: {
+      temperature: aiConfig.gemini.temperature || 0.7,
+      topP: aiConfig.gemini.topP || 0.95,
+      topK: aiConfig.gemini.topK || 40,
+    },
   });
 
-  // Handle tool function calls if needed
-  while (response.message.tool_calls && response.message.tool_calls.length > 0) {
-    const toolCalls = response.message.tool_calls;
-    const toolResults = [];
-
-    // for (const toolCall of toolCalls) {
-    //   if (toolCall.function.name === 'get_current_date') {
-    //     const today = new Date();
-    //     const date = today.toISOString().split('T')[0]; // YYYY-MM-DD format
-    //     toolResults.push({
-    //       tool_call_id: toolCall.id,
-    //       role: 'tool',
-    //       content: date
-    //     });
-    //   }
-    // }
-
-    // Add the AI's message and tool results to the conversation
-    const updatedMessages = [
-      { role: 'user', content: finalPrompt },
-      response.message,
-      // ...toolResults
-    ];
-
-    // Get the final response from the AI
-    response = await oo.chat({
-      model: aiConfig.ollama.model || 'llama3',
-      messages: updatedMessages,
-      stream: false
-    });
-  }
+  // Send the prompt to Gemini
+  const result = await chat.sendMessage(finalPrompt);
+  const response = await result.response;
+  const responseText = response.text();
 
   return {
-    flow: response.message.content
+    flow: responseText
   }
 };
 

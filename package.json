@@ -16,6 +16,7 @@
   "description": "UI/Cli tool for testing flows",
   "dependencies": {
     "@faker-js/faker": "^9.5.0",
+    "@google/generative-ai": "^0.24.0",
     "@serenity-js/assertions": "^3.16.0",
     "@serenity-js/core": "^3.16.0",
     "@serenity-js/rest": "^3.16.0",
