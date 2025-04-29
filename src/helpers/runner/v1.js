@@ -135,7 +135,7 @@ const processor = async (flow, opts) => {
     steps = flow.steps;
     let index = 0;
     // validate environment is valid
-    const allEnvironments = await apps.allPossibleEnvironments();
+    const allEnvironments = await apps.allPossibleEnvironments(environment);
     if (!allEnvironments.includes(environment)) {
       flow.execution.status = 'error';
       flow.execution.error = {

@@ -84,6 +84,7 @@ steps:
 2. Extend NODE_PATH to npm's root, so your application scripts can access the library:
    - On Linux / MacOS: `export NODE_PATH=$(npm root -g)`.
    - On Windows: `set NODE_PATH=%AppData%\npm\node_modules`.
+   - On NVM for Windows: `set NODE_PATH=%NVM_SYMLINK%\node_modules`.
 
 ## Usage
 
