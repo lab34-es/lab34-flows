@@ -57,14 +57,16 @@ const buildSteps = (steps) => {
   return steps;
 }
 
-const buildData = (data, steps, memory) => {
+const buildData = (data, flow) => {
+  if (!data) return {};
+
   // Convert each step into a property in a json object
-  const stepData = steps.reduce((acc, step) => {
+  const stepData = flow.steps.reduce((acc, step) => {
     acc[step.id] = step;
     return acc;
   }, {});
 
-  data = replacer.json(JSON.stringify(data), { steps: stepData });
+  data = replacer.json(JSON.stringify(data), { steps: stepData, memory: flow.memory || {} }, {});
 
   return data;
 }
@@ -73,8 +75,8 @@ const executeStep = async (flow, step, attemptNumber = 0) => {
   const { application, method, parameters } = step;
 
   const stepIndex = flow.steps.findIndex(s => s.id === step.id);
-
-  const params = buildData(parameters, flow.steps, flow.memory);
+  
+  const params = buildData(parameters, flow);
 
   // ATTENTION! we might retry the step!!! Meaning that the line above 
   // (buildData) must NOT be executed multiple times. Otherwise, we'll
@@ -86,6 +88,7 @@ const executeStep = async (flow, step, attemptNumber = 0) => {
   // so the next execution attempts it uses the same data.
 
   flow.steps[stepIndex].parameters = params;
+  console.log('1', flow.memory); 
 
   let [headers, status, body, memory] = await applications[application][method](
     {

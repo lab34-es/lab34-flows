@@ -21,7 +21,7 @@ module.exports.description = description;
 // Helper function to convert array-style handlers to functions that can describe themselves
 const handler = (handlerArray, functionName) => {
   // The actual function that will be called
-  const handler = function(ctx, parameters) {
+  const handler = function(ctx, parameters, flow) {
     if (ctx === 'describe') {
       // Extract description and validations
       const description = handlerArray[0];
@@ -53,7 +53,7 @@ const handler = (handlerArray, functionName) => {
     }
     
     // Execute the main handler (last item in array)
-    return handlerArray[handlerArray.length - 1](ctx, parameters);
+    return handlerArray[handlerArray.length - 1](ctx, parameters, flow);
   };
   
   return handler;
