@@ -93,6 +93,7 @@ const executeStep = async (flow, step, attemptNumber = 0) => {
       reporter: flow.reporter
     },
     params,
+    flow
   );
 
   // Is the response empty?
