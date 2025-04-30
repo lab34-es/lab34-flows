@@ -133,7 +133,6 @@ const processor = async (flow, opts) => {
     const { environment } = opts;
 
     steps = flow.steps;
-    let index = 0;
     // validate environment is valid
     const allEnvironments = await apps.allPossibleEnvironments(environment);
     if (!allEnvironments.includes(environment)) {
@@ -210,8 +209,12 @@ const processor = async (flow, opts) => {
     // Send the diagram to the client, so the flow can be visualized
     flow.reporter.diagram();
 
-    for (let step of flow.steps) {
+    // Use a for loop with index as the control variable instead of for...of
+    // This allows us to control which step to execute next
+    for (let i = 0; i < flow.steps.length; i++) {
       console.log('')
+      
+      const step = flow.steps[i];
 
       try {
         // Execute the method and log the result. Pass each property in step.data as a separate argument.
@@ -219,11 +222,11 @@ const processor = async (flow, opts) => {
         if (!parameters) parameters = {};
 
         // Prepare holder for execution information
-        flow.steps[index].execution = {
+        flow.steps[i].execution = {
           times: {}
         };
-        flow.steps[index].execution.status = 'running';
-        flow.steps[index].execution.times.start = Date.now();
+        flow.steps[i].execution.status = 'running';
+        flow.steps[i].execution.times.start = Date.now();
 
         flow.reporter.stepStart(id);
         flow.reporter.stepUpdate(id);
@@ -239,57 +242,81 @@ const processor = async (flow, opts) => {
 
         const [headers, status, body] = await executeStep(flow, step)
         
-        flow.steps[index].execution.times.end = Date.now();
-        flow.steps[index].execution.times.duration = (new Date() - flow.execution.times.start) / 1000;
+        flow.steps[i].execution.times.end = Date.now();
+        flow.steps[i].execution.times.duration = (new Date() - flow.execution.times.start) / 1000;
         flow.reporter.stepUpdate(id);
 
-        flow.steps[index].response = { headers, status, body };
+        flow.steps[i].response = { headers, status, body };
         flow.reporter.response({ headers, status, body }, {
-          timing: flow.steps[index].execution.duration
+          timing: flow.steps[i].execution.duration
         });
 
         if (test || testlatentApplications) {
           const testReport = await tester.test(flow, test, { headers, status, body });
 
-          flow.steps[index].testReport = testReport;
+          flow.steps[i].testReport = testReport;
           flow.reporter.test(testReport);
 
           if (testReport.hasErrors) {
-            flow.steps[index].execution.status = 'failed';
-            flow.steps[index].execution.error = {
+            // Check if there's a retry configuration in the test parameter
+            if (test.retry && typeof test.retry === 'object' && 
+                typeof test.retry.times === 'number' && 
+                typeof test.retry.delay === 'number') {
+              
+              // Get the current attempt number or initialize it
+              const attemptNumber = flow.steps[i].execution.attempt || 0;
+              
+              // Update the attempt number
+              flow.steps[i].execution.attempt = attemptNumber + 1;
+              flow.reporter.stepUpdate(id);
+              
+              // Check if we should retry
+              if (attemptNumber < test.retry.times) {
+                console.log(`Test failed for step ${step.id}. Retrying (${attemptNumber + 1}/${test.retry.times})...`);
+                
+                // Wait for the specified delay
+                await new Promise(resolve => setTimeout(resolve, test.retry.delay));
+                
+                // Retry the step by decrementing i so the same step is executed again in the next iteration
+                i--; // This is the key change - we decrement i instead of index
+                continue; // Skip to the next iteration of the loop
+              }
+            }
+            
+            // If no retry configuration or max retries reached, fail the step
+            flow.steps[i].execution.status = 'failed';
+            flow.steps[i].execution.error = {
               name: 'TestFailed',
               message: `Test failed for step ${step.id}`,
               stepId: step.id,
               code: 4
             };
             flow.reporter.stepUpdate(id);
-            throw flow.steps[index].execution.error;
+            throw flow.steps[i].execution.error;
           }
           else {
-            flow.steps[index].execution.status = 'passed';
+            flow.steps[i].execution.status = 'passed';
           }
         }
         else {
-          flow.steps[index].execution.status = 'passed';
+          flow.steps[i].execution.status = 'passed';
         }
         flow.reporter.stepUpdate(id);
-
-        index++;
       } catch (stepError) {
         
         // Uncomment this for extra debugging
         // console.error(stepError);
 
-        flow.steps[index].execution.status = 'error';
+        flow.steps[i].execution.status = 'error';
         
-        flow.steps[index].execution.error = {
+        flow.steps[i].execution.error = {
           name: stepError.name || 'StepExecutionError',
           message: `Error executing step ${step.id}: ${stepError.message}`,
           code: stepError.code || 7,
           stepId: step.id
         };
         flow.reporter.stepUpdate(step.id);
-        throw flow.steps[index].execution.error;
+        throw flow.steps[i].execution.error;
       }
     }
 
