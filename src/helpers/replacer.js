@@ -279,6 +279,11 @@ module.exports.json = (input, data) => {
   // Initialize data object if not provided
   if (!data) data = {}
   data = Object.assign({}, data);
+
+  // Skip empty input
+  if (!input) {
+    return input;
+  }
   
   // Compile and process the Handlebars template
   const template = handlebars.compile(input);

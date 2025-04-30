@@ -57,7 +57,7 @@ const buildSteps = (steps) => {
   return steps;
 }
 
-const buildData = (data, steps, index) => {
+const buildData = (data, steps, memory) => {
   // Convert each step into a property in a json object
   const stepData = steps.reduce((acc, step) => {
     acc[step.id] = step;
@@ -74,7 +74,7 @@ const executeStep = async (flow, step, attemptNumber = 0) => {
 
   const stepIndex = flow.steps.findIndex(s => s.id === step.id);
 
-  const params = buildData(parameters, flow.steps, stepIndex);
+  const params = buildData(parameters, flow.steps, flow.memory);
 
   // ATTENTION! we might retry the step!!! Meaning that the line above 
   // (buildData) must NOT be executed multiple times. Otherwise, we'll
@@ -87,7 +87,7 @@ const executeStep = async (flow, step, attemptNumber = 0) => {
 
   flow.steps[stepIndex].parameters = params;
 
-  let [headers, status, body] = await applications[application][method](
+  let [headers, status, body, memory] = await applications[application][method](
     {
       ...appsCtx[application],
       reporter: flow.reporter
@@ -125,7 +125,7 @@ const executeStep = async (flow, step, attemptNumber = 0) => {
     }
   }
 
-  return [headers, status, body]
+  return [headers, status, body, memory]
 }
 
 const processor = async (flow, opts) => {
@@ -222,8 +222,12 @@ const processor = async (flow, opts) => {
         if (!parameters) parameters = {};
 
         // Prepare holder for execution information
+        // If the execution object already exists (due to a retry), preserve the attempt number
+        const existingAttempt = flow.steps[i].execution?.attempt || 0;
+        
         flow.steps[i].execution = {
-          times: {}
+          times: {},
+          attempt: existingAttempt // Preserve the attempt number
         };
         flow.steps[i].execution.status = 'running';
         flow.steps[i].execution.times.start = Date.now();
@@ -240,11 +244,13 @@ const processor = async (flow, opts) => {
           throw new Error(`Method not found: ${method} in ${application}`);
         }
 
-        const [headers, status, body] = await executeStep(flow, step)
+        const [headers, status, body, memory] = await executeStep(flow, step)
         
         flow.steps[i].execution.times.end = Date.now();
         flow.steps[i].execution.times.duration = (new Date() - flow.execution.times.start) / 1000;
         flow.reporter.stepUpdate(id);
+
+        flow.memory = Object.assign(flow.memory || {}, memory || {});
 
         flow.steps[i].response = { headers, status, body };
         flow.reporter.response({ headers, status, body }, {
