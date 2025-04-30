@@ -127,7 +127,8 @@ const mimicStart = (mimicConfig) => {
 const request = (method, _opts) => {
   const {
     url,
-    options
+    options,
+    data
   } = _opts;
 
   const {
@@ -175,6 +176,22 @@ const request = (method, _opts) => {
     const spacesStr = ' '.repeat(6);
     console.log(
       highlight(JSON.stringify(bodyForReport, null, 2), { language: 'json' })
+        .split('\n')
+        .map(line => `${spacesStr}${line}`).join('\n')
+    );
+  }
+
+  // If XML data exists, log it
+  if (data) {
+    console.log([
+      '   ',
+      '   XML Data'.green.bold,
+    ].join(''));
+
+    // Add indentation to each line of the XML data
+    const spacesStr = ' '.repeat(6);
+    console.log(
+      highlight(data, { language: 'xml' })
         .split('\n')
         .map(line => `${spacesStr}${line}`).join('\n')
     );

@@ -96,18 +96,9 @@ const belgianCitiesEn = [
 handlebars.registerHelper('barcode', function() {
   // Convert arguments object to array, excluding the last item which is the Handlebars options object
   const parts = Array.from(arguments).slice(0, arguments.length - 1);
-  
-  // Process parts to convert string numbers to actual numbers
-  const processedParts = parts.map(part => {
-    // If the part is a string that represents a number, convert it to a number
-    if (typeof part === 'string' && !isNaN(part) && part.trim() !== '') {
-      return parseInt(part, 10);
-    }
-    return part;
-  });
-  
   // Generate barcode using the existing barcode function
-  return barcode(processedParts);
+  const result = barcode(parts);
+  return result
 });
 
 
@@ -172,35 +163,14 @@ module.exports.timeAgo = timeAgo;
  * @returns {string} - Generated barcode string
  */
 const barcode = (parts) => {
-  const parseBarcodePattern = (mask) => {
-    if (!mask) return [];
-    
-    const parts = [];
-    const regex = /(\[\d+\])|([^_]+)/g;
-    let match;
-    
-    while ((match = regex.exec(mask)) !== null) {
-      const part = match[0];
-      if (part.startsWith('[') && part.endsWith(']')) {
-        // Extract the number of digits from [n]
-        const digitCount = parseInt(part.substring(1, part.length - 1), 10);
-        if (!isNaN(digitCount)) {
-          parts.push(digitCount);
-        }
-      } else {
-        parts.push(part);
-      }
-    }
-    
-    return parts;
-  }
-
   // If parts is a string, parse it as a barcode pattern
   if (typeof parts === 'string') {
     parts = parseBarcodePattern(parts);
   }
   
+  
   return parts.map(part => {
+    console.log(typeof part, part)
     if (typeof part === 'number') return Array.from({length: part}, () => Math.floor(Math.random() * 10)).join('');
     if (typeof part === 'string') return part;
     return part;
@@ -270,8 +240,6 @@ const values = () => {
 
     randomEmail: faker.internet.email(),
     randomName: `${faker.person.firstName()} ${faker.person.lastName()}`,
-
-    randomBarcode: barcode(['ABC', 10]),
 
     // Companies
     randomCompanyName: faker.company.name(),
