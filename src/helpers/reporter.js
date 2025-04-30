@@ -128,12 +128,12 @@ const request = (method, _opts) => {
   const {
     url,
     options,
-    data
   } = _opts;
 
   const {
     headers,
-    body
+    body,
+    data
   } = options;
 
   // Log the request method and URL
