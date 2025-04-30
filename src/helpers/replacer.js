@@ -168,7 +168,6 @@ const barcode = (parts) => {
     parts = parseBarcodePattern(parts);
   }
   
-  
   return parts.map(part => {
     if (typeof part === 'number') return Array.from({length: part}, () => Math.floor(Math.random() * 10)).join('');
     if (typeof part === 'string') return part;
