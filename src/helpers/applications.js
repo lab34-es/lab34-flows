@@ -212,12 +212,12 @@ module.exports.yamlSummary = yamlSummary;
  */
 const parseApplications = async () => {
 
-  const libraryPath = '@lab34/flows'
+  let libraryPath = '@lab34/flows'
 
   // Check if NODE_PATH is set
   // If not, set it to the output of `npm root -g`
   if (!process.env.NODE_PATH) {
-    const npmRoot = await new Promise((resolve, reject) => {
+    libraryPath = await new Promise((resolve, reject) => {
       require('child_process').exec('npm root -g', (err, stdout) => {
         if (err) {
           return reject(err);
@@ -225,7 +225,7 @@ const parseApplications = async () => {
         resolve(stdout.trim());
       });
     });
-    process.env.NODE_PATH = npmRoot;
+    libraryPath = path.join(libraryPath, '@lab34', 'flows');
   }
 
   const appsPath = await paths.fromHome(['applications']);
@@ -260,11 +260,15 @@ const parseApplications = async () => {
     if (fs.existsSync(path.join(appPath, 'index.js'))) {
       try {
 
-        // Replace "require('@lab34/flows') with "require('`${libraryPath}`')"
-        // in the index.js file
+        // Replace all instances of @lab34/flows with libraryPath in the index.js file
+        // This handles both bare module names and quoted strings
         const indexPath = path.join(appPath, 'index.js');
         const indexFile = fs.readFileSync(indexPath, 'utf8');
-        const modifiedIndexFile = indexFile.replace(/require\('@lab34\/flows'\)/g, `require('${libraryPath}')`);
+        
+        // Replace both quoted and unquoted instances
+        const modifiedIndexFile = indexFile
+          .replace(/@lab34\/flows/g, libraryPath);
+        
         fs.writeFileSync(indexPath, modifiedIndexFile, 'utf8');
 
         const lib = require(appPath);
@@ -272,8 +276,12 @@ const parseApplications = async () => {
           return lib[method]('describe')
         });
 
-        // Revert back the require statement
-        const revertedIndexFile = modifiedIndexFile.replace(/require\('@lab34\/flows'\)/g, `require('${libraryPath}')`);
+        // Revert back all replacements
+        const revertedIndexFile = modifiedIndexFile
+          .replace(new RegExp(`'${libraryPath}'`, 'g'), "'@lab34/flows'")
+          .replace(new RegExp(`"${libraryPath}"`, 'g'), '"@lab34/flows"')
+          .replace(new RegExp(libraryPath, 'g'), "@lab34/flows");
+        
         fs.writeFileSync(indexPath, revertedIndexFile, 'utf8');
       }
       catch (ex) {
@@ -283,15 +291,6 @@ const parseApplications = async () => {
         });
       }
     }
-
-    console.log({
-      name: applicationName,
-      slug: applicationName,
-      path: appPath,
-      envFiles: envFilesWithPaths,
-      methods,
-      errors,
-    })
 
     return {
       name: applicationName,
