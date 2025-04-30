@@ -170,7 +170,6 @@ const barcode = (parts) => {
   
   
   return parts.map(part => {
-    console.log(typeof part, part)
     if (typeof part === 'number') return Array.from({length: part}, () => Math.floor(Math.random() * 10)).join('');
     if (typeof part === 'string') return part;
     return part;
