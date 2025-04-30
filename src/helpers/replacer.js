@@ -92,34 +92,77 @@ const belgianCitiesEn = [
   "Bilzen"
 ];
 
-/**
- * Parses a barcode mask string into parts
- * 
- * @param {string} mask - Barcode mask string (e.g., "3232_[4]_247")
- * @returns {Array} - Array of parts (strings and numbers) for barcode generation
- */
-const parseBarcodePattern = (mask) => {
-  if (!mask) return [];
+// Register custom barcode helper
+handlebars.registerHelper('barcode', function() {
+  // Convert arguments object to array, excluding the last item which is the Handlebars options object
+  const parts = Array.from(arguments).slice(0, arguments.length - 1);
   
-  const parts = [];
-  const regex = /(\[\d+\])|([^_]+)/g;
-  let match;
-  
-  while ((match = regex.exec(mask)) !== null) {
-    const part = match[0];
-    if (part.startsWith('[') && part.endsWith(']')) {
-      // Extract the number of digits from [n]
-      const digitCount = parseInt(part.substring(1, part.length - 1), 10);
-      if (!isNaN(digitCount)) {
-        parts.push(digitCount);
-      }
-    } else {
-      parts.push(part);
+  // Process parts to convert string numbers to actual numbers
+  const processedParts = parts.map(part => {
+    // If the part is a string that represents a number, convert it to a number
+    if (typeof part === 'string' && !isNaN(part) && part.trim() !== '') {
+      return parseInt(part, 10);
     }
-  }
+    return part;
+  });
   
-  return parts;
+  // Generate barcode using the existing barcode function
+  return barcode(processedParts);
+});
+
+
+/**
+ * Calculates a date in the past based on a given amount and time lapse.
+ *
+ * @param {number} amount The amount of the time lapse (e.g., 6 for 6 minutes).
+ * @param {string} lapse The unit of the time lapse (e.g., 'minutes', 'hours', 'days', 'months', 'years', 'seconds', 'ms'). Case-insensitive.
+ * @returns {Date} A Date object representing the time in the past.
+ * @throws {Error} If an invalid lapse unit is provided.
+ */
+const timeAgo = (amount, lapse) => {
+  const now = new Date(); // Get the current date and time
+  const lapseLower = lapse.toLowerCase(); // Convert lapse to lowercase for easier comparison
+
+  switch (lapseLower) {
+    case 'ms':
+    case 'millisecond':
+    case 'milliseconds':
+      now.setTime(now.getTime() - amount);
+      break;
+    case 'second':
+    case 'seconds':
+      now.setSeconds(now.getSeconds() - amount);
+      break;
+    case 'minute':
+    case 'minutes':
+      now.setMinutes(now.getMinutes() - amount);
+      break;
+    case 'hour':
+    case 'hours':
+      now.setHours(now.getHours() - amount);
+      break;
+    case 'day':
+    case 'days':
+      now.setDate(now.getDate() - amount);
+      break;
+    case 'month':
+    case 'months':
+      // Using setMonth handles varying days in months correctly
+      now.setMonth(now.getMonth() - amount);
+      break;
+    case 'year':
+    case 'years':
+      // Using setFullYear handles leap years correctly
+      now.setFullYear(now.getFullYear() - amount);
+      break;
+    default:
+      throw new Error(`Invalid time lapse unit: ${lapse}. Supported units are ms, seconds, minutes, hours, days, months, years.`);
+  }
+
+  return now; // Return the calculated date
 };
+
+module.exports.timeAgo = timeAgo;
 
 /**
  * Generates a barcode by combining static and random parts
@@ -129,6 +172,29 @@ const parseBarcodePattern = (mask) => {
  * @returns {string} - Generated barcode string
  */
 const barcode = (parts) => {
+  const parseBarcodePattern = (mask) => {
+    if (!mask) return [];
+    
+    const parts = [];
+    const regex = /(\[\d+\])|([^_]+)/g;
+    let match;
+    
+    while ((match = regex.exec(mask)) !== null) {
+      const part = match[0];
+      if (part.startsWith('[') && part.endsWith(']')) {
+        // Extract the number of digits from [n]
+        const digitCount = parseInt(part.substring(1, part.length - 1), 10);
+        if (!isNaN(digitCount)) {
+          parts.push(digitCount);
+        }
+      } else {
+        parts.push(part);
+      }
+    }
+    
+    return parts;
+  }
+
   // If parts is a string, parse it as a barcode pattern
   if (typeof parts === 'string') {
     parts = parseBarcodePattern(parts);
@@ -205,10 +271,7 @@ const values = () => {
     randomEmail: faker.internet.email(),
     randomName: `${faker.person.firstName()} ${faker.person.lastName()}`,
 
-    // Barcodes
     randomBarcode: barcode(['ABC', 10]),
-    // Example of using the new string mask format
-    randomMaskedBarcode: barcode('3232_[4]_247'),
 
     // Companies
     randomCompanyName: faker.company.name(),
