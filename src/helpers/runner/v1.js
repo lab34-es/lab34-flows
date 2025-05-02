@@ -88,7 +88,6 @@ const executeStep = async (flow, step, attemptNumber = 0) => {
   // so the next execution attempts it uses the same data.
 
   flow.steps[stepIndex].parameters = params;
-  console.log('1', flow.memory); 
 
   let [headers, status, body, memory] = await applications[application][method](
     {
@@ -129,7 +128,7 @@ const executeStep = async (flow, step, attemptNumber = 0) => {
     }
   }
 
-  return [headers, status, body, memory]
+  return [params, headers, status, body, memory]
 }
 
 const processor = async (flow, opts) => {
@@ -248,7 +247,7 @@ const processor = async (flow, opts) => {
           throw new Error(`Method not found: ${method} in ${application}`);
         }
 
-        const [headers, status, body, memory] = await executeStep(flow, step)
+        const [request, headers, status, body, memory] = await executeStep(flow, step)
         
         flow.steps[i].execution.times.end = Date.now();
         flow.steps[i].execution.times.duration = (new Date() - flow.execution.times.start) / 1000;
@@ -256,6 +255,7 @@ const processor = async (flow, opts) => {
 
         flow.memory = Object.assign(flow.memory || {}, memory || {});
 
+        flow.steps[i].request = request;
         flow.steps[i].response = { headers, status, body };
         flow.reporter.response({ headers, status, body }, {
           timing: flow.steps[i].execution.duration
