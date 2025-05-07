@@ -26,7 +26,7 @@ const sensitive = (input) => {
         if (valueLength > 4) {
           result[key] = value.slice(0, 4).replace(/./g, '*') + value.slice(-4);
         } else {
-          result[key] = value.replace(/./g, '*');
+          result[key] = (value||'').replace(/./g, '*');
         }
       } else {
         result[key] = sensitive(input[key]);
@@ -146,7 +146,7 @@ const request = (method, _opts) => {
   ].join(''));
 
   // Convert the body to a JSON string with sensitive data removed
-  const bodyForReport = sensitive(body);
+  const bodyForReport = sensitive(body || data);
   const headersForReport = JSON.stringify(sensitive(headers), null, 2);
 
   // If the headers exist, log them
@@ -165,33 +165,28 @@ const request = (method, _opts) => {
     );
   }
 
-  // If the body exists, log it
-  if (body) {
-    console.log([
-      '   ',
-      '   Body'.green.bold,
-    ].join(''));
-
-    // Add indentation to each line of the body
-    const spacesStr = ' '.repeat(6);
-    console.log(
-      highlight(JSON.stringify(bodyForReport, null, 2), { language: 'json' })
-        .split('\n')
-        .map(line => `${spacesStr}${line}`).join('\n')
-    );
-  }
-
   // If XML data exists, log it
   if (data) {
+
+    let isJson = false;
+    try {
+      isJson = JSON.parse(data);
+    } catch (e) {
+      isJson = false;
+    }
+
     console.log([
       '   ',
-      '   XML Data'.green.bold,
+      isJson ? '   JSON Data'.green.bold : '   XML Data'.green.bold,
     ].join(''));
+
 
     // Add indentation to each line of the XML data
     const spacesStr = ' '.repeat(6);
     console.log(
-      highlight(data, { language: 'xml' })
+      highlight(
+        bodyForReport,
+        { language: isJson ? 'json' : 'xml' })
         .split('\n')
         .map(line => `${spacesStr}${line}`).join('\n')
     );
@@ -407,7 +402,7 @@ const playwrigthStep = (ctx, method, parameters) => {
       value = value.slice(0, 4).replace(/./g, '*') + value.slice(-4);
     }
     else {
-      value = value.replace(/./g, '*');
+      value = (value||'').replace(/./g, '*');
     }
   }
 

@@ -248,7 +248,7 @@ const processor = async (flow, opts) => {
         }
 
         const [request, headers, status, body, memory] = await executeStep(flow, step)
-        
+
         flow.steps[i].execution.times.end = Date.now();
         flow.steps[i].execution.times.duration = (new Date() - flow.execution.times.start) / 1000;
         flow.reporter.stepUpdate(id);
@@ -269,9 +269,22 @@ const processor = async (flow, opts) => {
 
           if (testReport.hasErrors) {
             // Check if there's a retry configuration in the test parameter
-            if (test.retry && typeof test.retry === 'object' && 
-                typeof test.retry.times === 'number' && 
-                typeof test.retry.delay === 'number') {
+            if (test.retry && typeof test.retry === 'object') {
+
+              // test.times must be a number
+              if (typeof test.retry.times !== 'number' || test.retry.times < 1) {
+                throw new Error('Invalid retry configuration: times must be a number greater than 0');
+              }
+
+              // test.delay defaults to 1000 if not set
+              if (!test.retry.delay) {
+                test.retry.delay = 1000;
+              }
+
+              // test.delay must be a number
+              if (typeof test.retry.delay !== 'number' || test.retry.delay < 0) {
+                throw new Error('Invalid retry configuration: delay must be a number greater than or equal to 0');
+              }
               
               // Get the current attempt number or initialize it
               const attemptNumber = flow.steps[i].execution.attempt || 0;

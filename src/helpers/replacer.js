@@ -155,6 +155,30 @@ const timeAgo = (amount, lapse) => {
 
 module.exports.timeAgo = timeAgo;
 
+const timestampAgo = (amount, lapse) => {
+  const result = timeAgo(amount, lapse);
+  return result.getTime(); // Return the timestamp in milliseconds
+}
+
+module.exports.timestampAgo = timestampAgo;
+
+const tsAgo = (amount, lapse) => {
+  const result = timeAgo(amount, lapse);
+
+  // Return in the format of YYYYMMDDHHMMSS
+
+  const year = result.getFullYear().toString().padStart(4, '0');
+  const month = (result.getMonth() + 1).toString().padStart(2, '0'); // Months are zero-based
+  const day = result.getDate().toString().padStart(2, '0');
+  const hours = result.getHours().toString().padStart(2, '0');
+  const minutes = result.getMinutes().toString().padStart(2, '0');
+  const seconds = result.getSeconds().toString().padStart(2, '0');
+  const milliseconds = result.getMilliseconds().toString().padStart(3, '0');
+  return `${year}${month}${day}${hours}${minutes}${seconds}`;
+}
+
+module.exports.tsAgo = tsAgo;
+
 /**
  * Generates a barcode by combining static and random parts
  * 
@@ -163,6 +187,8 @@ module.exports.timeAgo = timeAgo;
  * @returns {string} - Generated barcode string
  */
 const barcode = (parts) => {
+  if (!parts) parts = [];
+
   // If parts is a string, parse it as a barcode pattern
   if (typeof parts === 'string') {
     parts = parseBarcodePattern(parts);
@@ -209,6 +235,7 @@ module.exports.barcode = barcode;
  * - `randomPersonSurname` {string}: Random person last name.
  * - `randomPersonPrefix` {string}: Random person name prefix.
  * - `phoneIntl` {string}: Random phone number in international format.
+ * - `randomString` {string}: Randomly generated string
  */
 const values = () => {
   return {
@@ -254,7 +281,9 @@ const values = () => {
     randomPersonPrefix: faker.person.prefix(),
 
     // Number
-    phoneIntl: faker.phone.number({ style: 'international' })
+    phoneIntl: faker.phone.number({ style: 'international' }),
+
+    randomString: faker.string.alphanumeric(10)
   }
 }
 

@@ -24,6 +24,26 @@ const _fetch = (ctx, urlPath, opts) => {
   // Prepare meta object to track request timing
   const meta = { start: Date.now() };
 
+  const filteredCase = ctx.case || ''; // Default case if not provided
+
+  // ctx.env must contain all ctx.env variables, giving priority
+  // to the ones ending by "filteredCase" (e.g. "BASE_URL_filteredCase")
+
+  ctx.env = Object.keys(ctx.env).reduce((acc, key) => {
+    // Check if the key ends with the filtered case
+    if (key.endsWith(`_${filteredCase}`)) {
+      // Create a new key without the filtered case suffix
+      const newKey = key.replace(`_${filteredCase}`, '');
+      acc[newKey] = ctx.env[key]; // Assign the value to the new key
+    } else {
+      acc[key] = ctx.env[key]; // Keep the original key-value pair
+    }
+    return acc;
+  }
+  , {});
+
+  console.log('ctx.env', ctx.env);
+
   // Build full URL by combining base URL with the provided path
   const fullUrl = `${ctx.env.BASE_URL}${urlPath}`;
   
@@ -42,6 +62,14 @@ const _fetch = (ctx, urlPath, opts) => {
     if (typeof options.data === 'object') {
       options.data = JSON.stringify(options.data);
       options.headers['Content-Type'] = 'application/json';
+    }
+  }
+  
+  if (options.body) {
+    if (typeof options.body === 'object') {
+      options.data = JSON.stringify(options.body);
+      options.headers['Content-Type'] = 'application/json';
+      delete options.body; // Remove body to avoid duplication
     }
   }
 
@@ -78,11 +106,24 @@ const _fetch = (ctx, urlPath, opts) => {
  * @returns {Promise<Array>} - Promise resolving to [headers, status, body]
  */
 const formatResponse = async (ctx, response, meta) => {
+  let body;
+
   // Record end time for performance tracking
   meta.end = Date.now();
 
   // Re-throw if the response is an error
   if(response instanceof Error) {
+    try {
+      if (isJson) {
+        body = JSON.parse(response.data);
+      } else {
+        body = response.data;
+      }
+    } catch (error) {
+      // Fallback to raw data if parsing fails
+      body = response.data;
+    }
+    console.error('Error:', body);
     throw response;
   }
 
@@ -93,7 +134,6 @@ const formatResponse = async (ctx, response, meta) => {
   const isJson = headers.get('content-type') &&
     headers.get('content-type').includes('application/json');
   
-  let body;
   
   // Parse response body according to content type
   try {
@@ -106,6 +146,7 @@ const formatResponse = async (ctx, response, meta) => {
     // Fallback to raw data if parsing fails
     body = response.data;
   }
+
   
   // Log the response using the context's reporter and return response components
   return Promise.resolve([headers, status, body])

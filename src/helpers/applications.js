@@ -45,7 +45,8 @@ const handler = (handlerArray, functionName) => {
       };
     }
     
-    // Normal execution: run through all items in the array
+    // Normal execution: run through all items in the array expect last and first
+    // (which are description and execution function)
     for (let i = 1; i < handlerArray.length - 1; i++) {
       if (typeof handlerArray[i] === 'function') {
         handlerArray[i](ctx, parameters);
@@ -135,7 +136,7 @@ const maskValue = value => {
   }
 
   // Replace all characters with *
-  return value.replace(/./g, '*');
+  return (value||'').replace(/./g, '*');
 }
 
 const loadEnvFile = envPath => {
