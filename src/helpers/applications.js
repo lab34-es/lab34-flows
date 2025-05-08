@@ -136,7 +136,7 @@ const maskValue = value => {
   }
 
   // Replace all characters with *
-  return (value||'').replace(/./g, '*');
+  return (value||'').toString().replace(/./g, '*');
 }
 
 const loadEnvFile = envPath => {

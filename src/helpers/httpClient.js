@@ -39,10 +39,7 @@ const _fetch = (ctx, urlPath, opts) => {
       acc[key] = ctx.env[key]; // Keep the original key-value pair
     }
     return acc;
-  }
-  , {});
-
-  console.log('ctx.env', ctx.env);
+  }, {});
 
   // Build full URL by combining base URL with the provided path
   const fullUrl = `${ctx.env.BASE_URL}${urlPath}`;
@@ -61,14 +58,14 @@ const _fetch = (ctx, urlPath, opts) => {
   if (options.data) {
     if (typeof options.data === 'object') {
       options.data = JSON.stringify(options.data);
-      options.headers['Content-Type'] = 'application/json';
+      options.headers['content-type'] = 'application/json';
     }
   }
   
   if (options.body) {
     if (typeof options.body === 'object') {
       options.data = JSON.stringify(options.body);
-      options.headers['Content-Type'] = 'application/json';
+      options.headers['content-type'] = 'application/json';
       delete options.body; // Remove body to avoid duplication
     }
   }
@@ -133,7 +130,6 @@ const formatResponse = async (ctx, response, meta) => {
   // Determine if response is JSON based on content-type header
   const isJson = headers.get('content-type') &&
     headers.get('content-type').includes('application/json');
-  
   
   // Parse response body according to content type
   try {

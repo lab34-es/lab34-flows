@@ -24,9 +24,9 @@ const sensitive = (input) => {
         const value = input[key];
         const valueLength = value.length;
         if (valueLength > 4) {
-          result[key] = value.slice(0, 4).replace(/./g, '*') + value.slice(-4);
+          result[key] = value.toString().slice(0, 4).replace(/./g, '*') + value.slice(-4);
         } else {
-          result[key] = (value||'').replace(/./g, '*');
+          result[key] = (value||'').toString().replace(/./g, '*');
         }
       } else {
         result[key] = sensitive(input[key]);
@@ -402,7 +402,7 @@ const playwrigthStep = (ctx, method, parameters) => {
       value = value.slice(0, 4).replace(/./g, '*') + value.slice(-4);
     }
     else {
-      value = (value||'').replace(/./g, '*');
+      value = (value||'').toString().replace(/./g, '*');
     }
   }
 
