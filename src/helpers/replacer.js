@@ -101,6 +101,22 @@ handlebars.registerHelper('barcode', function() {
   return result
 });
 
+/**
+ * Returns a random element from the provided array.
+ * 
+ * @param {Array} arr - The array from which to select a random element.
+ * @returns {*} A random element from the array.
+ * @throws {Error} If the provided array is invalid or empty.
+ */
+const oneOf = (arr) => {
+  if (!arr || !Array.isArray(arr) || arr.length === 0) {
+    throw new Error('Invalid array provided to oneOf function');
+  }
+  const randomIndex = Math.floor(Math.random() * arr.length);
+  return arr[randomIndex];
+}
+
+module.exports.oneOf = oneOf;
 
 /**
  * Calculates a date in the past based on a given amount and time lapse.

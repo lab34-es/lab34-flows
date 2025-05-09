@@ -9,7 +9,8 @@ const headers = (ctx) => {
   const { env } = ctx;
   // Merge all conditional headers into a single object
   return [
-    env.X_API_KEY ? { 'x-api-key': env.X_API_KEY } : {},
+    env.X_API_KEY ? { 'x-api-key': Buffer.from(env.X_API_KEY).toString('base64') } : {},
+    env.HTTP_BASIC_AUTH ? { 'Authorization': `Basic ${Buffer.from(env.HTTP_BASIC_AUTH).toString('base64')}` } : {},
   ].reduce((acc, h) => Object.assign(acc, h), {});
 }
 
@@ -112,15 +113,16 @@ const formatResponse = async (ctx, response, meta) => {
   if(response instanceof Error) {
     try {
       if (isJson) {
-        body = JSON.parse(response.data);
+        body = JSON.parse(response.response.data);
       } else {
-        body = response.data;
+        body = response.response.data;
       }
     } catch (error) {
       // Fallback to raw data if parsing fails
-      body = response.data;
+      body = response.response.data;
     }
-    console.error('Error:', body);
+    // console.error('Error:', JSON.stringify(body, null, 2));
+    // process.exit(1)
     throw response;
   }
 
