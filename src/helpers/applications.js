@@ -3,6 +3,8 @@ const fs = require('fs');
 const dotenv = require('dotenv');
 const YAML = require('yaml');
 const os = require('os');
+const temp = require('temp');
+// temp.track(); // Automatically track and clean up temp files at exit
 
 const paths = require('./paths');
 
@@ -21,7 +23,7 @@ module.exports.description = description;
 // Helper function to convert array-style handlers to functions that can describe themselves
 const handler = (handlerArray, functionName) => {
   // The actual function that will be called
-  const handler = function(ctx, parameters) {
+  const handler = function(ctx, parameters, flow) {
     if (ctx === 'describe') {
       // Extract description and validations
       const description = handlerArray[0];
@@ -45,7 +47,8 @@ const handler = (handlerArray, functionName) => {
       };
     }
     
-    // Normal execution: run through all items in the array
+    // Normal execution: run through all items in the array expect last and first
+    // (which are description and execution function)
     for (let i = 1; i < handlerArray.length - 1; i++) {
       if (typeof handlerArray[i] === 'function') {
         handlerArray[i](ctx, parameters);
@@ -53,7 +56,7 @@ const handler = (handlerArray, functionName) => {
     }
     
     // Execute the main handler (last item in array)
-    return handlerArray[handlerArray.length - 1](ctx, parameters);
+    return handlerArray[handlerArray.length - 1](ctx, parameters, flow);
   };
   
   return handler;
@@ -104,9 +107,11 @@ const listEnvFiles = pathToSearch => {
 /**
  * Gets a unique list of all possible environments based on the .env files
  * present of all applications
+ * @param {string} lookFor - Optional environment name to check for in all applications
+ * @returns {Promise<string[]>} - Promise that resolves to a sorted array of unique environment names
  */
-const allPossibleEnvironments = () => {
-  return this.parseApplications()
+const allPossibleEnvironments = (lookFor) => {
+  return parseApplications()
     .then(apps => {
       const envs = apps.map(app => app.envFiles.map(env => env.name));
       return [...new Set(envs.flat())];
@@ -133,7 +138,7 @@ const maskValue = value => {
   }
 
   // Replace all characters with *
-  return value.replace(/./g, '*');
+  return (value||'').toString().replace(/./g, '*');
 }
 
 const loadEnvFile = envPath => {
@@ -182,7 +187,7 @@ module.exports.updateEnvFile = (envPath, key, value) => {
 }
 
 const yamlSummary = () => {
-  return this.parseApplications()
+  return parseApplications()
     .then(apps => {
       return apps.map(app => {
         return {
@@ -200,6 +205,7 @@ module.exports.yamlSummary = yamlSummary;
 
 /**
  * Returns the list of applications and .env files for each
+ * @param {string} source - Optional source directory to load applications from
  * @returns {Array[Object]} 
  * {
  *  application: string,
@@ -210,25 +216,16 @@ module.exports.yamlSummary = yamlSummary;
  *  }
  * }
  */
-const parseApplications = async () => {
-
-  let libraryPath = '@lab34/flows'
-
-  // Check if NODE_PATH is set
-  // If not, set it to the output of `npm root -g`
-  if (!process.env.NODE_PATH) {
-    libraryPath = await new Promise((resolve, reject) => {
-      require('child_process').exec('npm root -g', (err, stdout) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve(stdout.trim());
-      });
-    });
-    libraryPath = path.join(libraryPath, '@lab34', 'flows');
+const parseApplications = async (source) => {
+  let appsPath;
+  
+  if (source) {
+    // If source is provided, use it as the base path for applications
+    appsPath = path.join(source, 'applications');
+  } else {
+    // Otherwise use the default path
+    appsPath = await paths.fromHome(['applications']);
   }
-
-  const appsPath = await paths.fromHome(['applications']);
   
   const applications = fs.readdirSync(appsPath).filter(file => {
     return fs.statSync(path.join(appsPath, file)).isDirectory();

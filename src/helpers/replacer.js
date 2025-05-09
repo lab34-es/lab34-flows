@@ -92,19 +92,116 @@ const belgianCitiesEn = [
   "Bilzen"
 ];
 
+// Register custom barcode helper
+handlebars.registerHelper('barcode', function() {
+  // Convert arguments object to array, excluding the last item which is the Handlebars options object
+  const parts = Array.from(arguments).slice(0, arguments.length - 1);
+  // Generate barcode using the existing barcode function
+  const result = barcode(parts);
+  return result
+});
+
+
+/**
+ * Calculates a date in the past based on a given amount and time lapse.
+ *
+ * @param {number} amount The amount of the time lapse (e.g., 6 for 6 minutes).
+ * @param {string} lapse The unit of the time lapse (e.g., 'minutes', 'hours', 'days', 'months', 'years', 'seconds', 'ms'). Case-insensitive.
+ * @returns {Date} A Date object representing the time in the past.
+ * @throws {Error} If an invalid lapse unit is provided.
+ */
+const timeAgo = (amount, lapse) => {
+  const now = new Date(); // Get the current date and time
+  const lapseLower = lapse.toLowerCase(); // Convert lapse to lowercase for easier comparison
+
+  switch (lapseLower) {
+    case 'ms':
+    case 'millisecond':
+    case 'milliseconds':
+      now.setTime(now.getTime() - amount);
+      break;
+    case 'second':
+    case 'seconds':
+      now.setSeconds(now.getSeconds() - amount);
+      break;
+    case 'minute':
+    case 'minutes':
+      now.setMinutes(now.getMinutes() - amount);
+      break;
+    case 'hour':
+    case 'hours':
+      now.setHours(now.getHours() - amount);
+      break;
+    case 'day':
+    case 'days':
+      now.setDate(now.getDate() - amount);
+      break;
+    case 'month':
+    case 'months':
+      // Using setMonth handles varying days in months correctly
+      now.setMonth(now.getMonth() - amount);
+      break;
+    case 'year':
+    case 'years':
+      // Using setFullYear handles leap years correctly
+      now.setFullYear(now.getFullYear() - amount);
+      break;
+    default:
+      throw new Error(`Invalid time lapse unit: ${lapse}. Supported units are ms, seconds, minutes, hours, days, months, years.`);
+  }
+
+  return now; // Return the calculated date
+};
+
+module.exports.timeAgo = timeAgo;
+
+const timestampAgo = (amount, lapse) => {
+  const result = timeAgo(amount, lapse);
+  return result.getTime(); // Return the timestamp in milliseconds
+}
+
+module.exports.timestampAgo = timestampAgo;
+
+const tsAgo = (amount, lapse) => {
+  const result = timeAgo(amount, lapse);
+
+  // Return in the format of YYYYMMDDHHMMSS
+
+  const year = result.getFullYear().toString().padStart(4, '0');
+  const month = (result.getMonth() + 1).toString().padStart(2, '0'); // Months are zero-based
+  const day = result.getDate().toString().padStart(2, '0');
+  const hours = result.getHours().toString().padStart(2, '0');
+  const minutes = result.getMinutes().toString().padStart(2, '0');
+  const seconds = result.getSeconds().toString().padStart(2, '0');
+  const milliseconds = result.getMilliseconds().toString().padStart(3, '0');
+  return `${year}${month}${day}${hours}${minutes}${seconds}`;
+}
+
+module.exports.tsAgo = tsAgo;
+
 /**
  * Generates a barcode by combining static and random parts
  * 
- * @param {Array} parts - Array of strings and numbers, where numbers will be replaced with random digits
+ * @param {Array|string} parts - Array of strings and numbers, where numbers will be replaced with random digits,
+ *                              or a string mask like "3232_[4]_247"
  * @returns {string} - Generated barcode string
  */
 const barcode = (parts) => {
+  if (!parts) parts = [];
+
+  // If parts is a string, parse it as a barcode pattern
+  if (typeof parts === 'string') {
+    parts = parseBarcodePattern(parts);
+  }
+  
   return parts.map(part => {
     if (typeof part === 'number') return Array.from({length: part}, () => Math.floor(Math.random() * 10)).join('');
     if (typeof part === 'string') return part;
     return part;
   }).join('');
 }
+
+module.exports.barcode = barcode;
 
 /**
  * Generates an object with default values including timestamps, random integers, and other random data.
@@ -138,6 +235,7 @@ const barcode = (parts) => {
  * - `randomPersonSurname` {string}: Random person last name.
  * - `randomPersonPrefix` {string}: Random person name prefix.
  * - `phoneIntl` {string}: Random phone number in international format.
+ * - `randomString` {string}: Randomly generated string
  */
 const values = () => {
   return {
@@ -168,8 +266,6 @@ const values = () => {
     randomEmail: faker.internet.email(),
     randomName: `${faker.person.firstName()} ${faker.person.lastName()}`,
 
-    randomBarcode: barcode(['ABC', 10]),
-
     // Companies
     randomCompanyName: faker.company.name(),
 
@@ -185,7 +281,9 @@ const values = () => {
     randomPersonPrefix: faker.person.prefix(),
 
     // Number
-    phoneIntl: faker.phone.number({ style: 'international' })
+    phoneIntl: faker.phone.number({ style: 'international' }),
+
+    randomString: faker.string.alphanumeric(10)
   }
 }
 
@@ -208,6 +306,11 @@ module.exports.json = (input, data) => {
   // Initialize data object if not provided
   if (!data) data = {}
   data = Object.assign({}, data);
+
+  // Skip empty input
+  if (!input) {
+    return input;
+  }
   
   // Compile and process the Handlebars template
   const template = handlebars.compile(input);

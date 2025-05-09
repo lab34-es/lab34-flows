@@ -19,7 +19,15 @@ const sensitive = (input) => {
     const result = {};
     for (let key in input) {
       if (keysToHide.some(k => key.toLowerCase().includes(k))) {
-        result[key] = '<hidden potential sensitive data>';
+
+        // Show only 4 first and 4 last characters
+        const value = input[key];
+        const valueLength = value.length;
+        if (valueLength > 4) {
+          result[key] = value.toString().slice(0, 4).replace(/./g, '*') + value.slice(-4);
+        } else {
+          result[key] = (value||'').toString().replace(/./g, '*');
+        }
       } else {
         result[key] = sensitive(input[key]);
       }
@@ -119,12 +127,13 @@ const mimicStart = (mimicConfig) => {
 const request = (method, _opts) => {
   const {
     url,
-    options
+    options,
   } = _opts;
 
   const {
     headers,
-    body
+    body,
+    data
   } = options;
 
   // Log the request method and URL
@@ -137,7 +146,7 @@ const request = (method, _opts) => {
   ].join(''));
 
   // Convert the body to a JSON string with sensitive data removed
-  const bodyForReport = sensitive(body);
+  const bodyForReport = sensitive(body || data);
   const headersForReport = JSON.stringify(sensitive(headers), null, 2);
 
   // If the headers exist, log them
@@ -156,17 +165,28 @@ const request = (method, _opts) => {
     );
   }
 
-  // If the body exists, log it
-  if (body) {
+  // If XML data exists, log it
+  if (data) {
+
+    let isJson = false;
+    try {
+      isJson = JSON.parse(data);
+    } catch (e) {
+      isJson = false;
+    }
+
     console.log([
       '   ',
-      '   Body'.green.bold,
+      isJson ? '   JSON Data'.green.bold : '   XML Data'.green.bold,
     ].join(''));
 
-    // Add indentation to each line of the body
+
+    // Add indentation to each line of the XML data
     const spacesStr = ' '.repeat(6);
     console.log(
-      highlight(JSON.stringify(bodyForReport, null, 2), { language: 'json' })
+      highlight(
+        bodyForReport,
+        { language: isJson ? 'json' : 'xml' })
         .split('\n')
         .map(line => `${spacesStr}${line}`).join('\n')
     );
@@ -375,7 +395,15 @@ const playwrigthStep = (ctx, method, parameters) => {
   const sensitive = JSON.stringify(parameters||{}).toLowerCase().includes('password') || key.toLowerCase().includes('token');
   
   if (sensitive) {
-    value = '<hidden potential sensitive data>';
+    // Show only 4 first and 4 last characters
+    const valueLength = value.length;
+
+    if (valueLength > 4) {
+      value = value.slice(0, 4).replace(/./g, '*') + value.slice(-4);
+    }
+    else {
+      value = (value||'').toString().replace(/./g, '*');
+    }
   }
 
   console.log([

@@ -17,7 +17,7 @@ const validate = (schema, data) => {
 
 const body = schema => {
   const validator = (ctx, parameters) => {
-    validate(schema, parameters.body);
+    validate(schema, (parameters||{}).body || {});
   };
   // Attach the schema to the validator function
   validator.schemaType = 'body';
@@ -37,7 +37,7 @@ const query = schema => {
 
 const params = schema => {
   const validator = (ctx, parameters) => {
-    validate(schema, parameters);
+    validate(schema, (parameters||{}).params || {});
   };
   // Attach the schema to the validator function
   validator.schemaType = 'params';
@@ -47,7 +47,7 @@ const params = schema => {
 
 const headers = schema => {
   const validator = (ctx, parameters) => {
-    validate(schema, parameters.headers);
+    validate(schema, (parameters||{}).headers || {});
   };
   // Attach the schema to the validator function
   validator.schemaType = 'headers';
