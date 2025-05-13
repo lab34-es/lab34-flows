@@ -1,11 +1,15 @@
-> Trigger, understand and test E2E flows and behaviours. As part of your
-> CI/CD pipeline, or in VS Code.
-> On any environment (uat, production, etc).
+# Flows
 
+Heavily opinionated tool to help you test E2E flows and behaviours.
+
+> Trigger, understand and test E2E flows and behaviours.
+> Ask an AI to generate a flow for you.
+> Run on any environment (staging, production, etc).
 > From Async protocols, APIs and databases, to web applications.
 
 Features:
 
+- Integrates with Google Gemini AI to generate test scenarios.
 - Define flows in YAML format that can be shared across members and teams. (no need to explain failing cases verbally).
 - Generate flows automatically using AI with natural language prompts.
 - Define test cases for each step in a way that can be used for CI/CD automation.
@@ -204,12 +208,84 @@ The following basic replacers are available:
 | `randomInt0_500`  | Random integer between 0 and 499                 | `400`                            |
 | `randomInt0_1000` | Random integer between 0 and 999                 | `789`                            |
 | `randomInt0_9999` | Random integer between 0 and 9998                | `6789`                           |
-| `randomInt0_4000` | Random integer between 0 and 4000                | `3500`                           |
-| `randomInt0_5000` | Random integer between 0 and 5000                | `4500`                           |
-| `randomEmail`     | Randomly generated email address                 | `user123@example.com`            |
-| `belgianCityEn`   | Random Belgian city name in English              | `Brussels`                       |
+| `randomInt0_2000` | Random integer between 0 and 1999                | `1500`                           |
+| `randomInt0_3000` | Random integer between 0 and 2999                | `2500`                           |
+| `randomInt0_4000` | Random integer between 0 and 3999                | `3500`                           |
+| `randomInt0_5000` | Random integer between 0 and 4999                | `4500`                           |
+| `uuid`            | Random UUID                                      | `123e4567-e89b-12d3-a456-426614174000` |
+| `randomPostmanId` | Random 6-digit integer                           | `123456`                         |
 
-more information can be added by modifying the `src/helpers/replacers.js` file.
+### Personal Data Replacers
+
+| Replacer              | Description                                  | Example                          |
+|-----------------------|----------------------------------------------|----------------------------------|
+| `randomEmail`         | Randomly generated email address             | `user123@example.com`            |
+| `randomName`          | Random person full name                      | `John Doe`                       |
+| `randomPersonName`    | Random person first name                     | `Jane`                           |
+| `randomPersonSurname` | Random person last name                      | `Smith`                          |
+| `randomPersonPrefix`  | Random person name prefix                    | `Mr.`                            |
+| `phoneIntl`           | Random phone number in international format  | `+1 555-123-4567`                |
+| `randomString`        | Random alphanumeric string (10 characters)   | `a1b2c3d4e5`                     |
+
+### Location and Company Replacers
+
+| Replacer              | Description                                  | Example                          |
+|-----------------------|----------------------------------------------|----------------------------------|
+| `belgianCityEn`       | Random Belgian city name in English          | `Brussels`                       |
+| `randomCompanyName`   | Random company name                          | `Acme Corporation`               |
+| `randomStreet`        | Random street name                           | `Main Street`                    |
+| `randomStreetNumber`  | Random street number between 0 and 199       | `42`                             |
+| `randomPostalCode`    | Random 4-digit postal code                   | `1000`                           |
+
+### Time-Related Functions
+
+You can generate dates and timestamps in the past using the following helper functions:
+
+```text
+timeAgo amount lapse 
+timestampAgo amount lapse 
+tsAgo amount lapse 
+```
+
+Where:
+- `amount`: The number of time units to go back
+- `lapse`: The time unit (ms, seconds, minutes, hours, days, months, years)
+
+Examples:
+```text
+timeAgo 5 "days"       <!-- Returns a Date object 5 days in the past -->
+timestampAgo 2 "hours" <!-- Returns a timestamp in milliseconds from 2 hours ago -->
+tsAgo 1 "month"        <!-- Returns a formatted timestamp (YYYYMMDDHHMMSS) from 1 month ago -->
+```
+
+### Barcode Generation
+
+You can generate random barcodes using the barcode helper:
+
+```javascript
+barcode([pattern])
+```
+
+Where:
+- `pattern`: is an array of strings and/or numbers.
+  - An string is a fixed value.
+  - A number adds N number of numbers to the barcode.
+
+Examples:
+```javascript
+barcode(["123456", 3, "789"]) // Generates a barcode like "123456123789"
+barcode(["HELLO-", 4, "-WORLD"]) // Generates a barcode like "HELLO-7832-WORLD"
+```
+
+### Random Selection
+
+You can select a random element from an array using the oneOf helper:
+
+```javascript
+oneOf([array])
+```
+
+You can contribute and add more replacers by modifying the `src/helpers/replacer.js` file.
 
 ## Flows
 
