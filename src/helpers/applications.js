@@ -256,30 +256,10 @@ const parseApplications = async (source) => {
     let errors = [];
     if (fs.existsSync(path.join(appPath, 'index.js'))) {
       try {
-
-        // Replace all instances of @lab34/flows with libraryPath in the index.js file
-        // This handles both bare module names and quoted strings
-        const indexPath = path.join(appPath, 'index.js');
-        const indexFile = fs.readFileSync(indexPath, 'utf8');
-        
-        // Replace both quoted and unquoted instances
-        const modifiedIndexFile = indexFile
-          .replace(/@lab34\/flows/g, libraryPath);
-        
-        fs.writeFileSync(indexPath, modifiedIndexFile, 'utf8');
-
         const lib = require(appPath);
         methods = Object.keys(lib).map(method => {
           return lib[method]('describe')
         });
-
-        // Revert back all replacements
-        const revertedIndexFile = modifiedIndexFile
-          .replace(new RegExp(`'${libraryPath}'`, 'g'), "'@lab34/flows'")
-          .replace(new RegExp(`"${libraryPath}"`, 'g'), '"@lab34/flows"')
-          .replace(new RegExp(libraryPath, 'g'), "@lab34/flows");
-        
-        fs.writeFileSync(indexPath, revertedIndexFile, 'utf8');
       }
       catch (ex) {
         errors.push({
