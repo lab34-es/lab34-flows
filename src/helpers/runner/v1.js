@@ -190,7 +190,6 @@ const processor = async (flow, opts) => {
       }
     }
 
-
     if (!mimicing.validate(steps)) {
       flow.execution.status = 'error';
       flow.execution.error = {

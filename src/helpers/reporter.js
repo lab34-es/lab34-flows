@@ -394,17 +394,17 @@ const playwrigthStep = (ctx, method, parameters) => {
   // Contains could contain sensitive data?
   const sensitive = JSON.stringify(parameters||{}).toLowerCase().includes('password') || key.toLowerCase().includes('token');
   
-  if (sensitive) {
-    // Show only 4 first and 4 last characters
-    const valueLength = value.length;
+  // if (sensitive) {
+  //   // Show only 4 first and 4 last characters
+  //   const valueLength = value.length;
 
-    if (valueLength > 4) {
-      value = value.slice(0, 4).replace(/./g, '*') + value.slice(-4);
-    }
-    else {
-      value = (value||'').toString().replace(/./g, '*');
-    }
-  }
+  //   if (valueLength > 4) {
+  //     value = value.slice(0, 4).replace(/./g, '*') + value.slice(-4);
+  //   }
+  //   else {
+  //     value = (value||'').toString().replace(/./g, '*');
+  //   }
+  // }
 
   console.log([
     '   ⮕',

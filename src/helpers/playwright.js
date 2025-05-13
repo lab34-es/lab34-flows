@@ -50,9 +50,10 @@ const error = (ctx, yamlFile, error) => {
  * - string
  * - date
  * - boolean
+ * @param {string} regexp - The regex to apply to the result
  * @returns 
  */
-const formatScrapeResult = async (elements, output) => {
+const formatScrapeResult = async (elements, output, regexp) => {
   // Apply default output
   if (!output) output = 'string';
 
@@ -64,9 +65,18 @@ const formatScrapeResult = async (elements, output) => {
   let firstElement = Array.isArray(elements) ? elements[0] : elements;
   firstElement = await firstElement.textContent();
 
+  if (regexp) {
+    const regex = new RegExp(regexp);
+    const match = firstElement.match(regex);
+    if (match) {
+      firstElement = match[0];
+    } else {
+      return null;
+    }
+  }
+
   let result;
 
-  if (output === 'number') result = Number(firstElement.replace(/[^0-9.]/g, ''));
   if (output === 'number') result = Number(firstElement.replace(/[^0-9.]/g, ''));
   if (output === 'string') result = firstElement.trim();
   if (output === 'date') result = new Date(firstElement).toISOString();
@@ -130,7 +140,7 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
   const yaml = fs.readFileSync(yamlPath, 'utf8');
 
   const flow = YAML.parse(yaml);
-  let { device, steps, browserType = 'chromium', launchOptions = {} } = flow;
+  let { device, keepOpen, steps, browserType = 'chromium', launchOptions = {} } = flow;
 
   steps = buildSteps(steps);
 
@@ -294,9 +304,9 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
           case 'scrape':
             const results = {};
             for (const key in parameters) {
-              const { selector, output } = parameters[key];
+              const { selector, output, regex } = parameters[key];
               const elements = await page.$$(selector);
-              results[key] = await formatScrapeResult(elements, output);
+              results[key] = await formatScrapeResult(elements, output, regex);
             }
             steps[currentStep].result = results;
             break;
@@ -308,9 +318,10 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
       }
 
       // Teardown
-      await context.close();
-      await browser.close();
-
+      if (!keepOpen) {
+        await context.close();
+        await browser.close();
+      }
       const allScrappedData = steps
         .filter(step => step.method === 'scrape')
         .map(step => step.result)

@@ -271,6 +271,7 @@ The Playwright integration now supports enhanced configuration through the YAML 
 # Browser configuration
 browserType: chromium  # Options: chromium, firefox, webkit
 device: Desktop Chrome # Any device from playwright.devices
+keepOpen: true  # Keep the browser open after execution (only for debugging purposes)
 
 # Launch options
 launchOptions:
