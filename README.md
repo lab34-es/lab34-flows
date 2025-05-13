@@ -86,11 +86,21 @@ steps:
 
 ## Setup
 
-1. Install this repository, globally: `npm install -g lab34-flows-cli`.
-2. Extend NODE_PATH to npm's root, so your application scripts can access the library:
-   - On Linux / MacOS: `export NODE_PATH=$(npm root -g)`.
-   - On Windows: `set NODE_PATH=%AppData%\npm\node_modules`.
-   - On NVM for Windows: `set NODE_PATH=%NVM_SYMLINK%\node_modules`.
+```bash
+# Install this repository, globally.
+
+npm install -g @lab34/flows
+
+# Extend NODE_PATH to npm's root, so your application scripts can access the library:
+# On Linux / MacOS:
+export NODE_PATH=$(npm root -g)
+
+# On Windows:
+set NODE_PATH=%AppData%\npm\node_modules
+
+# On NVM for Windows:
+set NODE_PATH=%NVM_SYMLINK%\node_modules
+```
 
 ## Usage
 
@@ -99,7 +109,9 @@ The Lab34 Flows CLI tool provides a professional command-line interface for runn
 ### Usage
 
 ```bash
+lab34-flows --help
 lab34-flows --file <path-to-yaml-file> --env <environment> [--debug] [--help]
+lab34-flows --capabilities
 lab34-flows --ai "<prompt>"
 ```
 
@@ -127,7 +139,7 @@ lab34-flows --file flows/my-flow.yaml --env production --debug
 
 Generate and run a flow using AI:
 ```bash
-lab34-flows --ai "Test login functionality with valid credentials" --env development
+lab34-flows --ai "Test login functionality with valid credentials"
 ```
 
 ### AI Mode
