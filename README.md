@@ -7,6 +7,7 @@
 Features:
 
 - Define flows in YAML format that can be shared across members and teams. (no need to explain failing cases verbally).
+- Generate flows automatically using AI with natural language prompts.
 - Define test cases for each step in a way that can be used for CI/CD automation.
 - Mimic and customise the behaviour of dependant applications. (i.e. fail scenarios under user defined circusnstances).
 - Test with randomly generated data - on each attempt.
@@ -24,6 +25,7 @@ Features:
   - [General info](#general-info)
   - [Setup](#setup)
   - [Usage](#usage)
+    - [AI Mode](#ai-mode)
   - [Flows](#flows)
   - [Tests](#tests)
   - [Playwright](#playwright) (browser automation - experimental)
@@ -94,14 +96,16 @@ The Lab34 Flows CLI tool provides a professional command-line interface for runn
 
 ```bash
 lab34-flows --file <path-to-yaml-file> --env <environment> [--debug] [--help]
+lab34-flows --ai "<prompt>"
 ```
 
 ### Options
 
 |Parameter|Description|
 |-|-|
-|`--file`|Path to the YAML flow definition file (required)|
-|`--env`|Environment to run the flow in (required)|
+|`--file`|Path to the YAML flow definition file (required if not using --ai)|
+|`--ai`|Generate a flow from a prompt using AI (required if not using --file)|
+|`--env`|Environment to run the flow in (required for --file, optional for --ai)|
 |`--debug`|Print debug information including environment variables and Node.js variables|
 |`--help`|Show help information|
 
@@ -116,6 +120,53 @@ Run a flow with debug information:
 ```bash
 lab34-flows --file flows/my-flow.yaml --env production --debug
 ```
+
+Generate and run a flow using AI:
+```bash
+lab34-flows --ai "Test login functionality with valid credentials" --env development
+```
+
+### AI Mode
+
+The AI mode allows you to generate flow definitions using natural language prompts. This feature leverages Google's Generative AI (Gemini) to create YAML flow definitions based on your description of the testing scenario.
+
+#### AI Configuration
+
+Before using the AI feature, you need to set up your AI configuration:
+
+1. Create a file named `ai.json` in the `~/flows/config/` directory with the following structure:
+
+```json
+{
+  "defaultProvider": "gemini",
+  "gemini": {
+    "apiKey": "YOUR_GEMINI_API_KEY_HERE",
+    "model": "gemini-pro",
+    "temperature": 0.7,
+    "topP": 0.95,
+    "topK": 40
+  }
+}
+```
+
+2. Replace `YOUR_GEMINI_API_KEY_HERE` with your actual Gemini API key.
+
+#### Using AI Mode
+
+Once configured, you can use the AI mode to generate flows:
+
+```bash
+lab34-flows --ai "Test the user registration process with valid data"
+```
+
+The tool will:
+1. Send your prompt to the AI service
+2. Generate a YAML flow definition based on your description
+
+This feature is particularly useful for:
+- Quickly creating test flows without manually writing YAML
+- Exploring different testing scenarios
+- Generating comprehensive test cases from simple descriptions
 
 ### Debug Mode
 
@@ -132,27 +183,27 @@ This information is useful for troubleshooting and understanding the execution e
 
 ## Replacers
 
-Replacers are used to customise the requests and responses of the steps of the flow, as well as the mimiced applications.
+Replacers are used to customize the requests and responses of the steps in the flow, as well as the mimicked applications. The tool uses Handlebars templates for replacements.
 
-For example, you can define a barcode like `{{ ramndomBarcode }}` in the flow file, or the mimiced application responses, and the tool will replace it with a randomly generated barcode.
+For example, you can define a value like `{{ randomInt0_100 }}` in the flow file, or in the mimicked application responses, and the tool will replace it with a randomly generated integer between 0 and 100.
 
-The replacers available are:
+### Basic Replacers
+
+The following basic replacers are available:
 
 | Replacer          | Description                                      | Example                          |
 |-------------------|--------------------------------------------------|----------------------------------|
-| `timestamp`       | Current timestamp                                | `1633024800`                     |
-| `datetime`        | Current date and time                            | `2023-10-01T12:00:00Z`           |
-| `randomInt`       | Random integer                                   | `42`                             |
-| `randomInt0_5`    | Random integer between 0 and 5                   | `3`                              |
-| `randomInt0_10`   | Random integer between 0 and 10                  | `7`                              |
-| `randomInt0_100`  | Random integer between 0 and 100                 | `56`                             |
-| `randomInt0_200`  | Random integer between 0 and 200                 | `123`                            |
-| `randomInt0_300`  | Random integer between 0 and 300                 | `250`                            |
-| `randomInt0_500`  | Random integer between 0 and 500                 | `400`                            |
-| `randomInt0_1000` | Random integer between 0 and 1000                | `789`                            |
-| `randomInt0_9999` | Random integer between 0 and 9999                | `6789`                           |
-| `randomInt0_2000` | Random integer between 0 and 2000                | `1500`                           |
-| `randomInt0_3000` | Random integer between 0 and 3000                | `2500`                           |
+| `timestamp`       | Current timestamp in milliseconds                | `1633024800000`                  |
+| `datetime`        | Current date and time in ISO format              | `2023-10-01T12:00:00.000Z`       |
+| `randomInt`       | Random integer between 0 and 999                 | `42`                             |
+| `randomInt0_5`    | Random integer between 0 and 4                   | `3`                              |
+| `randomInt0_10`   | Random integer between 0 and 9                   | `7`                              |
+| `randomInt0_100`  | Random integer between 0 and 99                  | `56`                             |
+| `randomInt0_200`  | Random integer between 0 and 199                 | `123`                            |
+| `randomInt0_300`  | Random integer between 0 and 299                 | `250`                            |
+| `randomInt0_500`  | Random integer between 0 and 499                 | `400`                            |
+| `randomInt0_1000` | Random integer between 0 and 999                 | `789`                            |
+| `randomInt0_9999` | Random integer between 0 and 9998                | `6789`                           |
 | `randomInt0_4000` | Random integer between 0 and 4000                | `3500`                           |
 | `randomInt0_5000` | Random integer between 0 and 5000                | `4500`                           |
 | `randomEmail`     | Randomly generated email address                 | `user123@example.com`            |

@@ -25,8 +25,7 @@ module.exports.createAI = async (body) => {
     prompt,
     'Please provide the steps you would take to test this scenario.',
 
-    'The output must be a YAML - ONLY - file with the following structure:',
-    '```yaml',
+    'The output must be a YAML file with the following structure (without any code block markers):',
     'title: <Scenario Title>',
     'description: <Scenario Description>',
     'steps: # List of steps to perform',
@@ -35,7 +34,6 @@ module.exports.createAI = async (body) => {
     '    description: <description of the step>',
     '    parameters: <parameters to pass to the method>',
     '',
-    '```',
 
     `ONLY USE THE APPLICATIONS STRICLY NECESSARY. Do not include applications that are not needed for the scenario.`,
     'If you are not sure about an applicaiton, DO NOT include it.',
@@ -45,17 +43,17 @@ module.exports.createAI = async (body) => {
 
     'Below, the list of applications you can interact with, and their methods:',
     '------------------',
-    await apps.yamlSummary(),
+    await apps.yamlSummaryWithArgs(),
     '------------------',
-    'Do not reply with explanations, just the YAML.',
-    'Remember: ONLY YAML is accepted as response.',
-    'Do not enclose the YAML in code blocks.',
+    'IMPORTANT:',
+    '1. Do not reply with explanations, just the YAML.',
+    '2. Do not include any markdown code block markers like ```yaml or ``` in your response.',
+    '3. Your response should start directly with "title:" and contain only valid YAML.',
+    '4. Remember: ONLY YAML is accepted as response.',
   ];
 
   // Send message parts to the AI
   const finalPrompt = messageParts.join('\n');
-
-  console.log(finalPrompt)
 
   // Load AI config
   const aiConfig = await configHelper.load('ai');
@@ -80,12 +78,18 @@ module.exports.createAI = async (body) => {
   // Send the prompt to Gemini
   const result = await chat.sendMessage(finalPrompt);
   const response = await result.response;
-  const responseText = response.text();
+
+  let responseText = response.text();
+  responseText = responseText.replace(/```yaml/g, '').replace(/```/g, '').trim();
 
   return {
     flow: responseText
   }
 };
+
+module.exports.listCapabilities = async () => {
+  return apps.summary();
+}
 
 /**
  * Given the location of a yaml file, return its content

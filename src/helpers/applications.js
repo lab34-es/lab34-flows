@@ -186,7 +186,7 @@ module.exports.updateEnvFile = (envPath, key, value) => {
   });
 }
 
-const yamlSummary = () => {
+const yamlSummaryWithArgs = () => {
   return parseApplications()
     .then(apps => {
       return apps.map(app => {
@@ -201,7 +201,36 @@ const yamlSummary = () => {
     });
 };
 
-module.exports.yamlSummary = yamlSummary;
+module.exports.yamlSummaryWithArgs = yamlSummaryWithArgs;
+
+const summary = () => {
+  return parseApplications()
+    .then(apps => {
+      // Create a formatted output for console
+      console.log('\n=== Applications Summary ===\n');
+      
+      if (apps.length === 0) {
+        console.log('No applications found.');
+      }
+      
+      apps.forEach(app => {
+        console.log(`Application: ${app.name}`);
+        
+        if (app.methods && app.methods.length > 0) {
+          console.log('  Methods:');
+          app.methods.forEach(method => {
+            console.log(`    - ${method.name}: ${method.description || 'No description'}`);
+          });
+        } else {
+          console.log('  No methods found.');
+        }
+        
+        console.log(''); // Empty line between applications
+      });
+    })
+};
+
+module.exports.summary = summary;
 
 /**
  * Returns the list of applications and .env files for each
@@ -234,6 +263,7 @@ const parseApplications = async (source) => {
   return Promise.all(applications.map(async applicationName => {
     const appPath = path.join(appsPath, applicationName);
 
+
     // List env files
     const envFiles = listEnvFiles(appPath);
 
@@ -256,12 +286,33 @@ const parseApplications = async (source) => {
     let errors = [];
     if (fs.existsSync(path.join(appPath, 'index.js'))) {
       try {
+        const libraryPath = path.join(process.env.NODE_PATH, '@lab34/flows');
+        // Replace all instances of @lab34/flows with libraryPath in the index.js file
+        // This handles both bare module names and quoted strings
+        const indexPath = path.join(appPath, 'index.js');
+        const indexFile = fs.readFileSync(indexPath, 'utf8');
+        
+        // Replace both quoted and unquoted instances
+        const modifiedIndexFile = indexFile
+          .replace(/@lab34\/flows/g, libraryPath);
+        
+        fs.writeFileSync(indexPath, modifiedIndexFile, 'utf8');
+
         const lib = require(appPath);
         methods = Object.keys(lib).map(method => {
           return lib[method]('describe')
         });
+
+        // Revert back all replacements
+        const revertedIndexFile = modifiedIndexFile
+          .replace(new RegExp(`'${libraryPath}'`, 'g'), "'@lab34/flows'")
+          .replace(new RegExp(`"${libraryPath}"`, 'g'), '"@lab34/flows"')
+          .replace(new RegExp(libraryPath, 'g'), "@lab34/flows");
+        
+        fs.writeFileSync(indexPath, revertedIndexFile, 'utf8');
       }
       catch (ex) {
+        console.error('Error loading application', applicationName, ex);
         errors.push({
           message: ex.message,
           stack: ex.stack,
