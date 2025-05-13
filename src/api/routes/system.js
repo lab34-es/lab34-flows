@@ -13,7 +13,13 @@ router.get('/', (req, res) => {
   .then(async ([environments]) => {
     res.send({
       version: packageJson.version,
-      environments
+      environments,
+      config: [
+        {
+          title: 'AI',
+          path: await paths.fromHome(['config', `ai.son`])
+        }
+      ]
     });
   });
 });
