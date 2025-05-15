@@ -9,6 +9,7 @@ const temp = require('temp');
 const paths = require('./paths');
 
 // NODE_PATH=$(npm root -g)
+const DO_REPLACEMENT = false;
 
 const applications = {};
 
@@ -152,7 +153,6 @@ const loadEnvFile = envPath => {
     'authorization'
   ]
 
-
   const envConfig = dotenv.parse(fs.readFileSync(envPath));
   return Object.keys(envConfig).map(key => {
 
@@ -263,7 +263,6 @@ const parseApplications = async (source) => {
   return Promise.all(applications.map(async applicationName => {
     const appPath = path.join(appsPath, applicationName);
 
-
     // List env files
     const envFiles = listEnvFiles(appPath);
 
@@ -292,24 +291,26 @@ const parseApplications = async (source) => {
         const indexPath = path.join(appPath, 'index.js');
         const indexFile = fs.readFileSync(indexPath, 'utf8');
         
-        // Replace both quoted and unquoted instances
-        const modifiedIndexFile = indexFile
-          .replace(/@lab34\/flows/g, libraryPath);
-        
-        fs.writeFileSync(indexPath, modifiedIndexFile, 'utf8');
-
+        if (DO_REPLACEMENT) {
+          // Replace both quoted and unquoted instances
+          const modifiedIndexFile = indexFile
+            .replace(/@lab34\/flows/g, libraryPath);
+          fs.writeFileSync(indexPath, modifiedIndexFile, 'utf8');
+        }
         const lib = require(appPath);
         methods = Object.keys(lib).map(method => {
           return lib[method]('describe')
         });
 
-        // Revert back all replacements
-        const revertedIndexFile = modifiedIndexFile
-          .replace(new RegExp(`'${libraryPath}'`, 'g'), "'@lab34/flows'")
-          .replace(new RegExp(`"${libraryPath}"`, 'g'), '"@lab34/flows"')
-          .replace(new RegExp(libraryPath, 'g'), "@lab34/flows");
-        
-        fs.writeFileSync(indexPath, revertedIndexFile, 'utf8');
+        if (DO_REPLACEMENT) {
+          // Revert back all replacements
+          const revertedIndexFile = modifiedIndexFile
+            .replace(new RegExp(`'${libraryPath}'`, 'g'), "'@lab34/flows'")
+            .replace(new RegExp(`"${libraryPath}"`, 'g'), '"@lab34/flows"')
+            .replace(new RegExp(libraryPath, 'g'), "@lab34/flows");
+          
+          fs.writeFileSync(indexPath, revertedIndexFile, 'utf8');
+        }
       }
       catch (ex) {
         console.error('Error loading application', applicationName, ex);

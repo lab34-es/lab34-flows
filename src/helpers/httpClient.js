@@ -9,7 +9,7 @@ const headers = (ctx) => {
   const { env } = ctx;
   // Merge all conditional headers into a single object
   return [
-    env.X_API_KEY ? { 'x-api-key': Buffer.from(env.X_API_KEY).toString('base64') } : {},
+    env.X_API_KEY ? { 'x-api-key': env.X_API_KEY } : {},
     env.HTTP_BASIC_AUTH ? { 'Authorization': `Basic ${Buffer.from(env.HTTP_BASIC_AUTH).toString('base64')}` } : {},
   ].reduce((acc, h) => Object.assign(acc, h), {});
 }
@@ -30,17 +30,19 @@ const _fetch = (ctx, urlPath, opts) => {
   // ctx.env must contain all ctx.env variables, giving priority
   // to the ones ending by "filteredCase" (e.g. "BASE_URL_filteredCase")
 
-  ctx.env = Object.keys(ctx.env).reduce((acc, key) => {
-    // Check if the key ends with the filtered case
-    if (key.endsWith(`_${filteredCase}`)) {
-      // Create a new key without the filtered case suffix
-      const newKey = key.replace(`_${filteredCase}`, '');
-      acc[newKey] = ctx.env[key]; // Assign the value to the new key
-    } else {
-      acc[key] = ctx.env[key]; // Keep the original key-value pair
-    }
-    return acc;
-  }, {});
+  if (filteredCase) {
+    ctx.env = Object.keys(ctx.env).reduce((acc, key) => {
+      // Check if the key ends with the filtered case
+      if (key.endsWith(`_${filteredCase}`)) {
+        // Create a new key without the filtered case suffix
+        const newKey = key.replace(`_${filteredCase}`, '');
+        acc[newKey] = ctx.env[key]; // Assign the value to the new key
+      } else {
+        acc[key] = ctx.env[key]; // Keep the original key-value pair
+      }
+      return acc;
+    }, {});
+  }
 
   // Build full URL by combining base URL with the provided path
   const fullUrl = `${ctx.env.BASE_URL}${urlPath}`;
@@ -53,7 +55,7 @@ const _fetch = (ctx, urlPath, opts) => {
 
   // Initialize and merge headers from context
   if (!options.headers) options.headers = {};
-  options.headers = Object.assign(options.headers, headers(ctx));
+  options.headers = Object.assign(headers(ctx), options.headers);
 
   // Process request body for JSON objects
   if (options.data) {
@@ -121,8 +123,8 @@ const formatResponse = async (ctx, response, meta) => {
       // Fallback to raw data if parsing fails
       body = response.response.data;
     }
-    // console.error('Error:', JSON.stringify(body, null, 2));
-    // process.exit(1)
+    console.error('Error:', JSON.stringify(body, null, 2));
+    process.exit(1)
     throw response;
   }
 
@@ -144,7 +146,6 @@ const formatResponse = async (ctx, response, meta) => {
     // Fallback to raw data if parsing fails
     body = response.data;
   }
-
   
   // Log the response using the context's reporter and return response components
   return Promise.resolve([headers, status, body])

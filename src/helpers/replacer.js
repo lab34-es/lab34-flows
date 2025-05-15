@@ -299,7 +299,7 @@ const values = () => {
     // Number
     phoneIntl: faker.phone.number({ style: 'international' }),
 
-    randomString: faker.string.alphanumeric(10)
+    randomString: faker.string.alphanumeric(8)
   }
 }
 
