@@ -1,6 +1,6 @@
 {
   "name": "@lab34/flows",
-  "version": "0.6.8",
+  "version": "0.6.9",
   "type": "commonjs",
   "main": "src/index.js",
   "homepage": "https://github.com/lab34-es/lab34-flows",
