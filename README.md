@@ -683,6 +683,18 @@ DATABASE_CONNECTION_STRING=postgres://user:password@host:5432/database
 2. Otherwise, individual parameters (`PGUSER`, `PGHOST`, etc.) are used
 3. Additional parameters (`PGQUERY_TIMEOUT`, `PGLOCK_TIMEOUT`, etc.) work with both approaches
 
+#### SSL Configuration (Optional)
+
+The PostgreSQL client supports SSL connections with flexible configuration options:
+
+| Environment Variable | Description | Example |
+|---------------------|-------------|---------|
+| `PGSSL_ENABLED` | Enable SSL connection | `true` or `false` |
+| `PGSSL_REJECT_UNAUTHORIZED` | Reject unauthorized certificates | `true` or `false` |
+| `PGSSL_CA` | Path to CA certificate file | `/path/to/ca.pem` |
+| `PGSSL_CERT` | Path to client certificate file | `/path/to/client-cert.pem` |
+| `PGSSL_KEY` | Path to client key file | `/path/to/client-key.pem` |
+
 #### Examples
 
 **Using connection string:**
@@ -709,4 +721,35 @@ PGPASSWORD=localpass
 PGHOST=localhost
 PGPORT=5432
 PGDATABASE=testdb
+```
+
+**SSL connection with self-signed certificates (development):**
+```bash
+PGUSER=developer
+PGPASSWORD=devpass
+PGHOST=secure.dev.example.com
+PGPORT=5432
+PGDATABASE=devdb
+PGSSL_ENABLED=true
+PGSSL_REJECT_UNAUTHORIZED=false
+```
+
+**SSL connection with full certificate validation (production):**
+```bash
+DATABASE_CONNECTION_STRING=postgres://admin:secret@secure.db.example.com:5432/production
+PGSSL_ENABLED=true
+PGSSL_CA=/path/to/ca-certificate.pem
+PGSSL_CERT=/path/to/client-certificate.pem
+PGSSL_KEY=/path/to/client-key.pem
+```
+
+**SSL with custom CA certificate only:**
+```bash
+PGUSER=admin
+PGPASSWORD=secret
+PGHOST=db.example.com
+PGPORT=5432
+PGDATABASE=production
+PGSSL_ENABLED=true
+PGSSL_CA=/path/to/custom-ca.pem
 ```

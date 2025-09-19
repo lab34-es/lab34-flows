@@ -374,7 +374,7 @@ describe('pgClient', () => {
 
       try {
         await pgClient.query(ctx, 'SELECT * FROM users', []);
-      } catch (error) {
+      } catch {
         // Expected to throw
       }
 
@@ -461,6 +461,275 @@ describe('pgClient', () => {
       expect(client1.end).toHaveBeenCalledTimes(1);
       expect(client2.connect).toHaveBeenCalledTimes(1);
       expect(client2.end).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('SSL configuration', () => {
+    it('should not include SSL config when PGSSL_ENABLED is not set', async () => {
+      ctx.env = {
+        PGUSER: 'testuser',
+        PGHOST: 'localhost',
+        PGDATABASE: 'testdb'
+      };
+
+      mockClient.connect.mockResolvedValue();
+      mockClient.query.mockResolvedValue({
+        rows: [],
+        rowCount: 0
+      });
+
+      await pgClient.query(ctx, 'SELECT 1', []);
+
+      expect(pg.Client).toHaveBeenCalledWith({
+        user: 'testuser',
+        host: 'localhost',
+        database: 'testdb'
+      });
+    });
+
+    it('should enable SSL when PGSSL_ENABLED is true', async () => {
+      ctx.env = {
+        PGUSER: 'testuser',
+        PGHOST: 'localhost',
+        PGDATABASE: 'testdb',
+        PGSSL_ENABLED: 'true'
+      };
+
+      mockClient.connect.mockResolvedValue();
+      mockClient.query.mockResolvedValue({
+        rows: [],
+        rowCount: 0
+      });
+
+      await pgClient.query(ctx, 'SELECT 1', []);
+
+      expect(pg.Client).toHaveBeenCalledWith({
+        user: 'testuser',
+        host: 'localhost',
+        database: 'testdb',
+        ssl: {}
+      });
+    });
+
+    it('should set rejectUnauthorized to false when specified', async () => {
+      ctx.env = {
+        PGUSER: 'testuser',
+        PGHOST: 'localhost',
+        PGDATABASE: 'testdb',
+        PGSSL_ENABLED: 'true',
+        PGSSL_REJECT_UNAUTHORIZED: 'false'
+      };
+
+      mockClient.connect.mockResolvedValue();
+      mockClient.query.mockResolvedValue({
+        rows: [],
+        rowCount: 0
+      });
+
+      await pgClient.query(ctx, 'SELECT 1', []);
+
+      expect(pg.Client).toHaveBeenCalledWith({
+        user: 'testuser',
+        host: 'localhost',
+        database: 'testdb',
+        ssl: {
+          rejectUnauthorized: false
+        }
+      });
+    });
+
+    it('should include CA certificate path when provided', async () => {
+      ctx.env = {
+        PGUSER: 'testuser',
+        PGHOST: 'localhost',
+        PGDATABASE: 'testdb',
+        PGSSL_ENABLED: 'true',
+        PGSSL_CA: '/path/to/ca.pem'
+      };
+
+      mockClient.connect.mockResolvedValue();
+      mockClient.query.mockResolvedValue({
+        rows: [],
+        rowCount: 0
+      });
+
+      await pgClient.query(ctx, 'SELECT 1', []);
+
+      expect(pg.Client).toHaveBeenCalledWith({
+        user: 'testuser',
+        host: 'localhost',
+        database: 'testdb',
+        ssl: {
+          ca: '/path/to/ca.pem'
+        }
+      });
+    });
+
+    it('should include client certificate and key when provided', async () => {
+      ctx.env = {
+        PGUSER: 'testuser',
+        PGHOST: 'localhost',
+        PGDATABASE: 'testdb',
+        PGSSL_ENABLED: 'true',
+        PGSSL_CERT: '/path/to/client-cert.pem',
+        PGSSL_KEY: '/path/to/client-key.pem'
+      };
+
+      mockClient.connect.mockResolvedValue();
+      mockClient.query.mockResolvedValue({
+        rows: [],
+        rowCount: 0
+      });
+
+      await pgClient.query(ctx, 'SELECT 1', []);
+
+      expect(pg.Client).toHaveBeenCalledWith({
+        user: 'testuser',
+        host: 'localhost',
+        database: 'testdb',
+        ssl: {
+          cert: '/path/to/client-cert.pem',
+          key: '/path/to/client-key.pem'
+        }
+      });
+    });
+
+    it('should handle complete SSL configuration', async () => {
+      ctx.env = {
+        PGUSER: 'testuser',
+        PGHOST: 'secure.db.example.com',
+        PGDATABASE: 'production',
+        PGSSL_ENABLED: 'true',
+        PGSSL_REJECT_UNAUTHORIZED: 'false',
+        PGSSL_CA: '/path/to/ca.pem',
+        PGSSL_CERT: '/path/to/client-cert.pem',
+        PGSSL_KEY: '/path/to/client-key.pem'
+      };
+
+      mockClient.connect.mockResolvedValue();
+      mockClient.query.mockResolvedValue({
+        rows: [],
+        rowCount: 0
+      });
+
+      await pgClient.query(ctx, 'SELECT 1', []);
+
+      expect(pg.Client).toHaveBeenCalledWith({
+        user: 'testuser',
+        host: 'secure.db.example.com',
+        database: 'production',
+        ssl: {
+          rejectUnauthorized: false,
+          ca: '/path/to/ca.pem',
+          cert: '/path/to/client-cert.pem',
+          key: '/path/to/client-key.pem'
+        }
+      });
+    });
+
+    it('should work with connection string and SSL configuration', async () => {
+      ctx.env = {
+        DATABASE_CONNECTION_STRING: 'postgresql://user:pass@secure.db.example.com:5432/production',
+        PGSSL_ENABLED: 'true',
+        PGSSL_REJECT_UNAUTHORIZED: 'false'
+      };
+
+      mockClient.connect.mockResolvedValue();
+      mockClient.query.mockResolvedValue({
+        rows: [],
+        rowCount: 0
+      });
+
+      await pgClient.query(ctx, 'SELECT 1', []);
+
+      expect(pg.Client).toHaveBeenCalledWith({
+        connectionString: 'postgresql://user:pass@secure.db.example.com:5432/production',
+        ssl: {
+          rejectUnauthorized: false
+        }
+      });
+    });
+
+    it('should not enable SSL when PGSSL_ENABLED is false', async () => {
+      ctx.env = {
+        PGUSER: 'testuser',
+        PGHOST: 'localhost',
+        PGDATABASE: 'testdb',
+        PGSSL_ENABLED: 'false',
+        PGSSL_REJECT_UNAUTHORIZED: 'false'
+      };
+
+      mockClient.connect.mockResolvedValue();
+      mockClient.query.mockResolvedValue({
+        rows: [],
+        rowCount: 0
+      });
+
+      await pgClient.query(ctx, 'SELECT 1', []);
+
+      expect(pg.Client).toHaveBeenCalledWith({
+        user: 'testuser',
+        host: 'localhost',
+        database: 'testdb'
+        // No ssl property should be present
+      });
+    });
+
+    it('should only set SSL options when PGSSL_ENABLED is true', async () => {
+      ctx.env = {
+        PGUSER: 'testuser',
+        PGHOST: 'localhost',
+        PGDATABASE: 'testdb',
+        PGSSL_CA: '/path/to/ca.pem',
+        PGSSL_CERT: '/path/to/cert.pem'
+        // PGSSL_ENABLED is not set
+      };
+
+      mockClient.connect.mockResolvedValue();
+      mockClient.query.mockResolvedValue({
+        rows: [],
+        rowCount: 0
+      });
+
+      await pgClient.query(ctx, 'SELECT 1', []);
+
+      expect(pg.Client).toHaveBeenCalledWith({
+        user: 'testuser',
+        host: 'localhost',
+        database: 'testdb'
+        // SSL options should be ignored without PGSSL_ENABLED
+      });
+    });
+
+    it('should handle SSL with additional configuration parameters', async () => {
+      ctx.env = {
+        PGUSER: 'testuser',
+        PGHOST: 'localhost',
+        PGDATABASE: 'testdb',
+        PGSSL_ENABLED: 'true',
+        PGSSL_REJECT_UNAUTHORIZED: 'false',
+        PGQUERY_TIMEOUT: '30000',
+        PGLOCK_TIMEOUT: '10000'
+      };
+
+      mockClient.connect.mockResolvedValue();
+      mockClient.query.mockResolvedValue({
+        rows: [],
+        rowCount: 0
+      });
+
+      await pgClient.query(ctx, 'SELECT 1', []);
+
+      expect(pg.Client).toHaveBeenCalledWith({
+        user: 'testuser',
+        host: 'localhost',
+        database: 'testdb',
+        query_timeout: 30000,
+        lock_timeout: 10000,
+        ssl: {
+          rejectUnauthorized: false
+        }
+      });
     });
   });
 

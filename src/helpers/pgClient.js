@@ -16,6 +16,11 @@ const debug = require('debug')('lab34:flows:helpers:pgClient');
  * @param {string} [ctx.env.PGLOCK_TIMEOUT] - Lock timeout in milliseconds.
  * @param {string} [ctx.env.PGCLIENT_ENCODING] - Client encoding.
  * @param {string} [ctx.env.PGOPTIONS] - Command-line options to be sent to the server.
+ * @param {string} [ctx.env.PGSSL_ENABLED] - Enable SSL connection (true/false).
+ * @param {string} [ctx.env.PGSSL_REJECT_UNAUTHORIZED] - Reject unauthorized certificates (true/false).
+ * @param {string} [ctx.env.PGSSL_CA] - Path to CA certificate file.
+ * @param {string} [ctx.env.PGSSL_CERT] - Path to client certificate file.
+ * @param {string} [ctx.env.PGSSL_KEY] - Path to client key file.
  * @param {string} query - The SQL query to be executed.
  * @param {Array} values - The values to be used in the SQL query.
  * @returns {Promise<Object>} - A promise that resolves to the result of the query.
@@ -77,6 +82,32 @@ module.exports.query = (ctx, query, values) => {
   
   if (ctx.env.PGOPTIONS) {
     dbConfig.options = ctx.env.PGOPTIONS;
+  }
+
+  // SSL configuration
+  if (ctx.env.PGSSL_ENABLED === 'true') {
+    dbConfig.ssl = {};
+    debug('SSL: Enabled');
+    
+    if (ctx.env.PGSSL_REJECT_UNAUTHORIZED === 'false') {
+      dbConfig.ssl.rejectUnauthorized = false;
+      debug('SSL: Certificate validation disabled (rejectUnauthorized: false)');
+    }
+    
+    if (ctx.env.PGSSL_CA) {
+      dbConfig.ssl.ca = ctx.env.PGSSL_CA;
+      debug('SSL: CA certificate path: %s', ctx.env.PGSSL_CA);
+    }
+    
+    if (ctx.env.PGSSL_CERT) {
+      dbConfig.ssl.cert = ctx.env.PGSSL_CERT;
+      debug('SSL: Client certificate path: %s', ctx.env.PGSSL_CERT);
+    }
+    
+    if (ctx.env.PGSSL_KEY) {
+      dbConfig.ssl.key = ctx.env.PGSSL_KEY;
+      debug('SSL: Client key path: %s', ctx.env.PGSSL_KEY);
+    }
   }
 
   // Debug query details
