@@ -1,0 +1,6 @@
+node_modules/**
+tester-darwin-arm64/**
+.c**
+flows-tester-darwin-arm64/**
+tester-win32-x64/**
+dist/**

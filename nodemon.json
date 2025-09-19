@@ -1,0 +1,9 @@
+{
+  "watch": [
+    "**.js",
+    "flows/**",
+    "applications/*/*.js"
+  ],
+  "exec": "node src/api.js",
+  "args": []
+}
