@@ -76,9 +76,9 @@ Options:
   --help          Show this help message
 
 Examples:
-  lab34-flows --file flows/my-flow.yaml --env production
-  lab34-flows --capabilities
-  lab34-flows --ai "Test login functionality with valid credentials"
+  lab34-flows --context my/context/folder --file flows/my-flow.yaml --env production
+  lab34-flows --context my/context/folder --capabilities
+  lab34-flows --context --ai "Test login functionality with valid credentials"
   lab34-flows --server --context=myproject
   `);
   process.exit(0);
@@ -138,7 +138,8 @@ function parseArguments() {
     env: argv.env || null,
     context: argv.context || null,
     debug: argv.debug || false,
-    help: argv.help || false
+    help: argv.help || false,
+    v: argv.v || false
   };
 }
 
@@ -248,7 +249,6 @@ async function startServer() {
   console.log('Building frontend...');
   
   const { spawn } = require('child_process');
-  const path = require('path');
   
   // Build the frontend first
   const buildProcess = spawn('npm', ['run', 'build:frontend'], {
@@ -275,6 +275,12 @@ async function startServer() {
 async function main() {
   // Parse command line arguments
   const args = parseArguments();
+
+  // Show version if requested
+  if (args.v) {
+    console.log(packageJson.version);
+    process.exit(0);
+  }
 
   // Show help if requested
   if (args.help) {

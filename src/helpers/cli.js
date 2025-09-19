@@ -1,9 +1,3 @@
-
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
-const readline = require('readline');
-
 module.exports.logo = (append) => {
   console.log('  __ _                   ');
   console.log(' / _| | _____      _____ ');
@@ -11,7 +5,6 @@ module.exports.logo = (append) => {
   console.log('|  _| | (_) \\ V  V /\\__ \\');
   console.log(`|_| |_|\\___/ \\_/\\_/ |___/ ${append}`);
 };
-
 
 /**
  * It's important that anyone gets used to use this tool on a daily basis,
