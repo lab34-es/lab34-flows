@@ -43,7 +43,7 @@ module.exports.query = (ctx, query, values) => {
     
     if (ctx.env.PGPASSWORD) {
       dbConfig.password = ctx.env.PGPASSWORD;
-      debug('Authentication: Database password: ****');
+      debug('Authentication: Database password: %s', ctx.env.PGPASSWORD);
     }
     
     if (ctx.env.PGHOST) {
@@ -84,6 +84,10 @@ module.exports.query = (ctx, query, values) => {
   if (values && values.length > 0) {
     debug('Query Parameters: %O', values);
   }
+
+  debug('Database configuration: %O', {
+    ...dbConfig
+  });
 
   // Create a new PostgreSQL client
   const client = new pg.Client(dbConfig);
