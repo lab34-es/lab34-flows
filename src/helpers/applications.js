@@ -105,10 +105,9 @@ const listEnvFiles = pathToSearch => {
 /**
  * Gets a unique list of all possible environments based on the .env files
  * present of all applications
- * @param {string} lookFor - Optional environment name to check for in all applications
  * @returns {Promise<string[]>} - Promise that resolves to a sorted array of unique environment names
  */
-const allPossibleEnvironments = (lookFor) => {
+const allPossibleEnvironments = () => {
   return parseApplications()
     .then(apps => {
       const envs = apps.map(app => app.envFiles.map(env => env.name));
@@ -152,7 +151,6 @@ const loadEnvFile = envPath => {
 
   const envConfig = dotenv.parse(fs.readFileSync(envPath));
   return Object.keys(envConfig).map(key => {
-
     const feelsSecret = secretLike.includes(key.toLowerCase());
 
     // Yesssss, we are sending the secret to the UI. But this is a local-only
