@@ -649,10 +649,64 @@ parameters:
 
 ## Environment variables
 
-To prevent storing credentials and others in the repository, the tester tool will create environment files for each supported application in your user's home folder at the moment of running it.
+To prevent storing credentials and others in the repository, the testers must keep environment files for each supported application in the application folder itself.
 
-The location of those files is a folder named `flows` in your user's home folder.
+i.e. for an application called ABC, the configuration files must be stored in `~/.../applications/abc/envs/ac1.env`.
 
-Use this files to acconomodate any environment variable, and keep them secret.
+### PostgreSQL Database Configuration
 
-*The tool will add new environment variables ensuring your custom valus are not overriden.*
+The PostgreSQL client supports flexible configuration through environment variables. You can either use a connection string or individual parameters.
+
+#### Option 1: Connection String (Recommended for simplicity)
+
+```bash
+DATABASE_CONNECTION_STRING=postgres://user:password@host:5432/database
+```
+
+#### Option 2: Individual Parameters (Recommended for flexibility)
+
+| Environment Variable | Description | Example |
+|---------------------|-------------|---------|
+| `PGUSER` | Database user | `myuser` |
+| `PGPASSWORD` | Database password | `mypassword` |
+| `PGHOST` | Database host | `localhost` or `db.example.com` |
+| `PGPORT` | Database port | `5432` |
+| `PGDATABASE` | Database name | `mydatabase` |
+| `PGQUERY_TIMEOUT` | Query timeout in milliseconds | `30000` |
+| `PGLOCK_TIMEOUT` | Lock timeout in milliseconds | `10000` |
+| `PGCLIENT_ENCODING` | Client character encoding | `UTF8` |
+| `PGOPTIONS` | Command-line options for the server | `-c statement_timeout=30s` |
+
+#### Configuration Priority
+
+1. If `DATABASE_CONNECTION_STRING` is provided, it takes precedence (for backward compatibility)
+2. Otherwise, individual parameters (`PGUSER`, `PGHOST`, etc.) are used
+3. Additional parameters (`PGQUERY_TIMEOUT`, `PGLOCK_TIMEOUT`, etc.) work with both approaches
+
+#### Examples
+
+**Using connection string:**
+```bash
+DATABASE_CONNECTION_STRING=postgres://admin:secret@db.example.com:5432/production
+PGQUERY_TIMEOUT=60000
+```
+
+**Using individual parameters:**
+```bash
+PGUSER=admin
+PGPASSWORD=secret
+PGHOST=db.example.com
+PGPORT=5432
+PGDATABASE=production
+PGQUERY_TIMEOUT=60000
+PGLOCK_TIMEOUT=30000
+```
+
+**Local development example:**
+```bash
+PGUSER=developer
+PGPASSWORD=localpass
+PGHOST=localhost
+PGPORT=5432
+PGDATABASE=testdb
+```
