@@ -1,4 +1,5 @@
 const pg = require('pg');
+const debug = require('debug')('lab34:flows:helpers:pgClient');
 
 /**
  * Executes a query on a PostgreSQL database.
@@ -27,26 +28,37 @@ module.exports.query = (ctx, query, values) => {
   // Priority 1: Use connection string if provided (for backward compatibility)
   if (ctx.env.DATABASE_CONNECTION_STRING) {
     dbConfig.connectionString = ctx.env.DATABASE_CONNECTION_STRING;
+    // Debug connection string (mask sensitive parts)
+    const maskedConnectionString = ctx.env.DATABASE_CONNECTION_STRING.replace(
+      /(?<=:\/\/[^:]+:)[^@]+(?=@)/,
+      '****'
+    );
+    debug('Authentication: Using connection string: %s', maskedConnectionString);
   } else {
     // Priority 2: Use individual parameters
     if (ctx.env.PGUSER) {
       dbConfig.user = ctx.env.PGUSER;
+      debug('Authentication: Database user: %s', ctx.env.PGUSER);
     }
     
     if (ctx.env.PGPASSWORD) {
       dbConfig.password = ctx.env.PGPASSWORD;
+      debug('Authentication: Database password: ****');
     }
     
     if (ctx.env.PGHOST) {
       dbConfig.host = ctx.env.PGHOST;
+      debug('Authentication: Database host: %s', ctx.env.PGHOST);
     }
     
     if (ctx.env.PGPORT) {
       dbConfig.port = parseInt(ctx.env.PGPORT, 10);
+      debug('Authentication: Database port: %d', dbConfig.port);
     }
     
     if (ctx.env.PGDATABASE) {
       dbConfig.database = ctx.env.PGDATABASE;
+      debug('Authentication: Database name: %s', ctx.env.PGDATABASE);
     }
   }
 
@@ -67,24 +79,35 @@ module.exports.query = (ctx, query, values) => {
     dbConfig.options = ctx.env.PGOPTIONS;
   }
 
+  // Debug query details
+  debug('SQL Query: %s', query);
+  if (values && values.length > 0) {
+    debug('Query Parameters: %O', values);
+  }
+
   // Create a new PostgreSQL client
   const client = new pg.Client(dbConfig);
 
   // Connect to the database
   return client.connect()
     .then(() => {
+      debug('Database connection established');
       // Execute the query with the provided values
       return client.query(query, values)
     })
     .then((res) => {
+      debug('Query executed successfully. Rows affected: %d', res.rowCount);
       // Close the database connection
       client.end();
+      debug('Database connection closed');
       // Return the query result
       return res;
     })
     .catch((err) => {
+      debug('Query execution failed: %s', err.message);
       // Close the database connection in case of an error
       client.end();
+      debug('Database connection closed due to error');
       // Throw the error to be handled by the caller
       throw err;
     });

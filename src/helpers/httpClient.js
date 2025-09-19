@@ -1,4 +1,5 @@
 const axios = require('axios');
+const debug = require('debug')('lab34:flows:helpers:httpClient');
 
 /**
  * Generates request headers based on the context environment
@@ -46,6 +47,9 @@ const _fetch = (ctx, urlPath, opts) => {
 
   // Build full URL by combining base URL with the provided path
   const fullUrl = `${ctx.env.BASE_URL}${urlPath}`;
+  
+  // Debug URL
+  debug('Request URL: %s', fullUrl);
   
   // Extract special options and keep standard axios options
   let {
@@ -161,9 +165,10 @@ const formatResponse = async (ctx, response, meta) => {
   // Log the response using the context's reporter and return response components
   return Promise.resolve([headers, status, body])
     .then(([headers, status, body]) => {
+      const timing = meta.end - meta.start;
       ctx.reporter.response({headers, status, body}, {
         ...meta,
-        timing: meta.end - meta.start, // Calculate total request duration
+        timing, // Calculate total request duration
       });
       return [headers, status, body];
     });

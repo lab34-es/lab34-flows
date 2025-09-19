@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const YAML = require('yaml');
+const debug = require('debug')('lab34:flows:helpers:playwright');
 
 const { chromium, firefox, webkit, devices } = require('playwright');
 
@@ -150,6 +151,9 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
     error(ctx, yamlFile, `Invalid device: ${device}`);
   }
 
+  debug('Browser Type: %s', browserType);
+  debug('Device: %s', device);
+
   // Validate browser type
   if (!BROWSER_TYPES[browserType]) {
     error(ctx, yamlFile, `Invalid browser type: ${browserType}. Supported types are: ${Object.keys(BROWSER_TYPES).join(', ')}`);
@@ -173,6 +177,7 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
         ...launchOptions
       };
 
+      debug('Launching browser with options: %O', defaultLaunchOptions);
       const browser = await BROWSER_TYPES[browserType].launch(defaultLaunchOptions);
 
       const constextOptions = {
@@ -185,6 +190,7 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
         ...flow.contextOptions
       };
 
+      debug('Creating browser context with options: %O', constextOptions);
       const context = await browser.newContext(constextOptions);
       
       const page = await context.newPage();
@@ -209,16 +215,19 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
 
         const { method, parameters } = steps[currentStep];
 
+        debug('Executing step %d: %s with parameters: %O', currentStep + 1, method, parameters);
         ctx.reporter.playwrightStep(ctx, method, parameters);
         
         switch (method) {
           case 'goto':
+            debug('URL: Navigating to %s', parameters.url);
             await page.goto(parameters.url, { 
               waitUntil: parameters.waitUntil || 'networkidle',
               timeout: parameters.timeout || 30000 
             });
             break;
           case 'click':
+            debug('Clicking on selector: %s', parameters.selector);
             await page.click(parameters.selector, { 
               button: parameters.button || 'left',
               clickCount: parameters.clickCount || 1,
@@ -227,46 +236,54 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
             });
             break;
           case 'type':
+            debug('Typing in selector: %s', parameters.selector);
             await page.type(parameters.selector, parameters.text, {
               delay: parameters.delay,
               timeout: parameters.timeout
             });
             break;
           case 'fill':
+            debug('Filling selector: %s with value', parameters.selector);
             await page.fill(parameters.selector, parameters.value, {
               timeout: parameters.timeout
             });
             break;
           case 'press':
+            debug('Pressing key %s on selector: %s', parameters.key, parameters.selector);
             await page.press(parameters.selector, parameters.key, {
               delay: parameters.delay,
               timeout: parameters.timeout
             });
             break;
           case 'hover':
+            debug('Hovering over selector: %s', parameters.selector);
             await page.hover(parameters.selector, {
               position: parameters.position,
               timeout: parameters.timeout
             });
             break;
           case 'dragAndDrop':
+            debug('Dragging from %s to %s', parameters.source, parameters.target);
             await page.dragAndDrop(parameters.source, parameters.target, {
               force: parameters.force,
               timeout: parameters.timeout
             });
             break;
           case 'selectOption':
+            debug('Selecting option in selector: %s', parameters.selector);
             await page.selectOption(parameters.selector, parameters.values, {
               timeout: parameters.timeout
             });
             break;
           case 'check':
+            debug('Checking selector: %s', parameters.selector);
             await page.check(parameters.selector, {
               position: parameters.position,
               timeout: parameters.timeout
             });
             break;
           case 'uncheck':
+            debug('Unchecking selector: %s', parameters.selector);
             await page.uncheck(parameters.selector, {
               position: parameters.position,
               timeout: parameters.timeout
@@ -285,6 +302,7 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
             await page.waitForTimeout(parameters.time);
             break;
           case 'waitForSelector':
+            debug('Waiting for selector: %s', parameters.selector);
             await page.waitForSelector(parameters.selector);
             break;
           case 'assertTitle':
@@ -305,9 +323,11 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
             const results = {};
             for (const key in parameters) {
               const { selector, output, regex } = parameters[key];
+              debug('Scraping selector: %s for key: %s', selector, key);
               const elements = await page.$$(selector);
               results[key] = await formatScrapeResult(elements, output, regex);
             }
+            debug('Scrape results: %O', results);
             steps[currentStep].result = results;
             break;
           default:
@@ -319,17 +339,22 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
 
       // Teardown
       if (!keepOpen) {
+        debug('Closing browser context and browser');
         await context.close();
         await browser.close();
+      } else {
+        debug('Keeping browser open as requested');
       }
       const allScrappedData = steps
         .filter(step => step.method === 'scrape')
         .map(step => step.result)
         .reduce((acc, result) => Object.assign(acc, result), {});
 
+      debug('Flow completed successfully. Scraped data: %O', allScrappedData);
       resolve([null, null, allScrappedData]);
 
     } catch (error) {
+      debug('Flow execution failed: %s', error.message);
       reject(error);
     }
   });
