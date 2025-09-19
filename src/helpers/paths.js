@@ -2,25 +2,25 @@ const isWsl = require('is-wsl');
 const os = require('os');
 const path = require('path');
 const shell = require('./shell');
-const fs = require('fs')
-const argv = require('yargs-parser')(process.argv.slice(2))
+const fs = require('fs');
+const argv = require('yargs-parser')(process.argv.slice(2));
 
 // Cache the Windows home directory when inside WSL
-let winDir
+let winDir;
 
 /**
  * Get the Windows home directory when inside WSL
  * @returns {Promise<string>} The Windows home directory
  */
 const getWslWinHomeDir = async () => {
-  if (winDir) return winDir
-  const windowsHomeRaw = await shell.run('cmd.exe /c "<nul set /p=%UserProfile%" 2>/dev/null', true)
-  winDir = await shell.run(`wslpath "${windowsHomeRaw}"`, true)
-  return winDir
-}
+  if (winDir) {return winDir;}
+  const windowsHomeRaw = await shell.run('cmd.exe /c "<nul set /p=%UserProfile%" 2>/dev/null', true);
+  winDir = await shell.run(`wslpath "${windowsHomeRaw}"`, true);
+  return winDir;
+};
 
 module.exports.contextDir = async (pathParts) => {
-  let baseDir = isWsl ? await getWslWinHomeDir() : os.homedir();
+  const baseDir = isWsl ? await getWslWinHomeDir() : os.homedir();
   let context = argv.context;
 
   let finalPathParts = [];
@@ -49,42 +49,42 @@ module.exports.contextDir = async (pathParts) => {
 
   const finalPath = path.join.apply(null, finalPathParts);
   return finalPath;
-}
+};
 
 module.exports.createFolder = async (folderPath) => {
   // create if not exists
   if (!fs.existsSync(folderPath)) {
     fs.mkdirSync(folderPath, { recursive: true });
   }
-}
+};
 
 module.exports.findFiles = (dir, depth = 0, maxDepth = 4, results = [], formats) => {
-  if (depth > maxDepth) return results;
+  if (depth > maxDepth) {return results;}
 
   try {
-      const items = fs.readdirSync(dir, { withFileTypes: true });
+    const items = fs.readdirSync(dir, { withFileTypes: true });
 
-      for (const item of items) {
-          const fullPath = path.join(dir, item.name);
+    for (const item of items) {
+      const fullPath = path.join(dir, item.name);
 
-          if (item.isDirectory()) {
-              this.findFiles(fullPath, depth + 1, maxDepth, results);
-          } else if (item.isFile()) {
-            if (!formats) {
-              results.push(fullPath);
-              return 
-            }
+      if (item.isDirectory()) {
+        this.findFiles(fullPath, depth + 1, maxDepth, results);
+      } else if (item.isFile()) {
+        if (!formats) {
+          results.push(fullPath);
+          return; 
+        }
 
-            const fileName = path.basename(item.name);
-            const fileFormat = (fileName.split('.').pop()||'').toLowerCase();
-            if (formats.includes(fileFormat)) {
-              results.push(fullPath);
-            }
-          }
+        const fileName = path.basename(item.name);
+        const fileFormat = (fileName.split('.').pop()||'').toLowerCase();
+        if (formats.includes(fileFormat)) {
+          results.push(fullPath);
+        }
       }
+    }
   } catch (err) {
-      console.error(`Error reading directory "${dir}":`, err.message);
+    console.error(`Error reading directory "${dir}":`, err.message);
   }
 
   return results;
-}
+};

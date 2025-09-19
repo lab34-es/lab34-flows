@@ -230,7 +230,7 @@ async function generateFlowWithAI(prompt) {
       const filePath = `./${fileName}`;
       // Write the flow to a file
       fs.writeFileSync(filePath, result.flow, 'utf8');
-      return filePath
+      return filePath;
     } catch (yamlError) {
       console.error('Error parsing YAML from AI response:', yamlError.message);
       console.error('Raw AI response:', result.flow);

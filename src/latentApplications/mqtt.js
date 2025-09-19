@@ -1,5 +1,5 @@
-const mqtt = require("mqtt");
-const fs = require("fs");
+const mqtt = require('mqtt');
+const fs = require('fs');
 
 const instances = {};
 
@@ -10,27 +10,27 @@ const connect = (flow, details) => {
     const connectionOpts = {
       host: connection.host,
       clientId: id,
-      protocol: connection.protocol || 'mqtt',
-    } 
+      protocol: connection.protocol || 'mqtt'
+    }; 
 
-    if (connection.key) connectionOpts.key = fs.readFileSync(connection.key);
-    if (connection.cert) connectionOpts.cert = fs.readFileSync(connection.cert);
-    if (connection.ca) connectionOpts.ca = fs.readFileSync(connection.ca);
+    if (connection.key) {connectionOpts.key = fs.readFileSync(connection.key);}
+    if (connection.cert) {connectionOpts.cert = fs.readFileSync(connection.cert);}
+    if (connection.ca) {connectionOpts.ca = fs.readFileSync(connection.ca);}
     
     const client = mqtt.connect(connectionOpts);
 
-    client.on("connect", () => {
+    client.on('connect', () => {
       resolve(client);
     });
 
-    client.on("error", (err) => {
+    client.on('error', (err) => {
       console.log(`Error connecting to MQTT broker: ${err}`);
       reject(err);
     });
 
     return client;
   });
-}
+};
 
 const start = (flow, details) => {
   const {
@@ -45,18 +45,18 @@ const start = (flow, details) => {
     .then(client => {
       instances[id] = {
         client,
-        messages: [],
+        messages: []
       };
     })
 
     // Handle message reception
     .then(() => {
-      instances[id].client.on("message", (topic, message) => {
+      instances[id].client.on('message', (topic, message) => {
         const jsonMessage = JSON.parse(message.toString());
         instances[id].messages.push({
           topic,
           message: jsonMessage,
-          date: new Date(),
+          date: new Date()
         });
       });
     })
@@ -81,15 +81,15 @@ const start = (flow, details) => {
           });
         }));
       }
-    })
-}
+    });
+};
 
 const stop = (id) => {
   if (instances[id] && instances[id].client) {
     instances[id].client.end();
     delete instances[id];
   }
-}
+};
 
 const test = (flow, test, contents) => {
   return new Promise((resolve, reject) => {

@@ -93,7 +93,7 @@ module.exports.query = (ctx, query, values) => {
     .then(() => {
       debug('Database connection established');
       // Execute the query with the provided values
-      return client.query(query, values)
+      return client.query(query, values);
     })
     .then((res) => {
       debug('Query executed successfully. Rows affected: %d', res.rowCount);
@@ -111,4 +111,4 @@ module.exports.query = (ctx, query, values) => {
       // Throw the error to be handled by the caller
       throw err;
     });
-}
+};

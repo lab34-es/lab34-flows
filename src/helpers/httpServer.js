@@ -30,17 +30,17 @@ const start = (mimicConfig, port, cb) => {
     mimicConfig.flow.reporter.mimicRequest(application, req.url, {
       method: req.method,
       headers: req.headers,
-      body: req.body,
+      body: req.body
     });
 
     // Add replacer to res.
     res.json = (data) => {
-      mimicConfig.flow.reporter.mimicResponse(application, req.url)
+      mimicConfig.flow.reporter.mimicResponse(application, req.url);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      const response = replacer.any(data, req.body)
-      mimicConfig.flow.reporter.mimicResponseBody(response)
+      const response = replacer.any(data, req.body);
+      mimicConfig.flow.reporter.mimicResponseBody(response);
       res.end(JSON.stringify(response));
-    }
+    };
 
     cb(req, res, next);
   });
@@ -52,7 +52,7 @@ const start = (mimicConfig, port, cb) => {
       resolve(server.server);
     });
   });
-}
+};
 
 const stop = (id) => {
   // Find the server with the given id
@@ -70,7 +70,7 @@ const stop = (id) => {
       resolve();
     });
   });
-}
+};
 
 module.exports.start = start;
 module.exports.stop = stop;

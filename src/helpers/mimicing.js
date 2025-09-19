@@ -36,7 +36,7 @@ module.exports.validate = async (steps) => {
     console.error(`Error validating mimic files: ${error.message}`);
     return false;
   }
-}
+};
 
 module.exports.load = async (steps) => {
   const result = {};
@@ -72,21 +72,21 @@ module.exports.load = async (steps) => {
     console.error(`Error loading mimic files: ${error.message}`);
     process.exit(1);
   }
-}
+};
 
 module.exports.startStep = (mimicdApplications, step, flow) => {
   const { mimic } = step;
 
   if (mimic?.length) {
-    flow.reporter.mimicStart()
+    flow.reporter.mimicStart();
   }
 
   // Start the mimic'd applications, using promises
   return Promise.all((mimic || []).map(m => {
-    flow.reporter.mimicStart(m)
+    flow.reporter.mimicStart(m);
     return mimicdApplications[m.application].start({
       flow,
-      ...m,
+      ...m
     });
   }));
 
@@ -94,7 +94,7 @@ module.exports.startStep = (mimicdApplications, step, flow) => {
   //   report.mimicStart(m)
   //   mimicdApplications[m.application].start(m);
   // });
-}
+};
 
 module.exports.stopStep = (mimicdApplications, step) => {
   const { mimic } = step;
@@ -102,4 +102,4 @@ module.exports.stopStep = (mimicdApplications, step) => {
   return Promise.all((mimic || []).map(m => {
     return mimicdApplications[m.application].stop(m);
   }));
-}
+};

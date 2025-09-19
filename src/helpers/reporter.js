@@ -1,4 +1,4 @@
-const highlight = require('cli-highlight').highlight
+const highlight = require('cli-highlight').highlight;
 
 let _flow;
 
@@ -17,7 +17,7 @@ const sensitive = (input) => {
 
   if (typeof input === 'object') {
     const result = {};
-    for (let key in input) {
+    for (const key in input) {
       if (keysToHide.some(k => key.toLowerCase().includes(k))) {
 
         // Show only 4 first and 4 last characters
@@ -36,7 +36,7 @@ const sensitive = (input) => {
   }
 
   return input;
-}
+};
 
 /**
  * Logs the details of a specific step in a series of steps.
@@ -53,7 +53,7 @@ const stepStart = function (stepId) {
 
   const reportedStep = _flow.steps[index];
 
-  let { application, description, method, parameters, mimic } = reportedStep;
+  const { application, description, method, parameters, mimic } = reportedStep;
 
   // Convert camelCase application name to human-readable format
   const humanReadableApplication = (application || '').split(/(?=[A-Z])/).join(' ');
@@ -68,7 +68,7 @@ const stepStart = function (stepId) {
       ' ',
       stepTxt.bgGreen.black,
       ' ',
-      stepText.bgGray.black,
+      stepText.bgGray.black
     ].join('')
   );
 
@@ -76,7 +76,7 @@ const stepStart = function (stepId) {
   if (description) {
     console.log(`      ${description}`);
   }
-}
+};
 
 const stepUpdate = function (stepId) {
   const index = _flow.steps.findIndex(step => step.id === stepId);
@@ -95,7 +95,7 @@ const stepUpdate = function (stepId) {
       data: reportedStep
     }
   });
-}
+};
 
 /**
  * Logs the start of a mimic process.
@@ -114,8 +114,8 @@ const mimicStart = (mimicConfig) => {
   const urlName = mimicConfig.url;
 
   // Log the start of the mimic process with application name and URL.
-  console.log(`   ⿻ MIMIC`.bold.yellow + ` ${applicationName}` + ` ${urlName}`.bold.gray);
-}
+  console.log('   ⿻ MIMIC'.bold.yellow + ` ${applicationName}` + ` ${urlName}`.bold.gray);
+};
 
 /**
  * Logs the details of an HTTP request.
@@ -127,7 +127,7 @@ const mimicStart = (mimicConfig) => {
 const request = (method, _opts) => {
   const {
     url,
-    options,
+    options
   } = _opts;
 
   const {
@@ -153,7 +153,7 @@ const request = (method, _opts) => {
   if (headers) {
     console.log([
       '   ',
-      '   Headers'.green.bold,
+      '   Headers'.green.bold
     ].join(''));
 
     // Add indentation to each line of the headers
@@ -177,7 +177,7 @@ const request = (method, _opts) => {
 
     console.log([
       '   ',
-      isJson ? '   JSON Data'.green.bold : '   XML Data'.green.bold,
+      isJson ? '   JSON Data'.green.bold : '   XML Data'.green.bold
     ].join(''));
 
 
@@ -191,13 +191,13 @@ const request = (method, _opts) => {
         .map(line => `${spacesStr}${line}`).join('\n')
     );
   }
-}
+};
 
 const mimicRequest = (application, _method, request) => {
   const {
     method,
     headers,
-    body,
+    body
   } = request;
 
   console.log([
@@ -222,7 +222,7 @@ const mimicRequest = (application, _method, request) => {
       highlight(JSON.stringify(sensitive(headers), null, 2), { language: 'json' })
         .split('\n')
         .map(line => `${spacesStr}${line}`).join('\n')
-      );
+    );
   }
 
   if (!body) {
@@ -234,8 +234,8 @@ const mimicRequest = (application, _method, request) => {
     highlight(JSON.stringify(sensitive(body), null, 2), { language: 'json' })
       .split('\n')
       .map(line => `${spacesStr}${line}`).join('\n')
-    );
-}
+  );
+};
 
 const mimicResponse = (application, method) => {
   console.log([
@@ -245,13 +245,13 @@ const mimicResponse = (application, method) => {
     ' ',
     method.gray
   ].join(''));
-}
+};
 
 const mimicResponseBody = (response) => {
 
   console.log([
     '   ',
-    '   body'.green.bold,
+    '   body'.green.bold
   ].join(''));
   
   const spacesStr = ' '.repeat(6);
@@ -259,9 +259,9 @@ const mimicResponseBody = (response) => {
     highlight(JSON.stringify(sensitive(response), null, 2), { language: 'json' })
       .split('\n')
       .map(line => `${spacesStr}${line}`).join('\n')
-    );
+  );
   
-}
+};
 
 const mimicFile = (application, filePath, fileExists) => {
   const last3 = filePath.split('/').slice(-3).join('/');
@@ -271,7 +271,7 @@ const mimicFile = (application, filePath, fileExists) => {
     fileExists ? ' used '.bgGreen.black : ' not found '.bgRed,
     application,
     last3.gray
-  ]
+  ];
 
   console.log(reportParts.join(' '));
 
@@ -287,7 +287,7 @@ const response = (result, meta) => {
   console.log([
     '   ⬅',
     '  RESPONSE'.yellow.bold,
-    meta.timing ? ` (${meta.timing}s)`.gray : '',
+    meta.timing ? ` (${meta.timing}s)`.gray : ''
   ].join(''));
 
   const spacesStr = ' '.repeat(6);
@@ -308,7 +308,7 @@ const response = (result, meta) => {
       highlight(JSON.stringify(sensitive(headers), null, 2), { language: 'json' })
         .split('\n')
         .map(line => `${spacesStr}${line}`).join('\n')
-      );
+    );
   }
 
   if (!body) {
@@ -320,8 +320,8 @@ const response = (result, meta) => {
     highlight(JSON.stringify(sensitive(body), null, 2), { language: 'json' })
       .split('\n')
       .map(line => `${spacesStr}${line}`).join('\n')
-    );
-}
+  );
+};
 
 const test = (testReport) => {
 
@@ -345,13 +345,13 @@ const test = (testReport) => {
       for (let i = 0; i < report.length; i++) {
         const { application, errors } = report[i];
         console.log([
-          `            `,
-          application,
+          '            ',
+          application
         ].join(''));
 
         errors.forEach(error => {
           console.log([
-            `          `,
+            '          ',
             '  error '.red.bold,
             JSON.stringify(error)
           ].join(''));
@@ -364,18 +364,18 @@ const test = (testReport) => {
     for (let i = 0; i < report.length; i++) {
       const { message, expected, actual } = report[i];
       console.log([
-        `          `,
+        '          ',
         'expected '.green.bold,
-        JSON.stringify(expected),
+        JSON.stringify(expected)
       ].join(''));
       console.log([
-        `          `,
+        '          ',
         'actual   '.red.bold,
         JSON.stringify(actual)
       ].join(''));
     }
   });
-}
+};
 
 const playwrigthStep = (ctx, method, parameters) => {
 
@@ -384,7 +384,7 @@ const playwrigthStep = (ctx, method, parameters) => {
   // longest value of all the parameters and display it. Just as a meassure 
   // to don't have to support evety method's parameters. Let's Keep it simple.
 
-  let [ key, value ] = Object.entries(parameters||{}).reduce((acc, [key, value]) => {
+  const [key, value] = Object.entries(parameters||{}).reduce((acc, [key, value]) => {
     if (value.length > acc[1].length) {
       return [key, value];
     }
@@ -415,9 +415,9 @@ const playwrigthStep = (ctx, method, parameters) => {
     ' ',
     value.grey
   ].join(''));
-}
+};
 
-const stepTestError = (ctx, message) => {}
+const stepTestError = (ctx, message) => {};
 
 const execution = function () {
   const { id } = _flow.execution;
@@ -426,12 +426,12 @@ const execution = function () {
     topic: 'execution',
     data: _flow.execution
   });
-}
+};
 
 const _ = () => {
-  const { reporter, ...data } = _flow
+  const { reporter, ...data } = _flow;
   return data;
-}
+};
 
 const diagram = function () {
   const { id } = _flow.execution;
@@ -440,15 +440,15 @@ const diagram = function () {
     topic: 'diagram',
     data: _()
   });
-}
+};
 
-const get = function ({flow, cli, server}) {
-  let reporter = {};
+const get = function ({ flow, cli, server }) {
+  const reporter = {};
 
   if (cli) {
     reporter.server = {
       emit: () => {}
-    }
+    };
   }
   else {
     reporter.server = server;
@@ -473,8 +473,8 @@ const get = function ({flow, cli, server}) {
   reporter.stepTestError = stepTestError;
   
   return reporter;
-}
+};
 
 module.exports = {
-  get,
-}
+  get
+};

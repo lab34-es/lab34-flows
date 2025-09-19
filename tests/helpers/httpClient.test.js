@@ -442,7 +442,7 @@ describe('httpClient', () => {
     it('should handle JSON responses correctly', async () => {
       const mockResponse = {
         headers: { 
-          get: jest.fn().mockReturnValue('application/json'),
+          get: jest.fn().mockReturnValue('application/json')
         },
         status: 200,
         data: { key: 'value' }
@@ -459,7 +459,7 @@ describe('httpClient', () => {
     it('should handle non-JSON responses', async () => {
       const mockResponse = {
         headers: { 
-          get: jest.fn().mockReturnValue('text/html'),
+          get: jest.fn().mockReturnValue('text/html')
         },
         status: 200,
         data: '<html>Test</html>'
@@ -476,7 +476,7 @@ describe('httpClient', () => {
     it('should handle empty response body', async () => {
       const mockResponse = {
         headers: { 
-          get: jest.fn().mockReturnValue(null),
+          get: jest.fn().mockReturnValue(null)
         },
         status: 204,
         data: ''

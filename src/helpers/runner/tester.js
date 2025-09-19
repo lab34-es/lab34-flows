@@ -27,7 +27,7 @@ const compareObjectsDeep = (obj1, obj2) => {
     }
     return obj1[key] === obj2[key];
   });
-}
+};
 
 /**
  * Compares the expected status with the actual status.
@@ -37,7 +37,7 @@ const compareObjectsDeep = (obj1, obj2) => {
  * @returns {Object[]} - Returns an array of error objects if the statuses do not match, otherwise an empty array.
  */
 const status = (expected, actual) => {
-  let errors = [];
+  const errors = [];
 
   // Ensure expected is an array of statuses
   expected = Array.isArray(expected) ? expected : [expected];
@@ -52,7 +52,7 @@ const status = (expected, actual) => {
   }
 
   return errors;
-}
+};
 
 /**
  * Evaluates a JavaScript expression against a value.
@@ -70,7 +70,7 @@ const evaluateExpression = (expr, value) => {
     console.error(`Error evaluating expression: ${expr}`, error);
     return false;
   }
-}
+};
 
 /**
  * Determines if a value is a JavaScript expression test.
@@ -80,7 +80,7 @@ const evaluateExpression = (expr, value) => {
  */
 const isExpressionTest = (value) => {
   return typeof value === 'string' && value.startsWith('$expr:');
-}
+};
 
 /**
  * Compares the expected body with the actual body.
@@ -90,7 +90,7 @@ const isExpressionTest = (value) => {
  * @returns {Object[]} - Returns an array of error objects if the bodies do not match, otherwise an empty array.
  */
 const body = (expected, actual) => {
-  let errors = [];
+  const errors = [];
 
   // Check if we need to do deep comparison or expression evaluation
   const processObjectOrExpression = (expected, actual, path = '') => {
@@ -143,10 +143,10 @@ const body = (expected, actual) => {
   processObjectOrExpression(expected, actual);
   
   return errors;
-}
+};
 
 module.exports.test = async (flow, test, contents, opts) => {
-  let cases = {};
+  const cases = {};
 
   if (test.status) {
     cases.status = status(test.status, contents.status);
@@ -167,7 +167,7 @@ module.exports.test = async (flow, test, contents, opts) => {
         cases.latentApplications.push({
           application,
           errors
-        })
+        });
       }
     }));
   }
@@ -177,9 +177,9 @@ module.exports.test = async (flow, test, contents, opts) => {
 
   return {
     hasErrors,
-    ...cases,
+    ...cases
   };
-}
+};
 
 /**
  * Make sure all test applications are started.
@@ -193,8 +193,8 @@ module.exports.getReady = async (flow) => {
   let index = 0;
   for (const testApplication of flow.latentApplications) {
     const { application } = testApplication;
-    flow.latentApplications[index].code = require(`../../latentApplications/${application}`)
+    flow.latentApplications[index].code = require(`../../latentApplications/${application}`);
     await flow.latentApplications[index].code.start(flow, testApplication);
     index++;
   }
-}
+};

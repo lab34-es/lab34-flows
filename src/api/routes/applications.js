@@ -7,8 +7,8 @@ const apps = require('../../helpers/applications');
 router.get('/', (req, res) => {
   apps.parseApplications()
     .then(list => {
-      res.send(list)
-    })
+      res.send(list);
+    });
 });
 
 router.get('/:application', (req, res) => {
@@ -17,7 +17,7 @@ router.get('/:application', (req, res) => {
   apps.parseApplications()
     .then(list => {
       const app = list.find(app => app.slug === application);
-      res.send(app)
+      res.send(app);
     });
 });
 
@@ -27,7 +27,7 @@ router.get('/:application/envs', (req, res) => {
   apps.parseApplications()
     .then(list => {
       const app = list.find(app => app.slug === application);
-      res.send(app.envFiles)
+      res.send(app.envFiles);
     });
 });
 
@@ -39,7 +39,7 @@ router.get('/:application/envs/:env', (req, res) => {
     .then(list => {
       const app = list.find(app => app.slug === application);
       const envFile = app.envFiles.find(envFile => envFile.name === env);
-      res.send(envFile)
+      res.send(envFile);
     });
 });
 
@@ -71,7 +71,7 @@ router.put('/:application/envs/:env/:key', (req, res) => {
         success: true, 
         message: `Updated ${key} in ${application}/${env}` 
       });
-    })
+    });
 });
 
 // Get the raw content of an env file for editing
@@ -97,7 +97,7 @@ router.get('/:application/envs/:env/raw', (req, res) => {
         path: envFile.path,
         content: content
       });
-    })
+    });
 });
 
 // Update the entire content of an env file
@@ -128,7 +128,7 @@ router.put('/:application/envs/:env/raw', (req, res) => {
         success: true, 
         message: `Updated ${application}/${env}.env`
       });
-    })
+    });
 });
 
 module.exports = router;

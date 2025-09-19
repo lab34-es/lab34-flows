@@ -1,4 +1,4 @@
-const { exec } = require("child_process");
+const { exec } = require('child_process');
 
 /**
  * Run a shell command and return the output
@@ -8,17 +8,17 @@ const { exec } = require("child_process");
  * @returns {Promise<string>} The output of the command
  */
 module.exports.run = (cmd, oneLine) => {
-    return new Promise((resolve, reject) => {
-        exec(cmd, (error, stdout, stderr) => {
-            if (error && !stdout) {
-                reject(error)
-                return;
-            }
-            if (stderr) {
-                reject(stderr)
-                return;
-            }
-            resolve(oneLine ? stdout.replace(/[\n\r]+/g, '') : stdout)
-        });
-    })
-}
+  return new Promise((resolve, reject) => {
+    exec(cmd, (error, stdout, stderr) => {
+      if (error && !stdout) {
+        reject(error);
+        return;
+      }
+      if (stderr) {
+        reject(stderr);
+        return;
+      }
+      resolve(oneLine ? stdout.replace(/[\n\r]+/g, '') : stdout);
+    });
+  });
+};

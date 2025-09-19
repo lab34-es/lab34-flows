@@ -24,7 +24,7 @@ module.exports.createAI = async (body) => {
     return {
       name: app.name,
       methods: app.methods
-    }
+    };
   });
 
   const messageParts = [
@@ -43,7 +43,7 @@ module.exports.createAI = async (body) => {
     '    parameters: <parameters to pass to the method>',
     '',
 
-    `ONLY USE THE APPLICATIONS STRICLY NECESSARY. Do not include applications that are not needed for the scenario.`,
+    'ONLY USE THE APPLICATIONS STRICLY NECESSARY. Do not include applications that are not needed for the scenario.',
     'If you are not sure about an applicaiton, DO NOT include it.',
 
     'You MUST respect the format of the parameters. Strings must be enclosed in double quotes, numbers must be plain numbers, and booleans must be true or false.',
@@ -57,7 +57,7 @@ module.exports.createAI = async (body) => {
     '1. Do not reply with explanations, just the YAML.',
     '2. Do not include any markdown code block markers like ```yaml or ``` in your response.',
     '3. Your response should start directly with "title:" and contain only valid YAML.',
-    '4. Remember: ONLY YAML is accepted as response.',
+    '4. Remember: ONLY YAML is accepted as response.'
   ];
 
   // Send message parts to the AI
@@ -71,7 +71,7 @@ module.exports.createAI = async (body) => {
 
   // Get the Gemini model
   const model = genAI.getGenerativeModel({
-    model: aiConfig.gemini.model || 'gemini-pro',
+    model: aiConfig.gemini.model || 'gemini-pro'
   });
 
   // Create a chat session
@@ -79,8 +79,8 @@ module.exports.createAI = async (body) => {
     generationConfig: {
       temperature: aiConfig.gemini.temperature || 0.7,
       topP: aiConfig.gemini.topP || 0.95,
-      topK: aiConfig.gemini.topK || 40,
-    },
+      topK: aiConfig.gemini.topK || 40
+    }
   });
 
   // Send the prompt to Gemini
@@ -92,12 +92,12 @@ module.exports.createAI = async (body) => {
 
   return {
     flow: responseText
-  }
+  };
 };
 
 module.exports.listCapabilities = async () => {
   return apps.summary();
-}
+};
 
 /**
  * Given the location of a yaml file, return its content
@@ -125,19 +125,19 @@ const getContent = (flowPath) => {
   }
 
   return contents;
-}
+};
 
 module.exports.getUserFlow = (flowPath) => {
   if (!fs.existsSync(flowPath)) {
     return Promise.reject('Flow not found');
   }
 
-  const content = getContent(flowPath)
+  const content = getContent(flowPath);
   return Promise.resolve({
     ...content,
     path: flowPath,
     plainText: fs.readFileSync(flowPath, 'utf8')
-  })
+  });
 };
 
 /**
@@ -196,7 +196,7 @@ module.exports.list = async () => {
 module.exports.start = async (body, opts) => {
   const {
     value,
-    environment,
+    environment
   } = body;
 
   const {
@@ -218,6 +218,6 @@ module.exports.start = async (body, opts) => {
     reporter: {
       cli: false,
       server: io
-    },
+    }
   });
-}
+};

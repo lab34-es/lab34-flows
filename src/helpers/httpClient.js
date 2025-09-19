@@ -11,9 +11,9 @@ const headers = (ctx) => {
   // Merge all conditional headers into a single object
   return [
     env.X_API_KEY ? { 'x-api-key': env.X_API_KEY } : {},
-    env.HTTP_BASIC_AUTH ? { 'Authorization': `Basic ${Buffer.from(env.HTTP_BASIC_AUTH).toString('base64')}` } : {},
+    env.HTTP_BASIC_AUTH ? { 'Authorization': `Basic ${Buffer.from(env.HTTP_BASIC_AUTH).toString('base64')}` } : {}
   ].reduce((acc, h) => Object.assign(acc, h), {});
-}
+};
 
 /**
  * Core fetch function to make HTTP requests
@@ -52,13 +52,13 @@ const _fetch = (ctx, urlPath, opts) => {
   debug('Request URL: %s', fullUrl);
   
   // Extract special options and keep standard axios options
-  let {
+  const {
     skipCertCheck, // Custom option to bypass SSL certificate validation
     ...options
   } = opts || {};
 
   // Initialize and merge headers from context
-  if (!options.headers) options.headers = {};
+  if (!options.headers) {options.headers = {};}
   options.headers = Object.assign(headers(ctx), options.headers);
 
   // Process request body for JSON objects
@@ -85,10 +85,10 @@ const _fetch = (ctx, urlPath, opts) => {
   }
   
   // Log the outgoing request using the context's reporter
-  ctx.reporter.request(options.method, {url: fullUrl, options});
+  ctx.reporter.request(options.method, { url: fullUrl, options });
 
   // Prepare axios request configuration
-  const axiosRequest = Object.assign({}, {url: fullUrl}, options);
+  const axiosRequest = Object.assign({}, { url: fullUrl }, options);
 
   // Perform the request and handle response processing
   return axios.request(axiosRequest)
@@ -99,8 +99,8 @@ const _fetch = (ctx, urlPath, opts) => {
       if (skipCertCheck) {
         process.env.NODE_TLS_REJECT_UNAUTHORIZED = prevRejectUnauthorized;
       }
-    })
-}
+    });
+};
 
 /**
  * Process and format HTTP response
@@ -139,7 +139,7 @@ const formatResponse = async (ctx, response, meta) => {
       body = (response.response && response.response.data) || response.message || 'Unknown error';
     }
     console.error('Error:', JSON.stringify(body, null, 2));
-    process.exit(1)
+    process.exit(1);
     throw response;
   }
 
@@ -166,13 +166,13 @@ const formatResponse = async (ctx, response, meta) => {
   return Promise.resolve([headers, status, body])
     .then(([headers, status, body]) => {
       const timing = meta.end - meta.start;
-      ctx.reporter.response({headers, status, body}, {
+      ctx.reporter.response({ headers, status, body }, {
         ...meta,
-        timing, // Calculate total request duration
+        timing // Calculate total request duration
       });
       return [headers, status, body];
     });
-}
+};
 
 /**
  * Perform a GET request
@@ -182,8 +182,8 @@ const formatResponse = async (ctx, response, meta) => {
  * @returns {Promise<Array>} - Promise resolving to [headers, status, body]
  */
 const get = (ctx, url, opts) => {
-  return _fetch(ctx, url, Object.assign(opts || {}, {method: 'GET'}))
-}
+  return _fetch(ctx, url, Object.assign(opts || {}, { method: 'GET' }));
+};
 
 /**
  * Perform a POST request
@@ -193,8 +193,8 @@ const get = (ctx, url, opts) => {
  * @returns {Promise<Array>} - Promise resolving to [headers, status, body]
  */
 const post = (ctx, url, opts) => {
-  return _fetch(ctx, url, Object.assign(opts || {}, {method: 'POST'}))
-}
+  return _fetch(ctx, url, Object.assign(opts || {}, { method: 'POST' }));
+};
 
 /**
  * Perform a PUT request
@@ -204,8 +204,8 @@ const post = (ctx, url, opts) => {
  * @returns {Promise<Array>} - Promise resolving to [headers, status, body]
  */
 const put = (ctx, url, opts) => {
-  return _fetch(ctx, url, Object.assign(opts || {}, {method: 'PUT'}))
-}
+  return _fetch(ctx, url, Object.assign(opts || {}, { method: 'PUT' }));
+};
 
 /**
  * Perform a DELETE request
@@ -215,8 +215,8 @@ const put = (ctx, url, opts) => {
  * @returns {Promise<Array>} - Promise resolving to [headers, status, body]
  */
 const del = (ctx, url, opts) => {
-  return _fetch(ctx, url, Object.assign(opts || {}, {method: 'DELETE'}))
-}
+  return _fetch(ctx, url, Object.assign(opts || {}, { method: 'DELETE' }));
+};
 
 /**
  * Perform a PATCH request
@@ -226,13 +226,13 @@ const del = (ctx, url, opts) => {
  * @returns {Promise<Array>} - Promise resolving to [headers, status, body]
  */
 const patch = (ctx, url, opts) => {
-  return _fetch(ctx, url, Object.assign(opts || {}, {method: 'PATCH'}))
-}
+  return _fetch(ctx, url, Object.assign(opts || {}, { method: 'PATCH' }));
+};
 
 module.exports = {
   get,
   post,
   put,
   del,
-  patch,
-}
+  patch
+};

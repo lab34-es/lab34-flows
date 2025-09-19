@@ -1,7 +1,7 @@
 
-const path = require('path')
-const fs = require('fs')
-const os = require('os')
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const readline = require('readline');
 
 module.exports.logo = (append) => {
@@ -10,7 +10,7 @@ module.exports.logo = (append) => {
   console.log('| |_| |/ _ \\ \\ /\\ / / __|');
   console.log('|  _| | (_) \\ V  V /\\__ \\');
   console.log(`|_| |_|\\___/ \\_/\\_/ |___/ ${append}`);
-}
+};
 
 
 /**
@@ -43,7 +43,7 @@ module.exports.wisdom = () => {
 (maybe) Ron Jeffries: "The quality of your code is only as good as the quality of your tools."
 (maybe) Jez Humble: "The best tools for software development are those that fit seamlessly into your workflow and enhance productivity."
 (maybe) Paul Graham: "A tool that doesn’t fit your workflow is like a shoe that doesn’t fit your foot. Find the one that works for you."`;
-// Function to pick a random line from a multiline string
+  // Function to pick a random line from a multiline string
   const pickRandomLine = () => {
     // Split the multiline string into an array of lines
     const lines = multilineString.trim().split('\n');
@@ -54,11 +54,11 @@ module.exports.wisdom = () => {
   };
   // Use the function
   const quote = pickRandomLine();
-  console.log(`   ${quote}`)
-  console.log(`   `)
-  console.log(`   `)
-  console.log(`   `)
-}
+  console.log(`   ${quote}`);
+  console.log('   ');
+  console.log('   ');
+  console.log('   ');
+};
 
 const isInteractive = process.stdout.isTTY;
 module.exports.isInteractive = isInteractive;

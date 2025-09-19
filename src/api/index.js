@@ -58,10 +58,10 @@ module.exports.start = (options = {}) => {
     console.log('Server is running on port 3001');
     console.log('http://localhost:3001');
   });
-}
+};
 
 module.exports.stop = () => {
   server.close(() => {
     console.log('Server stopped');
   });
-}
+};

@@ -8,13 +8,13 @@ const start = async () => {
     context: argv.context || null
   };
   await api.start(options);
-}
+};
 
 module.exports.start = start;
 
 module.exports.stop = async () => {
   await api.stop();
-}
+};
 
 // Check if we'r running in the main process or just the script from cli
 

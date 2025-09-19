@@ -14,7 +14,7 @@ const validate = (schema, data) => {
   if (!valid) {
     throw new Error(ajv.errorsText());
   }
-}
+};
 
 /**
  * Applies fallbacks to data based on schema configuration
@@ -24,7 +24,7 @@ const validate = (schema, data) => {
  * @returns {Object} Data with fallbacks applied
  */
 const applyFallbacks = (data, schema, flow) => {
-  if (!schema.fallbacks) return data;
+  if (!schema.fallbacks) {return data;}
   
   const result = { ...data };
   
@@ -78,7 +78,7 @@ const applyFallbacks = (data, schema, flow) => {
  * @returns {Object} Data with nested fallbacks applied
  */
 const applyNestedFallbacks = (data, schema, parentFallbacks, flow) => {
-  if (!schema.properties) return data;
+  if (!schema.properties) {return data;}
   
   const result = { ...data };
   
@@ -110,8 +110,8 @@ const body = schema => {
     validate(cleanSchema, dataWithFallbacks);
     
     // Update parameters with fallback values
-    if (!parameters) parameters = {};
-    if (!parameters.body) parameters.body = {};
+    if (!parameters) {parameters = {};}
+    if (!parameters.body) {parameters.body = {};}
     Object.assign(parameters.body, dataWithFallbacks);
   };
   // Attach the schema to the validator function
@@ -130,15 +130,15 @@ const query = schema => {
     validate(cleanSchema, dataWithFallbacks);
     
     // Update parameters with fallback values
-    if (!parameters) parameters = {};
-    if (!parameters.query) parameters.query = {};
+    if (!parameters) {parameters = {};}
+    if (!parameters.query) {parameters.query = {};}
     Object.assign(parameters.query, dataWithFallbacks);
   };
   // Attach the schema to the validator function
   validator.schemaType = 'query';
   validator.schema = schema;
   return validator;
-}
+};
 
 const params = schema => {
   const validator = (ctx, parameters, flow) => {
@@ -150,15 +150,15 @@ const params = schema => {
     validate(cleanSchema, dataWithFallbacks);
     
     // Update parameters with fallback values
-    if (!parameters) parameters = {};
-    if (!parameters.params) parameters.params = {};
+    if (!parameters) {parameters = {};}
+    if (!parameters.params) {parameters.params = {};}
     Object.assign(parameters.params, dataWithFallbacks);
   };
   // Attach the schema to the validator function
   validator.schemaType = 'params';
   validator.schema = schema;
   return validator;
-}
+};
 
 const headers = schema => {
   const validator = (ctx, parameters) => {
@@ -168,7 +168,7 @@ const headers = schema => {
   validator.schemaType = 'headers';
   validator.schema = schema;
   return validator;
-}
+};
 
 module.exports.validate = validate;
 module.exports.applyFallbacks = applyFallbacks;

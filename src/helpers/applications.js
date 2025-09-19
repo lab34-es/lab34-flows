@@ -8,20 +8,20 @@ const temp = require('temp');
 
 const paths = require('./paths');
 
-let applications = {};
+const applications = {};
 
 module.exports.applications = applications;
 
 const description = (description) => {
   return description;
-}
+};
 
 module.exports.description = description;
 
 // Helper function to convert array-style handlers to functions that can describe themselves
 const handler = (handlerArray, functionName) => {
   // The actual function that will be called
-  const handler = function(ctx, parameters, flow) {
+  const handler = function (ctx, parameters, flow) {
     if (ctx === 'describe') {
       // Extract description and validations
       const description = handlerArray[0];
@@ -79,7 +79,7 @@ const loadAll = () => {
         return acc;
       }, {});
     });
-}
+};
 
 module.exports.loadAll = loadAll;
 
@@ -100,7 +100,7 @@ const listEnvFiles = pathToSearch => {
   return fs.readdirSync(envDir)
     .filter(file => fs.statSync(path.join(envDir, file)).isFile() && file.endsWith('.env'))
     .map(file => path.join(envDir, file));
-}
+};
 
 /**
  * Gets a unique list of all possible environments based on the .env files
@@ -115,7 +115,7 @@ const allPossibleEnvironments = (lookFor) => {
       return [...new Set(envs.flat())];
     })
     .then(envs => envs.filter(env => env && env.trim() !== '').sort());
-}
+};
 
 module.exports.allPossibleEnvironments = allPossibleEnvironments;
 
@@ -137,7 +137,7 @@ const maskValue = value => {
 
   // Replace all characters with *
   return (value||'').toString().replace(/./g, '*');
-}
+};
 
 const loadEnvFile = envPath => {
   const secretLike = [
@@ -148,7 +148,7 @@ const loadEnvFile = envPath => {
     'x_api_key',
     'password',
     'authorization'
-  ]
+  ];
 
   const envConfig = dotenv.parse(fs.readFileSync(envPath));
   return Object.keys(envConfig).map(key => {
@@ -160,10 +160,10 @@ const loadEnvFile = envPath => {
     return {
       key,
       isSecret: feelsSecret,
-      value: feelsSecret ? maskValue(envConfig[key]) : envConfig[key],
-    }
+      value: feelsSecret ? maskValue(envConfig[key]) : envConfig[key]
+    };
   });
-}
+};
 
 module.exports.updateEnvFile = (envPath, key, value) => {
   return new Promise((resolve, reject) => {
@@ -182,7 +182,7 @@ module.exports.updateEnvFile = (envPath, key, value) => {
       });
     });
   });
-}
+};
 
 const summary = () => {
   return parseApplications()
@@ -208,7 +208,7 @@ const summary = () => {
         
         console.log(''); // Empty line between applications
       });
-    })
+    });
 };
 
 module.exports.summary = summary;
@@ -227,7 +227,7 @@ module.exports.summary = summary;
  * }
  */
 const parseApplications = async () => {
-  let appsPath = await paths.contextDir(['applications']);
+  const appsPath = await paths.contextDir(['applications']);
 
   if (!fs.existsSync(appsPath)) {
     return [];
@@ -235,7 +235,7 @@ const parseApplications = async () => {
 
   const apps = fs.readdirSync(appsPath).filter(file => {
     return fs.statSync(path.join(appsPath, file)).isDirectory();
-  })
+  });
   
   const result = await Promise.all(apps.map(async applicationName => {
     const appPath = path.join(appsPath, applicationName);
@@ -252,13 +252,13 @@ const parseApplications = async () => {
         name: envName,
         source: envFile,
         path: envFile,
-        contents: loadEnvFile(envFile),
+        contents: loadEnvFile(envFile)
       };
     });
 
     // if index file exists load methods
     let methods = [];
-    let errors = [];
+    const errors = [];
 
     if (fs.existsSync(appIndex)) {
 
@@ -275,14 +275,14 @@ const parseApplications = async () => {
       try {
         const lib = require(appPath);
         methods = Object.keys(lib).map(method => {
-          return lib[method]('describe')
+          return lib[method]('describe');
         });
       }
       catch (ex) {
         console.error('Error loading application', applicationName, ex);
         errors.push({
           message: ex.message,
-          stack: ex.stack,
+          stack: ex.stack
         });
       }
       finally {
@@ -297,11 +297,11 @@ const parseApplications = async () => {
       path: appPath,
       envFiles: envFilesWithPaths,
       methods,
-      errors,
+      errors
     };
   }));
 
   return result;
-}
+};
 
 module.exports.parseApplications = parseApplications;

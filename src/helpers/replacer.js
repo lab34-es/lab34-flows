@@ -5,100 +5,100 @@ const handlebars = require('handlebars');
 const { faker } = require('@faker-js/faker');
 
 const belgianCitiesEn = [
-  "Brussels",
-  "Antwerp",
-  "Ghent",
-  "Bruges",
-  "Liège",
-  "Namur",
-  "Leuven",
-  "Mons",
-  "Aalst",
-  "Mechelen",
-  "La Louvière",
-  "Kortrijk",
-  "Hasselt",
-  "Ostend",
-  "Sint-Niklaas",
-  "Tournai",
-  "Genk",
-  "Seraing",
-  "Roeselare",
-  "Verviers",
-  "Mouscron",
-  "Beveren",
-  "Dendermonde",
-  "Beringen",
-  "Turnhout",
-  "Dilbeek",
-  "Heist-op-den-Berg",
-  "Sint-Truiden",
-  "Lokeren",
-  "Herstal",
-  "Maasmechelen",
-  "Châtelet",
-  "Halle",
-  "Hoboken",
-  "Schoten",
-  "Harelbeke",
-  "Knokke-Heist",
-  "Grimbergen",
-  "Geel",
-  "Mol",
-  "Brasschaat",
-  "Temse",
-  "Oudenaarde",
-  "Geraardsbergen",
-  "Vilvoorde",
-  "Lommel",
-  "Tienen",
-  "Diest",
-  "Izegem",
-  "Evergem",
-  "Ronse",
-  "Binche",
-  "Menen",
-  "Ath",
-  "Waregem",
-  "Tongeren",
-  "Aarschot",
-  "Bastogne",
-  "Ninove",
-  "Zottegem",
-  "Huy",
-  "Courcelles",
-  "Bilzen",
-  "Zwevegem",
-  "Herentals",
-  "Borgloon",
-  "Eeklo",
-  "Zaventem",
-  "Wavre",
-  "Lier",
-  "Deinze",
-  "Ypres",
-  "Leuven",
-  "Mechelen",
-  "Aarschot",
-  "Tienen",
-  "Diest",
-  "Hasselt",
-  "Genk",
-  "Tongeren",
-  "Sint-Truiden",
-  "Beringen",
-  "Lommel",
-  "Maaseik",
-  "Bilzen"
+  'Brussels',
+  'Antwerp',
+  'Ghent',
+  'Bruges',
+  'Liège',
+  'Namur',
+  'Leuven',
+  'Mons',
+  'Aalst',
+  'Mechelen',
+  'La Louvière',
+  'Kortrijk',
+  'Hasselt',
+  'Ostend',
+  'Sint-Niklaas',
+  'Tournai',
+  'Genk',
+  'Seraing',
+  'Roeselare',
+  'Verviers',
+  'Mouscron',
+  'Beveren',
+  'Dendermonde',
+  'Beringen',
+  'Turnhout',
+  'Dilbeek',
+  'Heist-op-den-Berg',
+  'Sint-Truiden',
+  'Lokeren',
+  'Herstal',
+  'Maasmechelen',
+  'Châtelet',
+  'Halle',
+  'Hoboken',
+  'Schoten',
+  'Harelbeke',
+  'Knokke-Heist',
+  'Grimbergen',
+  'Geel',
+  'Mol',
+  'Brasschaat',
+  'Temse',
+  'Oudenaarde',
+  'Geraardsbergen',
+  'Vilvoorde',
+  'Lommel',
+  'Tienen',
+  'Diest',
+  'Izegem',
+  'Evergem',
+  'Ronse',
+  'Binche',
+  'Menen',
+  'Ath',
+  'Waregem',
+  'Tongeren',
+  'Aarschot',
+  'Bastogne',
+  'Ninove',
+  'Zottegem',
+  'Huy',
+  'Courcelles',
+  'Bilzen',
+  'Zwevegem',
+  'Herentals',
+  'Borgloon',
+  'Eeklo',
+  'Zaventem',
+  'Wavre',
+  'Lier',
+  'Deinze',
+  'Ypres',
+  'Leuven',
+  'Mechelen',
+  'Aarschot',
+  'Tienen',
+  'Diest',
+  'Hasselt',
+  'Genk',
+  'Tongeren',
+  'Sint-Truiden',
+  'Beringen',
+  'Lommel',
+  'Maaseik',
+  'Bilzen'
 ];
 
 // Register custom barcode helper
-handlebars.registerHelper('barcode', function() {
+handlebars.registerHelper('barcode', function () {
   // Convert arguments object to array, excluding the last item which is the Handlebars options object
   const parts = Array.from(arguments).slice(0, arguments.length - 1);
   // Generate barcode using the existing barcode function
   const result = barcode(parts);
-  return result
+  return result;
 });
 
 /**
@@ -114,7 +114,7 @@ const oneOf = (arr) => {
   }
   const randomIndex = Math.floor(Math.random() * arr.length);
   return arr[randomIndex];
-}
+};
 
 module.exports.oneOf = oneOf;
 
@@ -174,7 +174,7 @@ module.exports.timeAgo = timeAgo;
 const timestampAgo = (amount, lapse) => {
   const result = timeAgo(amount, lapse);
   return result.getTime(); // Return the timestamp in milliseconds
-}
+};
 
 module.exports.timestampAgo = timestampAgo;
 
@@ -191,7 +191,7 @@ const tsAgo = (amount, lapse) => {
   const seconds = result.getSeconds().toString().padStart(2, '0');
   const milliseconds = result.getMilliseconds().toString().padStart(3, '0');
   return `${year}${month}${day}${hours}${minutes}${seconds}`;
-}
+};
 
 module.exports.tsAgo = tsAgo;
 
@@ -203,7 +203,7 @@ module.exports.tsAgo = tsAgo;
  * @returns {string} - Generated barcode string
  */
 const barcode = (parts) => {
-  if (!parts) parts = [];
+  if (!parts) {parts = [];}
 
   // If parts is a string, parse it as a barcode pattern
   if (typeof parts === 'string') {
@@ -211,11 +211,11 @@ const barcode = (parts) => {
   }
   
   return parts.map(part => {
-    if (typeof part === 'number') return Array.from({length: part}, () => Math.floor(Math.random() * 10)).join('');
-    if (typeof part === 'string') return part;
+    if (typeof part === 'number') {return Array.from({ length: part }, () => Math.floor(Math.random() * 10)).join('');}
+    if (typeof part === 'string') {return part;}
     return part;
   }).join('');
-}
+};
 
 module.exports.barcode = barcode;
 
@@ -300,8 +300,8 @@ const values = () => {
     phoneIntl: faker.phone.number({ style: 'international' }),
 
     randomString: faker.string.alphanumeric(8)
-  }
-}
+  };
+};
 
 module.exports.values = values;
 
@@ -320,7 +320,7 @@ module.exports.json = (input, data) => {
   }
   
   // Initialize data object if not provided
-  if (!data) data = {}
+  if (!data) {data = {};}
   data = Object.assign({}, data);
 
   // Skip empty input
@@ -336,9 +336,9 @@ module.exports.json = (input, data) => {
     return JSON.parse(finalValue);
   }
   catch (e) {
-    throw e
+    throw e;
   }
-}
+};
 
 /**
  * Processes a string with Handlebars templating
@@ -348,10 +348,10 @@ module.exports.json = (input, data) => {
  * @returns {string} - Processed string after template rendering
  */
 module.exports.string = (input, data) => {
-  if (!data) data = {}
+  if (!data) {data = {};}
   const template = handlebars.compile(input);
   return template(Object.assign({}, data, values()));
-}
+};
 
 /**
  * Attempts to process input as either JSON or string with Handlebars templating
@@ -361,11 +361,11 @@ module.exports.string = (input, data) => {
  * @returns {Object|string} - Processed result, either as JSON object or string
  */
 module.exports.any = (input, values) => {
-  if (!values) values = {}
+  if (!values) {values = {};}
   
   // Skip empty input
   input = input && input.trim();
-  if (!input) return input;
+  if (!input) {return input;}
   let result = null;
 
   // Try JSON first, fallback to string if that fails
@@ -377,4 +377,4 @@ module.exports.any = (input, values) => {
   }
 
   return result ? result : input;
-}
+};

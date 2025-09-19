@@ -42,7 +42,7 @@ const error = (ctx, yamlFile, error) => {
   const message = `Error in ${yamlFile}: ${error}`;
   console.error(message);
   process.exit(9);
-}
+};
 
 /**
  * @param {*} result 
@@ -56,7 +56,7 @@ const error = (ctx, yamlFile, error) => {
  */
 const formatScrapeResult = async (elements, output, regexp) => {
   // Apply default output
-  if (!output) output = 'string';
+  if (!output) {output = 'string';}
 
   const expectsArrayAsOutput = output.includes('[]');
   if (expectsArrayAsOutput) {
@@ -78,12 +78,12 @@ const formatScrapeResult = async (elements, output, regexp) => {
 
   let result;
 
-  if (output === 'number') result = Number(firstElement.replace(/[^0-9.]/g, ''));
-  if (output === 'string') result = firstElement.trim();
-  if (output === 'date') result = new Date(firstElement).toISOString();
-  if (output === 'boolean') result = ['true', 'yes', '1', 'si'].includes(firstElement.toLowerCase());
+  if (output === 'number') {result = Number(firstElement.replace(/[^0-9.]/g, ''));}
+  if (output === 'string') {result = firstElement.trim();}
+  if (output === 'date') {result = new Date(firstElement).toISOString();}
+  if (output === 'boolean') {result = ['true', 'yes', '1', 'si'].includes(firstElement.toLowerCase());}
   return Promise.resolve(result || firstElement);
-}
+};
 
 /**
  * Given a list of steps, return a list of steps with unique ids
@@ -94,11 +94,11 @@ const formatScrapeResult = async (elements, output, regexp) => {
 const buildSteps = (steps) => {
   // Add "id" property to each step with "applciation.method" as the value
   steps = steps.map((step, index) => {
-    if (typeof step === 'string') return { id: `${step}`, method: step };
-    if (step.slug) return { ...step, id: step.slug };
+    if (typeof step === 'string') {return { id: `${step}`, method: step };}
+    if (step.slug) {return { ...step, id: step.slug };}
 
     const stepIdParts = [
-      step.method,
+      step.method
     ];
 
     return {
@@ -112,12 +112,12 @@ const buildSteps = (steps) => {
   const uniqueIds = [...new Set(ids)];
   if (ids.length !== uniqueIds.length) {
     steps = steps.map((step, index) => {
-      if (ids.filter(id => id === step.id).length === 1) return step;
-      return { id: `${step.id}-${index}`, ...step, };
+      if (ids.filter(id => id === step.id).length === 1) {return step;}
+      return { id: `${step.id}-${index}`, ...step };
     });
   }
   return steps;
-}
+};
 
 const buildData = (data, vars, index) => {
   const {
@@ -131,10 +131,10 @@ const buildData = (data, vars, index) => {
     return acc;
   }, {});
 
-  data = replacer.json(JSON.stringify(data), Object.assign({}, rest, {steps: stepData}));
+  data = replacer.json(JSON.stringify(data), Object.assign({}, rest, { steps: stepData }));
 
   return data;
-}
+};
 
 module.exports.run = (ctx, yamlFile, stepParams) => {
   const yamlPath = path.join(ctx.path, yamlFile);
@@ -146,7 +146,7 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
   steps = buildSteps(steps);
 
   // Validate device
-  if (!device) device = 'iPhone 11 Pro';
+  if (!device) {device = 'iPhone 11 Pro';}
   if (!devices[device]) {
     error(ctx, yamlFile, `Invalid device: ${device}`);
   }
@@ -204,7 +204,7 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
 
       let currentStep = 0;
 
-      for (let step of steps) {
+      for (const step of steps) {
         // Replace step values
         steps[currentStep] = buildData(steps[currentStep], {
           ctx,
@@ -312,7 +312,7 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
             await page.screenshot({ path: parameters.path });
             break;
           case 'waitForInput':
-            process.stdout.write(`      Enter an input and press enter to continue: `.yellow.bold);
+            process.stdout.write('      Enter an input and press enter to continue: '.yellow.bold);
             await new Promise(resolve => process.stdin.once('data', (key) => {
               const input = key.toString().trim().replace('\n', '');
               steps[currentStep].result = { input };
@@ -358,4 +358,4 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
       reject(error);
     }
   });
-}
+};

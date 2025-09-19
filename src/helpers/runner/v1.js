@@ -12,19 +12,19 @@ const tester = require('./tester');
 const paths = require('../paths');
 const reporterHelper = require('../reporter');
 
-let steps = []
-let applications = apps.applications;
+let steps = [];
+const applications = apps.applications;
 
 let mimicdApplications = {};
-let appsCtx = {};
+const appsCtx = {};
 
 let running = false;
 
 const buildSteps = (steps) => {
   // Add "id" property to each step with "applciation.method" as the value
   steps = steps.map((step, index) => {
-    if (typeof step === 'string') return { method: step, id: `${step}`, };
-    if (step.slug) return { ...step, id: step.slug };
+    if (typeof step === 'string') {return { method: step, id: `${step}` };}
+    if (step.slug) {return { ...step, id: step.slug };}
 
     const stepIdParts = [
       step.application,
@@ -42,7 +42,7 @@ const buildSteps = (steps) => {
   
   if (ids.length !== uniqueIds.length) {
     steps = steps.map((step, index) => {
-      if (ids.filter(id => id === step.id).length === 1) return step;
+      if (ids.filter(id => id === step.id).length === 1) {return step;}
       return { ...step, id: `${step.id}-${index}` };
     });
   }
@@ -55,10 +55,10 @@ const buildSteps = (steps) => {
   });
 
   return steps;
-}
+};
 
 const buildData = (data, flow) => {
-  if (!data) return {};
+  if (!data) {return {};}
 
   // Convert each step into a property in a json object
   const stepData = flow.steps.reduce((acc, step) => {
@@ -69,7 +69,7 @@ const buildData = (data, flow) => {
   data = replacer.json(JSON.stringify(data), { steps: stepData, memory: flow.memory || {} }, {});
 
   return data;
-}
+};
 
 const executeStep = async (flow, step, attemptNumber = 0) => {
   const { application, method, parameters } = step;
@@ -89,7 +89,7 @@ const executeStep = async (flow, step, attemptNumber = 0) => {
 
   flow.steps[stepIndex].parameters = params;
 
-  let [headers, status, body, memory] = await applications[application][method](
+  const [headers, status, body, memory] = await applications[application][method](
     {
       ...appsCtx[application],
       reporter: flow.reporter
@@ -128,8 +128,8 @@ const executeStep = async (flow, step, attemptNumber = 0) => {
     }
   }
 
-  return [params, headers, status, body, memory]
-}
+  return [params, headers, status, body, memory];
+};
 
 const processor = async (flow, opts) => {
   try {
@@ -153,9 +153,9 @@ const processor = async (flow, opts) => {
     const uniqueApplications = [...new Set(steps.map(step => step.application).filter(Boolean))];
 
     // Load environment variables for each application
-    for (let application of uniqueApplications) {
+    for (const application of uniqueApplications) {
       try {
-        if (application === 'tester') continue;
+        if (application === 'tester') {continue;}
 
         const applicationPath = await paths.contextDir(['applications', application]);
         const envFile = await paths.contextDir(['applications', application, 'env', `${environment}.env`]);
@@ -167,7 +167,7 @@ const processor = async (flow, opts) => {
             name: 'MissingEnvironmentFile',
             message: `Missing environment file for ${application} at ${envFile}`,
             code: 3
-          }
+          };
           flow.reporter.execution();
           throw flow.execution.error;
         }
@@ -176,7 +176,7 @@ const processor = async (flow, opts) => {
           name: application,
           path: applicationPath,
           env: dotenv.parse(fs.readFileSync(envFile))
-        }
+        };
       } catch (err) {
         flow.execution.status = 'error';
         flow.execution.error = {
@@ -194,7 +194,7 @@ const processor = async (flow, opts) => {
       flow.execution.status = 'error';
       flow.execution.error = {
         name: 'InvalidMimic',
-        message: `Invalid mimic configuration`,
+        message: 'Invalid mimic configuration',
         code: 5
       };
       flow.reporter.execution();
@@ -214,14 +214,14 @@ const processor = async (flow, opts) => {
     // Use a for loop with index as the control variable instead of for...of
     // This allows us to control which step to execute next
     for (let i = 0; i < flow.steps.length; i++) {
-      console.log('')
+      console.log('');
       
       const step = flow.steps[i];
 
       try {
         // Execute the method and log the result. Pass each property in step.data as a separate argument.
         let { application, method, parameters, mimic, test, testlatentApplications, id } = step;
-        if (!parameters) parameters = {};
+        if (!parameters) {parameters = {};}
 
         // Prepare holder for execution information
         // If the execution object already exists (due to a retry), preserve the attempt number
@@ -246,7 +246,7 @@ const processor = async (flow, opts) => {
           throw new Error(`Method not found: ${method} in ${application}`);
         }
 
-        const [request, headers, status, body, memory] = await executeStep(flow, step)
+        const [request, headers, status, body, memory] = await executeStep(flow, step);
 
         flow.steps[i].execution.times.end = Date.now();
         flow.steps[i].execution.times.duration = (new Date() - flow.execution.times.start) / 1000;
@@ -385,19 +385,19 @@ const processor = async (flow, opts) => {
 const run = async (flow, opts) => {
   const executionId = uuidv4();
 
-  const { cli } = opts
+  const { cli } = opts;
 
   // Now that we've all details, prepare the reporter appropiately
   const { server } = opts.reporter;
-  flow.reporter = reporterHelper.get({flow, cli, server});
+  flow.reporter = reporterHelper.get({ flow, cli, server });
 
   // Initialize basis of execution information
   flow.execution = {
     id: executionId,
     status: 'running',
     times: {
-      start: Date.now(),
-    },
+      start: Date.now()
+    }
   };
 
   // Report it
@@ -411,13 +411,13 @@ const run = async (flow, opts) => {
     catch (ex) {
      
     }
-    return { execution: flow.execution }
+    return { execution: flow.execution };
   }
   // Invokations based on CLI must wait for processor to complete
   else {
     return processor(flow, opts);
   }
-}
+};
 
 module.exports = {
   steps,
@@ -428,7 +428,7 @@ module.exports = {
     }
     running = true;
     try {
-      return run(flow, opts)
+      return run(flow, opts);
     }
     catch (ex) {
       throw ex;
@@ -437,4 +437,4 @@ module.exports = {
       running = false;
     }
   }
-}
+};

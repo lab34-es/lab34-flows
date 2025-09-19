@@ -12,6 +12,6 @@ const load = async (name) => {
   const config = JSON.parse(configData);
 
   return config;
-}
+};
 
 module.exports.load = load;

@@ -6,12 +6,12 @@ const flows = require('../../helpers/flows');
 
 router.get('/', (req, res) => {
   flows.list()
-    .then(list => res.send(list))
+    .then(list => res.send(list));
 });
 
 router.post('/create/ai', (req, res) => {
   flows.createAI(req.body)
-    .then(flow => res.send(flow))
+    .then(flow => res.send(flow));
 });
 
 router.post('/start', (req, res) => {
@@ -19,8 +19,8 @@ router.post('/start', (req, res) => {
     io: req.app.get('io')
   })
     .then(flow => {
-        res.send({ execution: flow.execution });
-    })
+      res.send({ execution: flow.execution });
+    });
 });
 
 router.get('/user', (req, res) => {
@@ -33,7 +33,7 @@ router.get('/user', (req, res) => {
 router.post('/user/:application', (req, res) => {
   const path = req.query.path;
   flows.getUserFlow(path)
-    .then(flow => res.send(flow))
+    .then(flow => res.send(flow));
 });
 
 module.exports = router;
