@@ -100,6 +100,9 @@ set NODE_PATH=%AppData%\npm\node_modules
 
 # On NVM for Windows:
 set NODE_PATH=%NVM_SYMLINK%\node_modules
+
+# On NVM for Windows (powershell)
+$env:NODE_PATH = "$env:NVM_SYMLINK\node_modules"
 ```
 
 ## Usage
