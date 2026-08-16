@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { AlertCircle, AppWindow, BookOpen, Braces, ChevronDown, Database, FileWarning, SlidersHorizontal } from 'lucide-react';
 
@@ -11,7 +11,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Markdown from '@/components/shared/Markdown';
 import CodeBlock from '@/components/shared/CodeBlock';
+import ApplicationSource from '@/components/application/ApplicationSource';
 import { applicationsApi } from '@/services/api';
+import { useAppState } from '@/context/AppStateContext';
 
 function InputTable({ input }) {
   if (!input || !input.length) {
@@ -172,31 +174,48 @@ export function ApplicationPage() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
   const highlightedMethod = searchParams.get('method');
+  const { refreshApplications } = useAppState();
 
   const [app, setApp] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [view, setView] = useState('document');
+
+  const fetchApp = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+      setApp(null);
+    }
+    setError(null);
+
+    try {
+      const response = await applicationsApi.get(slug);
+      if (!response.data) {
+        setError(`Application “${slug}” not found`);
+      } else {
+        setApp(response.data);
+      }
+    } catch (ex) {
+      setError(ex.response?.data?.error || ex.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [slug]);
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setApp(null);
+    fetchApp();
+  }, [fetchApp]);
 
-    applicationsApi.get(slug)
-      .then((response) => {
-        if (cancelled) { return; }
-        if (!response.data) {
-          setError(`Application “${slug}” not found`);
-        } else {
-          setApp(response.data);
-        }
-      })
-      .catch((ex) => !cancelled && setError(ex.response?.data?.error || ex.message))
-      .finally(() => !cancelled && setLoading(false));
+  // Deep links to a method (?method=x) always land on the Document view
+  useEffect(() => {
+    if (highlightedMethod) { setView('document'); }
+  }, [highlightedMethod, slug]);
 
-    return () => { cancelled = true; };
-  }, [slug]);
+  // The Document view must reflect files saved from the Source view
+  const handleSourceSaved = useCallback(() => {
+    fetchApp({ silent: true });
+    refreshApplications();
+  }, [fetchApp, refreshApplications]);
 
   const defaultTab = useMemo(() => (highlightedMethod ? 'methods' : 'readme'), [highlightedMethod]);
 
@@ -226,14 +245,24 @@ export function ApplicationPage() {
     <div className="mx-auto w-full max-w-4xl space-y-6 p-6">
       {/* Header */}
       <div className="space-y-1.5">
-        <div className="flex items-center gap-3">
-          <div className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-lg">
-            <AppWindow className="size-5" />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-lg">
+              <AppWindow className="size-5" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">{app.name}</h1>
+              <p className="text-muted-foreground font-mono text-xs">{app.path}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{app.name}</h1>
-            <p className="text-muted-foreground font-mono text-xs">{app.path}</p>
-          </div>
+
+          {/* Same Document / Source toggle as the flow view */}
+          <Tabs value={view} onValueChange={setView}>
+            <TabsList>
+              <TabsTrigger value="document">Document</TabsTrigger>
+              <TabsTrigger value="source">Source</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
         {app.description && <p className="text-muted-foreground text-sm">{app.description}</p>}
       </div>
@@ -250,6 +279,10 @@ export function ApplicationPage() {
         </Alert>
       )}
 
+      {view === 'source' ? (
+        <ApplicationSource slug={slug} onSaved={handleSourceSaved} />
+      ) : (
+      <>
       <Tabs key={`${slug}:${highlightedMethod || ''}`} defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="readme"><BookOpen /> README</TabsTrigger>
@@ -327,8 +360,10 @@ export function ApplicationPage() {
       <Separator />
       <p className="text-muted-foreground text-xs">
         Methods and their documentation come from the application's <span className="font-mono">docs.json</span> and
-        the self-description of <span className="font-mono">index.js</span>.
+        the self-description of <span className="font-mono">index.js</span>. Edit them in the <strong>Source</strong> view.
       </p>
+      </>
+      )}
     </div>
   );
 }

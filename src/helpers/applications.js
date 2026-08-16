@@ -63,10 +63,8 @@ const handler = (handlerArray, functionName) => {
 module.exports.handler = handler;
 
 const loadAll = () => {
-  if (Object.keys(applications).length) {
-    return Promise.resolve(applications);
-  }
-
+  // Always reload: application code can be edited from the UI (Source view)
+  // and the next run must pick up the changes without restarting the server
   return parseApplications()
     .then(apps => {
       return apps.reduce((acc, app) => {
@@ -279,6 +277,9 @@ const parseApplications = async () => {
       fs.writeFileSync(appIndex, appIndexContentModified);
 
       try {
+        // Bust the require cache so edits made from the UI (Source view)
+        // are picked up without restarting the server
+        delete require.cache[appIndex];
         const lib = require(appPath);
         methods = Object.keys(lib).map(method => {
           return lib[method]('describe');
@@ -360,3 +361,102 @@ const parseApplications = async () => {
 };
 
 module.exports.parseApplications = parseApplications;
+
+/**
+ * Files of an application that can be viewed and edited from the UI
+ * (Source view): its docs, its code and its environment files.
+ */
+const CANONICAL_APP_FILES = ['README.md', 'docs.json', 'index.js'];
+
+/**
+ * Resolve an editable file inside an application folder, rejecting anything
+ * outside the whitelist or outside the application directory.
+ * @param {string} applicationName
+ * @param {string} relativePath - e.g. "README.md", "docs.json", "env/local.env"
+ * @returns {Promise<{appPath: string, absolute: string, relative: string}>}
+ */
+const resolveAppFile = async (applicationName, relativePath) => {
+  const appPath = await paths.contextDir(['applications', applicationName]);
+
+  if (!fs.existsSync(appPath) || !fs.statSync(appPath).isDirectory()) {
+    throw new Error('Application not found');
+  }
+
+  const normalized = (relativePath || '').split('\\').join('/');
+
+  const isCanonical = CANONICAL_APP_FILES.some(
+    name => name.toLowerCase() === normalized.toLowerCase()
+  );
+  const isEnvFile = /^env\/[^/]+\.env$/i.test(normalized);
+
+  if (!isCanonical && !isEnvFile) {
+    throw new Error(`Not an editable application file: ${normalized}`);
+  }
+
+  const absolute = path.resolve(appPath, normalized);
+  if (!absolute.startsWith(appPath + path.sep)) {
+    throw new Error('Invalid path');
+  }
+
+  return { appPath, absolute, relative: normalized };
+};
+
+/**
+ * List the editable files of an application. Canonical files (README.md,
+ * docs.json, index.js) are always listed with an `exists` flag so the UI
+ * can offer creating the missing ones; env files are listed when present.
+ * @param {string} applicationName
+ * @returns {Promise<Array<{path: string, exists: boolean}>>}
+ */
+module.exports.listAppFiles = async (applicationName) => {
+  const appPath = await paths.contextDir(['applications', applicationName]);
+
+  if (!fs.existsSync(appPath) || !fs.statSync(appPath).isDirectory()) {
+    throw new Error('Application not found');
+  }
+
+  const entries = fs.readdirSync(appPath);
+
+  const files = CANONICAL_APP_FILES.map(name => {
+    // Respect the on-disk casing (readme.md vs README.md)
+    const actual = entries.find(entry => entry.toLowerCase() === name.toLowerCase());
+    return { path: actual || name, exists: Boolean(actual) };
+  });
+
+  for (const envFile of listEnvFiles(appPath)) {
+    files.push({ path: `env/${path.basename(envFile)}`, exists: true });
+  }
+
+  return files;
+};
+
+/**
+ * Read an editable application file. Missing canonical files return empty
+ * content with exists=false so the UI can offer creating them.
+ * @param {string} applicationName
+ * @param {string} relativePath
+ */
+module.exports.readAppFile = async (applicationName, relativePath) => {
+  const { absolute, relative } = await resolveAppFile(applicationName, relativePath);
+
+  if (!fs.existsSync(absolute)) {
+    return { path: relative, exists: false, content: '' };
+  }
+
+  return { path: relative, exists: true, content: fs.readFileSync(absolute, 'utf8') };
+};
+
+/**
+ * Create or update an editable application file.
+ * @param {string} applicationName
+ * @param {string} relativePath
+ * @param {string} content
+ */
+module.exports.writeAppFile = async (applicationName, relativePath, content) => {
+  const { absolute, relative } = await resolveAppFile(applicationName, relativePath);
+
+  fs.mkdirSync(path.dirname(absolute), { recursive: true });
+  fs.writeFileSync(absolute, content ?? '', 'utf8');
+
+  return { path: relative };
+};

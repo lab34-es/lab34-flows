@@ -4,11 +4,38 @@ const router = express.Router();
 
 const apps = require('../../helpers/applications');
 
+const sendError = (res, error, status = 400) => {
+  const message = (error && error.message) || String(error);
+  const code = /not found/i.test(message) ? 404 : status;
+  res.status(code).send({ error: message });
+};
+
 router.get('/', (req, res) => {
   apps.parseApplications()
     .then(list => {
       res.send(list);
     });
+});
+
+// Editable source files of an application (Source view in the UI)
+router.get('/:application/files', (req, res) => {
+  apps.listAppFiles(req.params.application)
+    .then(files => res.send(files))
+    .catch(error => sendError(res, error));
+});
+
+// Read one editable file. ?path=README.md | docs.json | index.js | env/x.env
+router.get('/:application/files/content', (req, res) => {
+  apps.readAppFile(req.params.application, req.query.path)
+    .then(file => res.send(file))
+    .catch(error => sendError(res, error));
+});
+
+// Create or update one editable file. { path, content }
+router.put('/:application/files/content', (req, res) => {
+  apps.writeAppFile(req.params.application, req.body.path, req.body.content)
+    .then(result => res.send({ success: true, ...result }))
+    .catch(error => sendError(res, error));
 });
 
 router.get('/:application', (req, res) => {

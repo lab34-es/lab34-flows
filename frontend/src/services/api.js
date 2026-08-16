@@ -28,6 +28,11 @@ export const flowsApi = {
 export const applicationsApi = {
   list: () => api.get('/api/applications'),
   get: (slug) => api.get(`/api/applications/${encodeURIComponent(slug)}`),
+  listFiles: (slug) => api.get(`/api/applications/${encodeURIComponent(slug)}/files`),
+  getFile: (slug, path) =>
+    api.get(`/api/applications/${encodeURIComponent(slug)}/files/content?path=${encodeURIComponent(path)}`),
+  saveFile: (slug, path, content) =>
+    api.put(`/api/applications/${encodeURIComponent(slug)}/files/content`, { path, content }),
   getEnvs: (slug) => api.get(`/api/applications/${encodeURIComponent(slug)}/envs`),
   updateEnvVariable: (slug, env, key, value) =>
     api.put(`/api/applications/${encodeURIComponent(slug)}/envs/${env}/${key}`, { value }),

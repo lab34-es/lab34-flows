@@ -333,7 +333,9 @@ and open http://localhost:3001.
   - **Applications** — every application in your context directory. Click
     one to read its **README** and browse its **methods** (input parameters,
     output, memory usage and examples, from its `docs.json`), plus its
-    environment files.
+    environment files. Like flows, applications have a **Document / Source**
+    toggle: the Source view edits the application's files (`README.md`,
+    `docs.json`, `index.js` and `env/*.env`) right from the UI.
 - **Notebook view** — a flow renders as a document; each ```` ```step ````
   block is a cell. Press **Run** and the execution details of each step
   stream in below its block: status, timing, request, response and
