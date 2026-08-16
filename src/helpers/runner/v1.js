@@ -1,8 +1,7 @@
-const colors = require('colors');
+require('colors'); // extends String.prototype with color helpers
 const dotenv = require('dotenv');
 const { v4: uuidv4 } = require('uuid');
 
-const path = require('path');
 const fs = require('fs');
 
 const mimicing = require('../mimicing');
@@ -22,7 +21,7 @@ let running = false;
 
 const buildSteps = (steps) => {
   // Add "id" property to each step with "applciation.method" as the value
-  steps = steps.map((step, index) => {
+  steps = steps.map((step) => {
     if (typeof step === 'string') {return { method: step, id: `${step}` };}
     if (step.slug) {return { ...step, id: step.slug };}
 
@@ -135,6 +134,10 @@ const processor = async (flow, opts) => {
   try {
     const { environment } = opts;
 
+    // Make sure the application registry is populated (no-op when the CLI
+    // already loaded it; required when running through the API/GUI)
+    await apps.loadAll();
+
     steps = flow.steps;
     // validate environment is valid
     const allEnvironments = await apps.allPossibleEnvironments(environment);
@@ -220,7 +223,8 @@ const processor = async (flow, opts) => {
 
       try {
         // Execute the method and log the result. Pass each property in step.data as a separate argument.
-        let { application, method, parameters, mimic, test, testlatentApplications, id } = step;
+        const { application, method, test, testlatentApplications, id } = step;
+        let { parameters } = step;
         if (!parameters) {parameters = {};}
 
         // Prepare holder for execution information
@@ -248,8 +252,9 @@ const processor = async (flow, opts) => {
 
         const [request, headers, status, body, memory] = await executeStep(flow, step);
 
-        flow.steps[i].execution.times.end = Date.now();
-        flow.steps[i].execution.times.duration = (new Date() - flow.execution.times.start) / 1000;
+        const stepTimes = flow.steps[i].execution.times;
+        stepTimes.end = Date.now();
+        stepTimes.duration = (stepTimes.end - stepTimes.start) / 1000;
         flow.reporter.stepUpdate(id);
 
         flow.memory = Object.assign(flow.memory || {}, memory || {});
@@ -377,8 +382,8 @@ const processor = async (flow, opts) => {
 
 /**
  * Run the flow
- * @param {*} flow 
- * @param {Object} opts 
+ * @param {*} flow
+ * @param {Object} opts
  * @param {String} opts.environment
  * @param {Boolean} opts.cli
  */
@@ -403,38 +408,34 @@ const run = async (flow, opts) => {
   // Report it
   flow.reporter.execution();
 
-  // API request must reply with basic execution information
+  // API request must reply with basic execution information while the
+  // processor keeps working in the background. The lock is released once
+  // the processor finishes (progress is streamed through the reporter).
   if (!cli) {
-    try {
-      processor(flow, opts);
-    }
-    catch (ex) {
-     
-    }
+    processor(flow, opts)
+      .catch(() => {})
+      .finally(() => { running = false; });
     return { execution: flow.execution };
   }
+
   // Invokations based on CLI must wait for processor to complete
-  else {
-    return processor(flow, opts);
-  }
+  return processor(flow, opts)
+    .finally(() => { running = false; });
 };
 
 module.exports = {
   steps,
   run: async (flow, opts) => {
     if (running) {
-      console.error('Already running');
-      return;
+      throw new Error('A flow execution is already in progress');
     }
     running = true;
     try {
-      return run(flow, opts);
+      return await run(flow, opts);
     }
     catch (ex) {
-      throw ex;
-    }
-    finally {
       running = false;
+      throw ex;
     }
   }
 };

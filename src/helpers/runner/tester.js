@@ -1,35 +1,4 @@
 /**
- * Compares two objects deeply to check if they are equal.
- *
- * @param {Object} obj1 - The first object to compare.
- * @param {Object} obj2 - The second object to compare.
- * @returns {boolean} - Returns true if the objects are equal, otherwise false.
- */
-const compareObjectsDeep = (obj1, obj2) => {
-  // Get the keys of both objects
-  const keys1 = Object.keys(obj1);
-  const keys2 = Object.keys(obj2);
-
-  // Check if the number of keys is the same
-  if (keys1.length !== keys2.length) {
-    return false;
-  }
-
-  // Check if the keys are the same
-  if (!keys1.every(key => keys2.includes(key))) {
-    return false;
-  }
-
-  // Check if the values are the same
-  return keys1.every(key => {
-    if (typeof obj1[key] === 'object' && typeof obj2[key] === 'object') {
-      return compareObjectsDeep(obj1[key], obj2[key]);
-    }
-    return obj1[key] === obj2[key];
-  });
-};
-
-/**
  * Compares the expected status with the actual status.
  *
  * @param {number|number[]} expected - The expected status or list of possible statuses.
@@ -145,7 +114,7 @@ const body = (expected, actual) => {
   return errors;
 };
 
-module.exports.test = async (flow, test, contents, opts) => {
+module.exports.test = async (flow, test, contents, _opts) => {
   const cases = {};
 
   if (test.status) {
@@ -163,7 +132,7 @@ module.exports.test = async (flow, test, contents, opts) => {
       const { application } = testApplication;
       const testApplicationCode = flow.latentApplications.find(app => app.application === application).code;
       const errors = await testApplicationCode.test(flow, testApplication, contents);
-      if (errors) {
+      if (errors && errors.length) {
         cases.latentApplications.push({
           application,
           errors

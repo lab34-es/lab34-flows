@@ -1,3 +1,4 @@
+const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
 const YAML = require('yaml');
@@ -93,7 +94,7 @@ const formatScrapeResult = async (elements, output, regexp) => {
  */
 const buildSteps = (steps) => {
   // Add "id" property to each step with "applciation.method" as the value
-  steps = steps.map((step, index) => {
+  steps = steps.map((step) => {
     if (typeof step === 'string') {return { id: `${step}`, method: step };}
     if (step.slug) {return { ...step, id: step.slug };}
 
@@ -119,7 +120,7 @@ const buildSteps = (steps) => {
   return steps;
 };
 
-const buildData = (data, vars, index) => {
+const buildData = (data, vars, _index) => {
   const {
     steps,
     ...rest
@@ -141,12 +142,12 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
   const yaml = fs.readFileSync(yamlPath, 'utf8');
 
   const flow = YAML.parse(yaml);
-  let { device, keepOpen, steps, browserType = 'chromium', launchOptions = {} } = flow;
+  const { keepOpen, device = 'iPhone 11 Pro', browserType = 'chromium', launchOptions = {} } = flow;
+  let { steps } = flow;
 
   steps = buildSteps(steps);
 
   // Validate device
-  if (!device) {device = 'iPhone 11 Pro';}
   if (!devices[device]) {
     error(ctx, yamlFile, `Invalid device: ${device}`);
   }
@@ -166,6 +167,7 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
     error(ctx, yamlFile, `Invalid methods: ${invalidMethods.join(', ')}`);
   }
 
+  // eslint-disable-next-line no-async-promise-executor
   return new Promise(async (resolve, reject) => {
     try {
       // Setup with enhanced launch options
@@ -306,7 +308,7 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
             await page.waitForSelector(parameters.selector);
             break;
           case 'assertTitle':
-            assert(await page.title() === parameters.title);
+            assert.ok(await page.title() === parameters.title, `Page title does not match "${parameters.title}"`);
             break;
           case 'screenshot':
             await page.screenshot({ path: parameters.path });
@@ -319,7 +321,7 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
               resolve();
             }));
             break;
-          case 'scrape':
+          case 'scrape': {
             const results = {};
             for (const key in parameters) {
               const { selector, output, regex } = parameters[key];
@@ -330,6 +332,7 @@ module.exports.run = (ctx, yamlFile, stepParams) => {
             debug('Scrape results: %O', results);
             steps[currentStep].result = results;
             break;
+          }
           default:
             break;
         }

@@ -1,6 +1,6 @@
 const Ajv = require('ajv');
 const replacer = require('./replacer');
-const ajv = new Ajv({ allErrors: true });
+const ajv = new Ajv({ allErrors: true, allowUnionTypes: true });
 
 /**
  * Validates the given data against the provided schema using AJV.
@@ -106,7 +106,7 @@ const body = schema => {
     const dataWithFallbacks = applyFallbacks(originalData, schema, flow);
     
     // Create a clean schema without fallbacks for AJV validation
-    const { fallbacks, ...cleanSchema } = schema;
+    const { fallbacks: _fallbacks, ...cleanSchema } = schema;
     validate(cleanSchema, dataWithFallbacks);
     
     // Update parameters with fallback values
@@ -126,7 +126,7 @@ const query = schema => {
     const dataWithFallbacks = applyFallbacks(originalData, schema, flow);
     
     // Create a clean schema without fallbacks for AJV validation
-    const { fallbacks, ...cleanSchema } = schema;
+    const { fallbacks: _fallbacks, ...cleanSchema } = schema;
     validate(cleanSchema, dataWithFallbacks);
     
     // Update parameters with fallback values
@@ -146,7 +146,7 @@ const params = schema => {
     const dataWithFallbacks = applyFallbacks(originalData, schema, flow);
     
     // Create a clean schema without fallbacks for AJV validation
-    const { fallbacks, ...cleanSchema } = schema;
+    const { fallbacks: _fallbacks, ...cleanSchema } = schema;
     validate(cleanSchema, dataWithFallbacks);
     
     // Update parameters with fallback values

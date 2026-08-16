@@ -10,6 +10,23 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const ALLOWED_FILE_FORMATS = ['yaml', 'yml'];
 
+const DEFAULT_FLOW_TEMPLATE = `title: My new flow
+description: Describe what this flow verifies.
+
+steps:
+  # Each step calls a method exposed by one of your applications.
+  # Run "lab34-flows --capabilities" to list the available applications and methods.
+  - application: my-application
+    method: myMethod
+    description: Explain what this step does.
+    parameters:
+      params: {}
+      query: {}
+      headers: {}
+    test:
+      status: 200
+`;
+
 module.exports.createAI = async (body) => {
   const {
     prompt 
@@ -66,6 +83,11 @@ module.exports.createAI = async (body) => {
   // Load AI config
   const aiConfig = await configHelper.load('ai');
 
+  if (!aiConfig || !aiConfig.gemini || !aiConfig.gemini.apiKey) {
+    const configPath = await paths.contextDir(['config', 'ai.json']);
+    throw new Error(`AI is not configured. Create ${configPath} with your Gemini API key (see docs/ai-flow-generation.md)`);
+  }
+
   // Initialize the Gemini API with the API key
   const genAI = new GoogleGenerativeAI(aiConfig.gemini.apiKey);
 
@@ -120,7 +142,7 @@ const getContent = (flowPath) => {
       contents.title = contents.title.replace(/\b\w/g, l => l.toUpperCase());
     }
   }
-  catch (ex) {
+  catch {
     contents = null;
   }
 
@@ -138,6 +160,81 @@ module.exports.getUserFlow = (flowPath) => {
     path: flowPath,
     plainText: fs.readFileSync(flowPath, 'utf8')
   });
+};
+
+/**
+ * Overwrite an existing flow file with new content.
+ * Note: this is a local-only tool; the file must already exist and be a YAML file.
+ * @param {string} flowPath - Absolute path of the flow file to save
+ * @param {string} content - New file content (raw YAML text)
+ * @returns {Promise<Object>} The saved flow, as returned by getUserFlow
+ */
+module.exports.saveUserFlow = (flowPath, content) => {
+  if (!flowPath) {
+    return Promise.reject(new Error('Missing flow path'));
+  }
+
+  if (typeof content !== 'string') {
+    return Promise.reject(new Error('Missing flow content'));
+  }
+
+  const isYaml = ALLOWED_FILE_FORMATS.some(ext => flowPath.toLowerCase().endsWith(`.${ext}`));
+  if (!isYaml) {
+    return Promise.reject(new Error('Flow files must end with .yaml or .yml'));
+  }
+
+  if (!fs.existsSync(flowPath)) {
+    return Promise.reject(new Error('Flow not found'));
+  }
+
+  fs.writeFileSync(flowPath, content, 'utf8');
+  return this.getUserFlow(flowPath);
+};
+
+/**
+ * Create a new flow file inside the flows directory of the current context.
+ * @param {Object} body
+ * @param {string} body.name - Flow name (file name, without extension)
+ * @param {string} [body.folder] - Optional sub-folder (category) inside the flows directory
+ * @param {string} [body.content] - Optional initial YAML content; a starter template is used otherwise
+ * @returns {Promise<Object>} The created flow, as returned by getUserFlow
+ */
+module.exports.create = async (body = {}) => {
+  const { name, folder, content } = body;
+
+  const slugify = (value) => String(value || '')
+    .trim()
+    .replace(/\.(yaml|yml)$/i, '')
+    .replace(/[^a-zA-Z0-9-_ ]/g, '')
+    .trim()
+    .replace(/\s+/g, '-');
+
+  const safeName = slugify(name);
+  if (!safeName) {
+    throw new Error('Flow name is required and must contain letters or numbers');
+  }
+
+  const safeFolder = String(folder || '')
+    .split(/[\\/]/)
+    .map(slugify)
+    .filter(Boolean)
+    .join(path.sep);
+
+  const flowsDir = await paths.contextDir(['flows']);
+  const targetDir = safeFolder ? path.join(flowsDir, safeFolder) : flowsDir;
+  await paths.createFolder(targetDir);
+
+  const filePath = path.join(targetDir, `${safeName}.yaml`);
+  if (fs.existsSync(filePath)) {
+    throw new Error(`A flow named "${safeName}.yaml" already exists in that folder`);
+  }
+
+  const initialContent = typeof content === 'string' && content.trim()
+    ? content
+    : DEFAULT_FLOW_TEMPLATE;
+
+  fs.writeFileSync(filePath, initialContent, 'utf8');
+  return this.getUserFlow(filePath);
 };
 
 /**

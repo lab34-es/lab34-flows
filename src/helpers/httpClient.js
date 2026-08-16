@@ -110,68 +110,55 @@ const _fetch = (ctx, urlPath, opts) => {
  * @returns {Promise<Array>} - Promise resolving to [headers, status, body]
  */
 const formatResponse = async (ctx, response, meta) => {
-  let body;
-
   // Record end time for performance tracking
   meta.end = Date.now();
 
-  // Determine if response is JSON based on content-type header
-  // Note: For error cases, we'll check if response.response exists and has headers
-  let isJson = false;
-  if (response instanceof Error && response.response && response.response.headers) {
-    const errorHeaders = response.response.headers;
-    isJson = errorHeaders['content-type'] && errorHeaders['content-type'].includes('application/json');
-  } else if (response.headers) {
-    isJson = response.headers.get && response.headers.get('content-type') &&
-      response.headers.get('content-type').includes('application/json');
-  }
-
-  // Re-throw if the response is an error
-  if(response instanceof Error) {
-    try {
-      if (isJson && response.response && response.response.data) {
-        body = typeof response.response.data === 'string' ? JSON.parse(response.response.data) : response.response.data;
-      } else {
-        body = (response.response && response.response.data) || response.message || 'Unknown error';
-      }
-    } catch (error) {
-      // Fallback to raw data if parsing fails
-      body = (response.response && response.response.data) || response.message || 'Unknown error';
-    }
-    console.error('Error:', JSON.stringify(body, null, 2));
-    process.exit(1);
+  // Network-level failures (DNS, connection refused, timeout...) carry no
+  // HTTP response: propagate them so the runner can mark the step as errored.
+  if (response instanceof Error && !response.response) {
     throw response;
   }
 
-  const headers = response.headers;
+  // HTTP-level errors (4xx / 5xx) are regular responses for this tool:
+  // flows frequently assert on them (e.g. "test: status: 404").
+  if (response instanceof Error) {
+    response = response.response;
+  }
+
+  const headers = response.headers || {};
   const status = response.status;
 
-  // Re-determine if response is JSON for successful responses
-  isJson = headers.get('content-type') && 
-    headers.get('content-type').includes('application/json');
-  
+  // Read a header value from either an AxiosHeaders instance or a plain object
+  const getHeader = (name) => {
+    if (typeof headers.get === 'function') {
+      return headers.get(name);
+    }
+    return headers[name];
+  };
+
+  const isJson = String(getHeader('content-type') || '').includes('application/json');
+
   // Parse response body according to content type
+  let body;
   try {
     if (isJson && response.data) {
       body = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
     } else {
       body = response.data || '';
     }
-  } catch (error) {
+  } catch {
     // Fallback to raw data if parsing fails
     body = response.data || '';
   }
-  
+
   // Log the response using the context's reporter and return response components
-  return Promise.resolve([headers, status, body])
-    .then(([headers, status, body]) => {
-      const timing = meta.end - meta.start;
-      ctx.reporter.response({ headers, status, body }, {
-        ...meta,
-        timing // Calculate total request duration
-      });
-      return [headers, status, body];
-    });
+  const timing = meta.end - meta.start;
+  ctx.reporter.response({ headers, status, body }, {
+    ...meta,
+    timing // Total request duration
+  });
+
+  return [headers, status, body];
 };
 
 /**

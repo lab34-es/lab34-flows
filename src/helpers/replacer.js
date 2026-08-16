@@ -189,17 +189,30 @@ const tsAgo = (amount, lapse) => {
   const hours = result.getHours().toString().padStart(2, '0');
   const minutes = result.getMinutes().toString().padStart(2, '0');
   const seconds = result.getSeconds().toString().padStart(2, '0');
-  const milliseconds = result.getMilliseconds().toString().padStart(3, '0');
   return `${year}${month}${day}${hours}${minutes}${seconds}`;
 };
 
 module.exports.tsAgo = tsAgo;
 
 /**
+ * Parses a barcode pattern string like "3232[4]247" into parts:
+ * plain text is kept as-is, [N] becomes N random digits.
+ *
+ * @param {string} pattern - The pattern to parse
+ * @returns {Array} - Array of strings and numbers
+ */
+const parseBarcodePattern = (pattern) => {
+  return pattern
+    .split(/\[(\d+)\]/)
+    .map((part, index) => (index % 2 === 1 ? parseInt(part, 10) : part))
+    .filter(part => part !== '');
+};
+
+/**
  * Generates a barcode by combining static and random parts
- * 
+ *
  * @param {Array|string} parts - Array of strings and numbers, where numbers will be replaced with random digits,
- *                              or a string mask like "3232_[4]_247"
+ *                              or a string mask like "3232[4]247"
  * @returns {string} - Generated barcode string
  */
 const barcode = (parts) => {
@@ -331,13 +344,8 @@ module.exports.json = (input, data) => {
   // Compile and process the Handlebars template
   const template = handlebars.compile(input);
   const finalValue = template(Object.assign({}, data, values()));
-  
-  try {
-    return JSON.parse(finalValue);
-  }
-  catch (e) {
-    throw e;
-  }
+
+  return JSON.parse(finalValue);
 };
 
 /**
@@ -362,7 +370,12 @@ module.exports.string = (input, data) => {
  */
 module.exports.any = (input, values) => {
   if (!values) {values = {};}
-  
+
+  // Objects and arrays go straight through the JSON path
+  if (input && typeof input === 'object') {
+    return this.json(input, values);
+  }
+
   // Skip empty input
   input = input && input.trim();
   if (!input) {return input;}
@@ -372,7 +385,7 @@ module.exports.any = (input, values) => {
   try {
     result = this.json(input, values);
   }
-  catch (e) {
+  catch {
     result = this.string(input, values);
   }
 

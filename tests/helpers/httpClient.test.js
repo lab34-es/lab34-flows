@@ -104,7 +104,7 @@ describe('httpClient', () => {
       
       axios.request.mockResolvedValue(mockResponse);
 
-      const [headers, status, body] = await httpClient.get(ctx, '/users');
+      const [, status, body] = await httpClient.get(ctx, '/users');
 
       expect(axios.request).toHaveBeenCalledWith({
         url: 'https://api.example.com/users',
@@ -150,7 +150,7 @@ describe('httpClient', () => {
       axios.request.mockResolvedValue(mockResponse);
 
       const postData = { name: 'Test User', email: 'test@example.com' };
-      const [headers, status, body] = await httpClient.post(ctx, '/users', {
+      const [, status, body] = await httpClient.post(ctx, '/users', {
         data: postData
       });
 
@@ -220,7 +220,7 @@ describe('httpClient', () => {
       axios.request.mockResolvedValue(mockResponse);
 
       const putData = { name: 'Updated Name' };
-      const [headers, status, body] = await httpClient.put(ctx, '/users/1', {
+      const [, status, body] = await httpClient.put(ctx, '/users/1', {
         data: putData
       });
 
@@ -246,7 +246,7 @@ describe('httpClient', () => {
       
       axios.request.mockResolvedValue(mockResponse);
 
-      const [headers, status, body] = await httpClient.del(ctx, '/users/1');
+      const [, status, body] = await httpClient.del(ctx, '/users/1');
 
       expect(axios.request).toHaveBeenCalledWith({
         url: 'https://api.example.com/users/1',
@@ -270,7 +270,7 @@ describe('httpClient', () => {
       axios.request.mockResolvedValue(mockResponse);
 
       const patchData = { field: 'new value' };
-      const [headers, status, body] = await httpClient.patch(ctx, '/users/1', {
+      const [, status, body] = await httpClient.patch(ctx, '/users/1', {
         data: patchData
       });
 
@@ -287,60 +287,52 @@ describe('httpClient', () => {
   });
 
   describe('Error handling', () => {
-    it('should handle network errors', async () => {
+    it('should propagate network errors without killing the process', async () => {
       const networkError = new Error('Network Error');
-      networkError.message = 'Network Error';
-      
+
       axios.request.mockRejectedValue(networkError);
 
-      try {
-        await httpClient.get(ctx, '/test');
-      } catch (error) {
-        // Expected to throw
-      }
-
-      expect(process.exit).toHaveBeenCalledWith(1);
-      expect(console.error).toHaveBeenCalled();
+      await expect(httpClient.get(ctx, '/test')).rejects.toThrow('Network Error');
+      expect(process.exit).not.toHaveBeenCalled();
     });
 
-    it('should handle HTTP error responses', async () => {
+    it('should resolve HTTP error responses so flows can assert on them', async () => {
       const errorResponse = new Error('Request failed');
       errorResponse.response = {
         status: 404,
         headers: { 'content-type': 'application/json' },
         data: { error: 'Not Found' }
       };
-      
+
       axios.request.mockRejectedValue(errorResponse);
 
-      try {
-        await httpClient.get(ctx, '/notfound');
-      } catch (error) {
-        // Expected to throw
-      }
+      const [headers, status, body] = await httpClient.get(ctx, '/notfound');
 
-      expect(process.exit).toHaveBeenCalledWith(1);
-      expect(console.error).toHaveBeenCalledWith('Error:', JSON.stringify({ error: 'Not Found' }, null, 2));
+      expect(status).toBe(404);
+      expect(body).toEqual({ error: 'Not Found' });
+      expect(headers).toEqual({ 'content-type': 'application/json' });
+      expect(process.exit).not.toHaveBeenCalled();
+      expect(mockReporter.response).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 404 }),
+        expect.any(Object)
+      );
     });
 
-    it('should handle error responses with string data', async () => {
+    it('should resolve error responses with string data', async () => {
       const errorResponse = new Error('Request failed');
       errorResponse.response = {
         status: 500,
         headers: { 'content-type': 'text/plain' },
         data: 'Internal Server Error'
       };
-      
+
       axios.request.mockRejectedValue(errorResponse);
 
-      try {
-        await httpClient.get(ctx, '/error');
-      } catch (error) {
-        // Expected to throw
-      }
+      const [, status, body] = await httpClient.get(ctx, '/error');
 
-      expect(process.exit).toHaveBeenCalledWith(1);
-      expect(console.error).toHaveBeenCalledWith('Error:', JSON.stringify('Internal Server Error', null, 2));
+      expect(status).toBe(500);
+      expect(body).toBe('Internal Server Error');
+      expect(process.exit).not.toHaveBeenCalled();
     });
   });
 
@@ -450,7 +442,7 @@ describe('httpClient', () => {
       
       axios.request.mockResolvedValue(mockResponse);
 
-      const [headers, status, body] = await httpClient.get(ctx, '/json');
+      const [, status, body] = await httpClient.get(ctx, '/json');
 
       expect(status).toBe(200);
       expect(body).toEqual({ key: 'value' });
@@ -467,7 +459,7 @@ describe('httpClient', () => {
       
       axios.request.mockResolvedValue(mockResponse);
 
-      const [headers, status, body] = await httpClient.get(ctx, '/html');
+      const [, status, body] = await httpClient.get(ctx, '/html');
 
       expect(status).toBe(200);
       expect(body).toBe('<html>Test</html>');
@@ -484,7 +476,7 @@ describe('httpClient', () => {
       
       axios.request.mockResolvedValue(mockResponse);
 
-      const [headers, status, body] = await httpClient.get(ctx, '/empty');
+      const [, status, body] = await httpClient.get(ctx, '/empty');
 
       expect(status).toBe(204);
       expect(body).toBe('');

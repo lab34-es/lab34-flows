@@ -1,5 +1,4 @@
 const express = require('express');
-const highlight = require('cli-highlight').highlight;
 
 const replacer = require('./replacer');
 
@@ -36,9 +35,11 @@ const start = (mimicConfig, port, cb) => {
     // Add replacer to res.
     res.json = (data) => {
       mimicConfig.flow.reporter.mimicResponse(application, req.url);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
+      // Build the response before writing headers, so replacer errors can
+      // still produce a clean error response instead of a dropped socket
       const response = replacer.any(data, req.body);
       mimicConfig.flow.reporter.mimicResponseBody(response);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(response));
     };
 
@@ -49,7 +50,16 @@ const start = (mimicConfig, port, cb) => {
   return new Promise((resolve, reject) => {
     const server = app.listen(port, () => {
       servers.push({ application, port, server });
-      resolve(server.server);
+      resolve(server);
+    });
+
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        return reject(new Error(
+          `Mimic port ${port} for "${application}" is already in use. Is another lab34-flows instance running?`
+        ));
+      }
+      reject(err);
     });
   });
 };
@@ -64,7 +74,7 @@ const stop = (id) => {
   }
 
   // Stop the server
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     server.server.close(() => {
       servers.splice(servers.indexOf(server), 1);
       resolve();

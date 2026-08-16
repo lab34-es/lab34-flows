@@ -48,8 +48,8 @@ module.exports.start = (options = {}) => {
     console.warn('Frontend dist folder not found. Run "npm run build:frontend" first.');
   }
 
-  // API error reporter
-  app.use((err, req, res, next) => {
+  // API error reporter (4-arg signature marks this as express error middleware)
+  app.use((err, req, res, _next) => {
     console.error(err);
     res.status(500).send('Something broke!');
   });

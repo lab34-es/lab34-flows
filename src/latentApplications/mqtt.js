@@ -91,7 +91,7 @@ const stop = (id) => {
   }
 };
 
-const test = (flow, test, contents) => {
+const test = (flow, test, _contents) => {
   return new Promise((resolve, reject) => {
     const { client: id, test: testMessages, retry } = test;
 

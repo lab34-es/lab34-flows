@@ -48,18 +48,14 @@ const stepStart = function (stepId) {
   const index = _flow.steps.findIndex(step => step.id === stepId);
 
   if (index === -1) {
-    throw new Error(`Step with id ${id} not found`);
+    throw new Error(`Step with id ${stepId} not found`);
   }
 
   const reportedStep = _flow.steps[index];
 
-  const { application, description, method, parameters, mimic } = reportedStep;
-
-  // Convert camelCase application name to human-readable format
-  const humanReadableApplication = (application || '').split(/(?=[A-Z])/).join(' ');
+  const { description } = reportedStep;
 
   const stepTxt = ` STEP ${index + 1} `;
-  const applicationText = ` ${humanReadableApplication} `;
   const stepText = ` ${reportedStep.id} `;
 
   // Log the step number and ID
@@ -82,7 +78,7 @@ const stepUpdate = function (stepId) {
   const index = _flow.steps.findIndex(step => step.id === stepId);
 
   if (index === -1) {
-    throw new Error(`Step with id ${id} not found`);
+    throw new Error(`Step with id ${stepId} not found`);
   }
 
   const reportedStep = _flow.steps[index];
@@ -114,7 +110,7 @@ const mimicStart = (mimicConfig) => {
   const urlName = mimicConfig.url;
 
   // Log the start of the mimic process with application name and URL.
-  console.log('   ⿻ MIMIC'.bold.yellow + ` ${applicationName}` + ` ${urlName}`.bold.gray);
+  console.log('   ⿻ MIMIC'.bold.yellow + ` ${applicationName}` + (urlName ? ` ${urlName}`.bold.gray : ''));
 };
 
 /**
@@ -171,7 +167,7 @@ const request = (method, _opts) => {
     let isJson = false;
     try {
       isJson = JSON.parse(data);
-    } catch (e) {
+    } catch {
       isJson = false;
     }
 
@@ -362,7 +358,7 @@ const test = (testReport) => {
     }
 
     for (let i = 0; i < report.length; i++) {
-      const { message, expected, actual } = report[i];
+      const { expected, actual } = report[i];
       console.log([
         '          ',
         'expected '.green.bold,
@@ -391,21 +387,6 @@ const playwrigthStep = (ctx, method, parameters) => {
     return acc;
   }, ['', '']);
 
-  // Contains could contain sensitive data?
-  const sensitive = JSON.stringify(parameters||{}).toLowerCase().includes('password') || key.toLowerCase().includes('token');
-  
-  // if (sensitive) {
-  //   // Show only 4 first and 4 last characters
-  //   const valueLength = value.length;
-
-  //   if (valueLength > 4) {
-  //     value = value.slice(0, 4).replace(/./g, '*') + value.slice(-4);
-  //   }
-  //   else {
-  //     value = (value||'').toString().replace(/./g, '*');
-  //   }
-  // }
-
   console.log([
     '   ⮕',
     '  PLAYWRIGHT '.yellow.bold,
@@ -417,7 +398,7 @@ const playwrigthStep = (ctx, method, parameters) => {
   ].join(''));
 };
 
-const stepTestError = (ctx, message) => {};
+const stepTestError = (_ctx, _message) => {};
 
 const execution = function () {
   const { id } = _flow.execution;
@@ -429,7 +410,7 @@ const execution = function () {
 };
 
 const _ = () => {
-  const { reporter, ...data } = _flow;
+  const { reporter: _reporter, ...data } = _flow;
   return data;
 };
 

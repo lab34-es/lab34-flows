@@ -1,7 +1,9 @@
-const path = require('path');
 const fs = require('fs');
 
 const paths = require('./paths');
+
+// Mimic files require this package as "lab34-flows"
+require('./moduleAlias').install();
 
 /**
  * given a list of steps, search if all mimic'd applications have a mimic file

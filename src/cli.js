@@ -67,19 +67,22 @@ Usage:
 
 Options:
   --file          Path to the YAML flow definition file (required if not using --ai or --server)
-  --capabilities  List all available capabilities from the contents of ~/flows
+  --capabilities  List all available capabilities of the current workspace
   --ai            Generate a flow from a prompt using AI (required if not using --file or --server)
-  --server        Start the web server with built frontend and API
+  --server        Start the web UI (API + built frontend) on http://localhost:3001
   --env           Environment to run the flow in (required for --file, optional for --ai)
-  --context       Context directory for server mode (optional)
+  --context       Workspace directory (defaults to ~/lab34-flows)
+  --keep-alive    Do not exit when the flow finishes (e.g. Playwright keepOpen)
   --debug         Print debug information including environment variables
+  --v             Print the version
   --help          Show this help message
 
 Examples:
-  lab34-flows --context my/context/folder --file flows/my-flow.yaml --env production
-  lab34-flows --context my/context/folder --capabilities
-  lab34-flows --context --ai "Test login functionality with valid credentials"
-  lab34-flows --server --context=myproject
+  lab34-flows --file flows/my-flow.yaml --env production
+  lab34-flows --context my/workspace --file flows/my-flow.yaml --env staging
+  lab34-flows --context my/workspace --capabilities
+  lab34-flows --ai "Test login functionality with valid credentials"
+  lab34-flows --server --context=my/workspace
   `);
   process.exit(0);
 }
@@ -196,12 +199,20 @@ async function runFlow(flowConfig, options) {
     const runnerVersion = flowConfig.version || '1';
     const runner = require(`./helpers/runner/v${runnerVersion}`);
 
+    const finish = async () => {
+      await runner.run(flowConfig, options);
+
+      // Mimic servers, MQTT clients or Playwright's keepOpen option can keep
+      // the event loop alive; exit explicitly unless the user opts out.
+      if (!argv.keepAlive) {
+        process.exit(0);
+      }
+    };
+
     if (process.env.IS_NODEMON) {
-      setTimeout(() => {
-        runner.run(flowConfig, options);
-      }, 1000);
+      setTimeout(finish, 1000);
     } else {
-      runner.run(flowConfig, options);
+      await finish();
     }
   } catch (error) {
     console.trace(error);
@@ -243,30 +254,64 @@ async function generateFlowWithAI(prompt) {
 }
 
 /**
- * Start the web server with built frontend and API
+ * Run an npm command and resolve when it finishes successfully
+ * @param {string[]} npmArgs - Arguments passed to npm
+ * @param {string} cwd - Working directory for the command
+ * @returns {Promise<void>}
+ */
+function runNpm(npmArgs, cwd) {
+  const { spawn } = require('child_process');
+
+  return new Promise((resolve, reject) => {
+    const child = spawn('npm', npmArgs, {
+      stdio: 'inherit',
+      cwd,
+      // npm is a .cmd file on Windows, so it needs a shell
+      shell: process.platform === 'win32'
+    });
+
+    child.on('close', code => {
+      if (code !== 0) {
+        return reject(new Error(`npm ${npmArgs.join(' ')} exited with code ${code}`));
+      }
+      resolve();
+    });
+  });
+}
+
+/**
+ * Start the web server with built frontend and API.
+ *
+ * Uses the frontend build shipped with the package when available;
+ * otherwise builds it once (first run from a source checkout).
  */
 async function startServer() {
-  console.log('Building frontend...');
-  
-  const { spawn } = require('child_process');
-  
-  // Build the frontend first
-  const buildProcess = spawn('npm', ['run', 'build:frontend'], {
-    stdio: 'inherit',
-    cwd: process.cwd()
-  });
-  
-  buildProcess.on('close', async (code) => {
-    if (code !== 0) {
-      exitWithError('Failed to build frontend');
+  const path = require('path');
+
+  const packageRoot = path.join(__dirname, '..');
+  const distPath = path.join(packageRoot, 'frontend', 'dist');
+
+  if (!fs.existsSync(distPath)) {
+    console.log('Frontend build not found. Building it now (first run only)...');
+
+    try {
+      const frontendModules = path.join(packageRoot, 'frontend', 'node_modules');
+      if (!fs.existsSync(frontendModules)) {
+        await runNpm(['run', 'install:frontend'], packageRoot);
+      }
+      await runNpm(['run', 'build:frontend'], packageRoot);
+    } catch (error) {
+      exitWithError(`Failed to build frontend: ${error.message}`);
     }
-    
-    console.log('Frontend built successfully. Starting server...');
-    
-    // Start the API server which will serve the built frontend
-    const api = require('./api');
-    await api.start();
-  });
+
+    console.log('Frontend built successfully.');
+  }
+
+  console.log('Starting server...');
+
+  // Start the API server which will serve the built frontend
+  const api = require('./api');
+  await api.start({ context: argv.context || null });
 }
 
 /**

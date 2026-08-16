@@ -1,12 +1,11 @@
 const path = require('path');
 const fs = require('fs');
 const dotenv = require('dotenv');
-const YAML = require('yaml');
-const os = require('os');
-const temp = require('temp');
-// temp.track(); // Automatically track and clean up temp files at exit
 
 const paths = require('./paths');
+
+// User workspace code requires this package as "lab34-flows"
+require('./moduleAlias').install();
 
 const applications = {};
 
@@ -259,17 +258,8 @@ const parseApplications = async () => {
     const errors = [];
 
     if (fs.existsSync(appIndex)) {
-
-      // Replace in appIndex "lab34-flows" with $NODE_PATH/@lab34/flows/
-      const nodePath = process.env.NODE_PATH || '';
-      const flowsPath = path.join(nodePath, '@lab34', 'flows');
-      const appIndexContentOriginal = fs.readFileSync(appIndex, 'utf8');
-      const appIndexContentModified = fs.readFileSync(appIndex, 'utf8')
-        .replace(/lab34-flows/g, flowsPath);
-
-      // Write the modified content to a temporary file
-      fs.writeFileSync(appIndex, appIndexContentModified);
-
+      // Applications import this package as "lab34-flows"; the module alias
+      // installed above resolves that to the running package.
       try {
         const lib = require(appPath);
         methods = Object.keys(lib).map(method => {
@@ -282,10 +272,6 @@ const parseApplications = async () => {
           message: ex.message,
           stack: ex.stack
         });
-      }
-      finally {
-        // Clean up the temporary file
-        fs.writeFileSync(appIndex, appIndexContentOriginal);
       }
     }
 
