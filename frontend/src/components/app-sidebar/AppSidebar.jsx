@@ -5,11 +5,9 @@ import {
   FilePlus2,
   FolderPlus,
   Globe,
-  Moon,
   Plus,
   RefreshCw,
   Settings,
-  Sun,
   Upload,
   Workflow,
 } from 'lucide-react';
@@ -43,20 +41,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import FlowTree from '@/components/app-sidebar/FlowTree';
 import FlowDialogs from '@/components/app-sidebar/FlowDialogs';
 import { useAppState } from '@/context/AppStateContext';
-import { useTheme } from '@/context/ThemeContext';
 import { flowsApi } from '@/services/api';
 
 export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { tree, treeLoading, refreshTree, applications, applicationsLoading, environments, environment, setEnvironment } = useAppState();
-  const { theme, toggleTheme } = useTheme();
 
   const [action, setAction] = useState(null);
   const uploadInputRef = useRef(null);
@@ -196,9 +191,9 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              isActive={location.pathname === '/settings'}
+              isActive={location.pathname.startsWith('/settings')}
               onClick={() => navigate('/settings')}
-              title="AI provider, model and API keys"
+              title="AI, Xray, UI and help"
             >
               <Settings className="text-muted-foreground" />
               <span>Settings</span>
@@ -206,30 +201,20 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
 
-        <div className="flex items-end gap-2 px-2 pb-1">
-          <div className="grid flex-1 gap-1">
-            <Label className="text-muted-foreground flex items-center gap-1 text-xs">
-              <Globe className="size-3" /> Environment
-            </Label>
-            <Select value={environment || undefined} onValueChange={setEnvironment}>
-              <SelectTrigger size="sm" className="w-full" aria-label="Environment">
-                <SelectValue placeholder="Select environment" />
-              </SelectTrigger>
-              <SelectContent>
-                {environments.map((env) => (
-                  <SelectItem key={env} value={env}>{env}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {theme === 'dark' ? <Sun /> : <Moon />}
-          </Button>
+        <div className="grid gap-1 px-2 pb-1">
+          <Label className="text-muted-foreground flex items-center gap-1 text-xs">
+            <Globe className="size-3" /> Environment
+          </Label>
+          <Select value={environment || undefined} onValueChange={setEnvironment}>
+            <SelectTrigger size="sm" className="w-full" aria-label="Environment">
+              <SelectValue placeholder="Select environment" />
+            </SelectTrigger>
+            <SelectContent>
+              {environments.map((env) => (
+                <SelectItem key={env} value={env}>{env}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </SidebarFooter>
 
