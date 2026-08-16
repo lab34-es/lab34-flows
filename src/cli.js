@@ -9,22 +9,25 @@ const applications = require('./helpers/applications');
  * A command-line interface for running flow definitions from YAML files.
  * 
  * Usage:
- *   node cli.js --file <path-to-yaml-file> --env <environment> [--debug] [--help]
+ *   node cli.js --file <path-to-flow-file> --env <environment> [--debug] [--help]
  *   node cli.js --capabilities
- *   node cli.js --ai "<prompt>"
- * 
+ *   node cli.js --server
+ *
  * Options:
- *   --file         Path to the YAML flow definition file (required if not using --ai)
- *   --ai           Generate a flow from a prompt using AI (required if not using --file)
+ *   --file         Path to the flow definition file (.md or .yaml)
  *   --context      Context directory
  *   --capabilities List all available capabilities from the contents of ~/flows
- *   --env          Environment to run the flow in (required for --file, optional for --ai)
+ *   --env          Environment to run the flow in (required for --file)
+ *   --server       Start the web server with built frontend and API
  *   --debug        Print debug information including environment variables
  *   --help         Show this help message
- * 
+ *
+ * Flow generation with AI lives in the web UI (--server), where the provider,
+ * model and API keys are configured.
+ *
  * Examples:
- *   node cli.js --file flows/my-flow.yaml --env production
- *   node cli.js --ai "Test login functionality with valid credentials"
+ *   node cli.js --file flows/my-flow.md --env production
+ *   node cli.js --server
  */
 
 'use strict';
@@ -62,23 +65,23 @@ Lab34 Flows CLI Tool v${packageJson.version}
 
 Usage:
   lab34-flows --file <path-to-flow-file> --env <environment> [--debug] [--help]
-  lab34-flows --ai "<prompt>"
   lab34-flows --server [--context=<context>]
 
 Options:
-  --file          Path to the flow definition file (.md markdown flow or .yaml) (required if not using --ai or --server)
+  --file          Path to the flow definition file (.md markdown flow or .yaml) (required if not using --server)
   --capabilities  List all available capabilities from the contents of ~/flows
-  --ai            Generate a flow from a prompt using AI (required if not using --file or --server)
   --server        Start the web server with built frontend and API
-  --env           Environment to run the flow in (required for --file, optional for --ai)
+  --env           Environment to run the flow in (required for --file)
   --context       Context directory for server mode (optional)
   --debug         Print debug information including environment variables
   --help          Show this help message
 
+Generating flows with AI is done from the web UI (--server): the provider,
+model and API keys are configured there, under Settings.
+
 Examples:
-  lab34-flows --context my/context/folder --file flows/my-flow.yaml --env production
+  lab34-flows --context my/context/folder --file flows/my-flow.md --env production
   lab34-flows --context my/context/folder --capabilities
-  lab34-flows --context --ai "Test login functionality with valid credentials"
   lab34-flows --server --context=myproject
   `);
   process.exit(0);
@@ -132,7 +135,7 @@ function printDebugInfo() {
 function parseArguments() {
   return {
     file: argv.file || null,
-    ai: argv.ai || null,
+    ai: argv.ai || null, // Removed: kept only to show a helpful error
     capabilities: argv.capabilities || false,
     server: argv.server || false,
     env: argv.env || null,
@@ -215,39 +218,6 @@ async function runFlow(flowConfig, options) {
 }
 
 /**
- * Generate a flow using AI
- * @param {string} prompt - The prompt to generate a flow from
- * @returns {Promise<Object>} - The generated flow configuration
- */
-async function generateFlowWithAI(prompt) {
-  console.log('Generating flow from prompt using AI...');
-
-  try {
-    const result = await flows.createAI({ prompt });
-    if (!result || !result.flow) {
-      exitWithError('Failed to generate flow from AI');
-    }
-    
-    console.log('Flow generated successfully!');
-    
-    try {
-      // Create random file name
-      const fileName = `flow-${Math.random().toString(36).substring(2, 15)}.yaml`;
-      const filePath = `./${fileName}`;
-      // Write the flow to a file
-      fs.writeFileSync(filePath, result.flow, 'utf8');
-      return filePath;
-    } catch (yamlError) {
-      console.error('Error parsing YAML from AI response:', yamlError.message);
-      console.error('Raw AI response:', result.flow);
-      exitWithError('Failed to parse the AI-generated YAML. Please try again with a different prompt.');
-    }
-  } catch (error) {
-    exitWithError(`Error generating flow with AI: ${error.message}`);
-  }
-}
-
-/**
  * Start the web server with built frontend and API
  */
 async function startServer() {
@@ -298,11 +268,13 @@ async function main() {
     printDebugInfo();
   }
 
-  // Check if we're using AI, server, or a file
+  // Check if we're using the server or a file
   if (args.ai) {
-    const flowPath = await generateFlowWithAI(args.ai);
-    console.log(`Flow generated and saved to ${flowPath}`);
-    process.exit(0);
+    exitWithError(
+      'Generating flows with AI is no longer available from the CLI. ' +
+      'Start the UI with "lab34-flows --server" and use the "Create using AI" ' +
+      'option when creating a flow.'
+    );
   } else if (args.capabilities) {
     // List capabilities
     await flows.listCapabilities();
@@ -332,7 +304,7 @@ async function main() {
     // Run the flow
     await runFlow(flowConfig, options);
   } else {
-    exitWithError('No flow source specified. Use either --file <path-to-yaml-file>, --ai "<prompt>", or --server');
+    exitWithError('No flow source specified. Use either --file <path-to-flow-file> or --server');
   }
 }
 

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { AlertCircle, CheckCircle2, FileText, Loader2, Play, Save, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, FileText, Loader2, Play, Save, Wand2, XCircle } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Markdown from '@/components/shared/Markdown';
+import AiEditDialog from '@/components/flow/AiEditDialog';
 import StepCell from '@/components/flow/StepCell';
 import { flowsApi } from '@/services/api';
 import { useAppState } from '@/context/AppStateContext';
@@ -37,6 +38,7 @@ export function FlowPage() {
   const [tab, setTab] = useState('document');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [aiOpen, setAiOpen] = useState(false);
 
   const run = flowPath ? executions[flowPath] : undefined;
   const dirty = flowData ? draft !== flowData.plainText : false;
@@ -59,8 +61,36 @@ export function FlowPage() {
   useEffect(() => {
     setTab('document');
     setSaveError(null);
+    setAiOpen(false);
     loadFlow();
   }, [loadFlow]);
+
+  /**
+   * Take the document the model rewrote as an unsaved change: the notebook
+   * is re-parsed so it shows the new content right away, but the file on
+   * disk is only touched when the user hits Save.
+   */
+  const handleAiEdit = async (content) => {
+    setDraft(content);
+    setSaveError(null);
+
+    try {
+      const parsed = await flowsApi.parse(content, flowData.format);
+      setFlowData((current) => ({
+        ...current,
+        segments: parsed.data.segments,
+        steps: parsed.data.steps,
+        errors: parsed.data.errors,
+        title: parsed.data.title || current.title,
+      }));
+    } catch (ex) {
+      setSaveError(ex.response?.data?.error || ex.message);
+    }
+
+    // The previous run's step mapping no longer matches the document
+    clearRun(flowPath);
+    setTab('document');
+  };
 
   const handleRun = async () => {
     if (!flowData || !environment) { return; }
@@ -161,6 +191,13 @@ export function FlowPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
+      <AiEditDialog
+        open={aiOpen}
+        onOpenChange={setAiOpen}
+        content={dirty ? draft : flowData.plainText}
+        onApply={handleAiEdit}
+      />
+
       {/* Toolbar */}
       <div className="bg-background/95 sticky top-0 z-10 border-b px-6 py-3 backdrop-blur">
         <div className="mx-auto flex w-full max-w-4xl flex-wrap items-center gap-3">
@@ -187,6 +224,17 @@ export function FlowPage() {
               <TabsTrigger value="source">Source</TabsTrigger>
             </TabsList>
           </Tabs>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setAiOpen(true)}
+            disabled={anyRunning}
+            title="Edit this flow with AI"
+            aria-label="Edit this flow with AI"
+          >
+            <Wand2 />
+          </Button>
 
           {dirty && flowData.relativePath && (
             <Button variant="outline" onClick={handleSave} disabled={saving}>

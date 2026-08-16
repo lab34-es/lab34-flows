@@ -4,120 +4,26 @@ const YAML = require('yaml');
 
 const paths = require('./paths');
 const apps = require('./applications');
-const configHelper = require('./config');
+const aiFlows = require('./aiFlows');
 const markdownFlows = require('./markdownFlows');
-
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const ALLOWED_FILE_FORMATS = ['md', 'markdown', 'yaml', 'yml'];
 const MARKDOWN_FORMATS = ['md', 'markdown'];
 
-module.exports.createAI = async (body) => {
-  const {
-    prompt 
-  } = body;
+/**
+ * Generate a brand new Markdown flow from a natural language description.
+ * Only available from the UI: see helpers/aiFlows.
+ * @param {Object} body - { prompt }
+ * @returns {Promise<{flow: string, format: string, provider: string, model: string}>}
+ */
+module.exports.createAI = async (body) => aiFlows.create(body || {});
 
-  if (!prompt) {
-    return Promise.reject('Invalid request');
-  }
-
-  // Applications describe themselves through the JSDoc blocks of their
-  // index.js: the description of the application and, per method, its
-  // description, input parameters, output, memory usage and example step.
-  const papps = await apps.parseApplications();
-  const appsDefinition = papps.map(app => {
-    return {
-      name: app.name,
-      description: app.description || undefined,
-      methods: (app.methods || [])
-        .filter(method => method.implemented !== false)
-        .map(method => {
-          const docs = method.docs || {};
-          return {
-            name: method.name,
-            description: method.description || undefined,
-            input: docs.input && docs.input.length ? docs.input : undefined,
-            output: docs.output || undefined,
-            memory: docs.memory && docs.memory.length ? docs.memory : undefined,
-            example: docs.example || undefined,
-            parameters: method.parameters && Object.keys(method.parameters).length
-              ? method.parameters
-              : undefined
-          };
-        })
-    };
-  });
-
-  const messageParts = [
-    'You are an experienced E2E tester, and you are tasked to build a list of steps to E2E test an scenario.',
-    'The scenario is the following:',
-    prompt,
-    'Please provide the steps you would take to test this scenario.',
-
-    'The output must be a YAML file with the following structure (without any code block markers):',
-    'title: <Scenario Title>',
-    'description: <Scenario Description>',
-    'steps: # List of steps to perform',
-    '  - application: <application involved in the step>',
-    '    method: <action to perform>',
-    '    description: <description of the step>',
-    '    parameters: <parameters to pass to the method>',
-    '',
-
-    'ONLY USE THE APPLICATIONS STRICLY NECESSARY. Do not include applications that are not needed for the scenario.',
-    'If you are not sure about an applicaiton, DO NOT include it.',
-
-    'You MUST respect the format of the parameters. Strings must be enclosed in double quotes, numbers must be plain numbers, and booleans must be true or false.',
-    'Avoid repeating steps.',
-
-    'Below, the list of applications you can interact with, and their methods.',
-    'Each method documents its description, its "input" parameters (with the ' +
-      'exact name to use, e.g. "body.a" means parameters.body.a), its "output", ' +
-      'the flow "memory" it reads or writes, and an "example" step:',
-    '------------------',
-    JSON.stringify(appsDefinition),
-    '------------------',
-    'IMPORTANT:',
-    '1. Do not reply with explanations, just the YAML.',
-    '2. Do not include any markdown code block markers like ```yaml or ``` in your response.',
-    '3. Your response should start directly with "title:" and contain only valid YAML.',
-    '4. Remember: ONLY YAML is accepted as response.'
-  ];
-
-  // Send message parts to the AI
-  const finalPrompt = messageParts.join('\n');
-
-  // Load AI config
-  const aiConfig = await configHelper.load('ai');
-
-  // Initialize the Gemini API with the API key
-  const genAI = new GoogleGenerativeAI(aiConfig.gemini.apiKey);
-
-  // Get the Gemini model
-  const model = genAI.getGenerativeModel({
-    model: aiConfig.gemini.model || 'gemini-pro'
-  });
-
-  // Create a chat session
-  const chat = model.startChat({
-    generationConfig: {
-      temperature: aiConfig.gemini.temperature || 0.7,
-      topP: aiConfig.gemini.topP || 0.95,
-      topK: aiConfig.gemini.topK || 40
-    }
-  });
-
-  // Send the prompt to Gemini
-  const result = await chat.sendMessage(finalPrompt);
-  const response = await result.response;
-
-  let responseText = response.text();
-  responseText = responseText.replace(/```yaml/g, '').replace(/```/g, '').trim();
-
-  return {
-    flow: responseText
-  };
-};
+/**
+ * Rewrite an existing flow following an instruction.
+ * @param {Object} body - { prompt, content }
+ * @returns {Promise<{flow: string, format: string, provider: string, model: string}>}
+ */
+module.exports.editAI = async (body) => aiFlows.edit(body || {});
 
 module.exports.listCapabilities = async () => {
   return apps.summary();

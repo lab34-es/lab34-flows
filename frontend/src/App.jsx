@@ -7,6 +7,7 @@ import AppSidebar from '@/components/app-sidebar/AppSidebar';
 import HomePage from '@/pages/HomePage';
 import FlowPage from '@/pages/FlowPage';
 import ApplicationPage from '@/pages/ApplicationPage';
+import SettingsPage from '@/pages/SettingsPage';
 import { AppStateProvider } from '@/context/AppStateContext';
 import { ExecutionProvider } from '@/context/ExecutionContext';
 import { ThemeProvider } from '@/context/ThemeContext';
@@ -26,6 +27,7 @@ function Shell() {
             <Route path="/" element={<HomePage />} />
             <Route path="/flows/view" element={<FlowPage />} />
             <Route path="/applications/:slug" element={<ApplicationPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

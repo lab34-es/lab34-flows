@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const paths = require('./paths');
 
 const load = async (name) => {
@@ -14,4 +15,20 @@ const load = async (name) => {
   return config;
 };
 
+/**
+ * Persist a configuration file inside the context "config" folder.
+ * @param {string} name - File name, without the ".json" extension
+ * @param {Object} data - Contents to write
+ * @returns {Promise<Object>} The saved data
+ */
+const save = async (name, data) => {
+  const configFilePath = await paths.contextDir(['config', `${name}.json`]);
+
+  fs.mkdirSync(path.dirname(configFilePath), { recursive: true });
+  fs.writeFileSync(configFilePath, JSON.stringify(data ?? {}, null, 2), 'utf8');
+
+  return data;
+};
+
 module.exports.load = load;
+module.exports.save = save;

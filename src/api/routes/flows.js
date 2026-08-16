@@ -32,10 +32,18 @@ router.post('/parse', (req, res) => {
   }
 });
 
+// Generate a new Markdown flow from a prompt. { prompt }
 router.post('/create/ai', (req, res) => {
   flows.createAI(req.body)
     .then(flow => res.send(flow))
-    .catch(error => sendError(res, error, 500));
+    .catch(error => sendError(res, error));
+});
+
+// Rewrite an existing flow following an instruction. { prompt, content }
+router.post('/edit/ai', (req, res) => {
+  flows.editAI(req.body)
+    .then(flow => res.send(flow))
+    .catch(error => sendError(res, error));
 });
 
 router.post('/start', (req, res) => {
