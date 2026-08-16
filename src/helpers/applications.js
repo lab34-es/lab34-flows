@@ -7,6 +7,7 @@ const temp = require('temp');
 // temp.track(); // Automatically track and clean up temp files at exit
 
 const paths = require('./paths');
+const appDocs = require('./appDocs');
 
 const applications = {};
 
@@ -19,14 +20,21 @@ const description = (description) => {
 module.exports.description = description;
 
 // Helper function to convert array-style handlers to functions that can describe themselves
+//
+// The array holds the validation middlewares and, as its last item, the
+// function to execute. Documentation is not part of it: methods are
+// documented with a JSDoc block above them (see helpers/appDocs.js). A
+// leading string is still accepted as a description, for applications
+// written before documentation moved to JSDoc.
 const handler = (handlerArray, functionName) => {
+  const hasInlineDescription = typeof handlerArray[0] === 'string';
+
   // The actual function that will be called
   const handler = function (ctx, parameters, flow) {
     if (ctx === 'describe') {
-      // Extract description and validations
-      const description = handlerArray[0];
+      const description = hasInlineDescription ? handlerArray[0] : null;
       const validation = { };
-      
+
       // Find validation schemas
       handlerArray.forEach(item => {
         if (typeof item === 'function') {
@@ -37,36 +45,34 @@ const handler = (handlerArray, functionName) => {
           }
         }
       });
-      
+
       return {
         name: functionName,
         description,
         parameters: validation
       };
     }
-    
-    // Normal execution: run through all items in the array expect last and first
-    // (which are description and execution function)
-    for (let i = 1; i < handlerArray.length - 1; i++) {
+
+    // Normal execution: run every item except the last one (the execution
+    // function) and the optional leading description
+    for (let i = hasInlineDescription ? 1 : 0; i < handlerArray.length - 1; i++) {
       if (typeof handlerArray[i] === 'function') {
         handlerArray[i](ctx, parameters, flow);
       }
     }
-    
+
     // Execute the main handler (last item in array)
     return handlerArray[handlerArray.length - 1](ctx, parameters, flow);
   };
-  
+
   return handler;
 };
 
 module.exports.handler = handler;
 
 const loadAll = () => {
-  if (Object.keys(applications).length) {
-    return Promise.resolve(applications);
-  }
-
+  // Always reload: application code can be edited from the UI (Source view)
+  // and the next run must pick up the changes without restarting the server
   return parseApplications()
     .then(apps => {
       return apps.reduce((acc, app) => {
@@ -257,20 +263,33 @@ const parseApplications = async () => {
     // if index file exists load methods
     let methods = [];
     const errors = [];
+    let indexSource = null;
 
     if (fs.existsSync(appIndex)) {
 
       // Replace in appIndex "lab34-flows" with $NODE_PATH/@lab34/flows/
+      // When NODE_PATH is not set (or the global install is missing), fall
+      // back to this repository itself so applications work in development
+      // and when the tool runs its own bundled examples.
       const nodePath = process.env.NODE_PATH || '';
-      const flowsPath = path.join(nodePath, '@lab34', 'flows');
+      let flowsPath = nodePath ? path.join(nodePath, '@lab34', 'flows') : '';
+      if (!flowsPath || !fs.existsSync(flowsPath)) {
+        flowsPath = path.resolve(__dirname, '..', '..');
+      }
       const appIndexContentOriginal = fs.readFileSync(appIndex, 'utf8');
-      const appIndexContentModified = fs.readFileSync(appIndex, 'utf8')
-        .replace(/lab34-flows/g, flowsPath);
+      indexSource = appIndexContentOriginal;
+      const appIndexContentModified = appIndexContentOriginal
+        .replace(/(['"`])lab34-flows(\/[^'"`]*)?\1/g, (match, quote, subpath) => {
+          return `${quote}${flowsPath}${subpath || ''}${quote}`;
+        });
 
       // Write the modified content to a temporary file
       fs.writeFileSync(appIndex, appIndexContentModified);
 
       try {
+        // Bust the require cache so edits made from the UI (Source view)
+        // are picked up without restarting the server
+        delete require.cache[appIndex];
         const lib = require(appPath);
         methods = Object.keys(lib).map(method => {
           return lib[method]('describe');
@@ -289,12 +308,62 @@ const parseApplications = async () => {
       }
     }
 
+    // Load the application README, if any
+    let readme = null;
+    const readmeFile = fs.readdirSync(appPath)
+      .find(file => file.toLowerCase() === 'readme.md');
+    if (readmeFile) {
+      try {
+        readme = fs.readFileSync(path.join(appPath, readmeFile), 'utf8');
+      }
+      catch (ex) {
+        errors.push({ message: `Error reading README: ${ex.message}` });
+      }
+    }
+
+    // Documentation lives in the JSDoc blocks of index.js: the block at the
+    // top of the file describes the application, and the block above each
+    // exported method documents its input, output, memory usage and an
+    // example step.
+    const parsedDocs = appDocs.parse(indexSource);
+    const docsMethods = parsedDocs.methods;
+
+    // docs.json is no longer read: warn instead of silently ignoring it
+    if (fs.existsSync(path.join(appPath, 'docs.json'))) {
+      errors.push({
+        message: 'docs.json is no longer used. Document the application and its ' +
+          'methods with JSDoc blocks in index.js, then delete docs.json.'
+      });
+    }
+
+    // Merge the self-described methods (from index.js) with their JSDoc.
+    // The JSDoc description wins over the one a handler may still declare
+    // inline. Documented methods that could not be loaded are included too,
+    // flagged as not implemented.
+    const methodsByName = new Map();
+
+    methods.filter(Boolean).forEach(method => {
+      methodsByName.set(method.name, { ...method, implemented: true });
+    });
+
+    Object.keys(docsMethods).forEach(name => {
+      const existing = methodsByName.get(name) || { name, implemented: false };
+      const methodDocs = docsMethods[name];
+      methodsByName.set(name, {
+        ...existing,
+        description: methodDocs.description || existing.description || null,
+        docs: methodDocs
+      });
+    });
+
     return {
       name: applicationName,
       slug: applicationName,
       path: appPath,
+      description: parsedDocs.description,
+      readme,
       envFiles: envFilesWithPaths,
-      methods,
+      methods: Array.from(methodsByName.values()),
       errors
     };
   }));
@@ -303,3 +372,103 @@ const parseApplications = async () => {
 };
 
 module.exports.parseApplications = parseApplications;
+
+/**
+ * Files of an application that can be viewed and edited from the UI
+ * (Source view): its README, its code (which also carries its
+ * documentation, as JSDoc) and its environment files.
+ */
+const CANONICAL_APP_FILES = ['README.md', 'index.js'];
+
+/**
+ * Resolve an editable file inside an application folder, rejecting anything
+ * outside the whitelist or outside the application directory.
+ * @param {string} applicationName
+ * @param {string} relativePath - e.g. "README.md", "index.js", "env/local.env"
+ * @returns {Promise<{appPath: string, absolute: string, relative: string}>}
+ */
+const resolveAppFile = async (applicationName, relativePath) => {
+  const appPath = await paths.contextDir(['applications', applicationName]);
+
+  if (!fs.existsSync(appPath) || !fs.statSync(appPath).isDirectory()) {
+    throw new Error('Application not found');
+  }
+
+  const normalized = (relativePath || '').split('\\').join('/');
+
+  const isCanonical = CANONICAL_APP_FILES.some(
+    name => name.toLowerCase() === normalized.toLowerCase()
+  );
+  const isEnvFile = /^env\/[^/]+\.env$/i.test(normalized);
+
+  if (!isCanonical && !isEnvFile) {
+    throw new Error(`Not an editable application file: ${normalized}`);
+  }
+
+  const absolute = path.resolve(appPath, normalized);
+  if (!absolute.startsWith(appPath + path.sep)) {
+    throw new Error('Invalid path');
+  }
+
+  return { appPath, absolute, relative: normalized };
+};
+
+/**
+ * List the editable files of an application. Canonical files (README.md,
+ * index.js) are always listed with an `exists` flag so the UI
+ * can offer creating the missing ones; env files are listed when present.
+ * @param {string} applicationName
+ * @returns {Promise<Array<{path: string, exists: boolean}>>}
+ */
+module.exports.listAppFiles = async (applicationName) => {
+  const appPath = await paths.contextDir(['applications', applicationName]);
+
+  if (!fs.existsSync(appPath) || !fs.statSync(appPath).isDirectory()) {
+    throw new Error('Application not found');
+  }
+
+  const entries = fs.readdirSync(appPath);
+
+  const files = CANONICAL_APP_FILES.map(name => {
+    // Respect the on-disk casing (readme.md vs README.md)
+    const actual = entries.find(entry => entry.toLowerCase() === name.toLowerCase());
+    return { path: actual || name, exists: Boolean(actual) };
+  });
+
+  for (const envFile of listEnvFiles(appPath)) {
+    files.push({ path: `env/${path.basename(envFile)}`, exists: true });
+  }
+
+  return files;
+};
+
+/**
+ * Read an editable application file. Missing canonical files return empty
+ * content with exists=false so the UI can offer creating them.
+ * @param {string} applicationName
+ * @param {string} relativePath
+ */
+module.exports.readAppFile = async (applicationName, relativePath) => {
+  const { absolute, relative } = await resolveAppFile(applicationName, relativePath);
+
+  if (!fs.existsSync(absolute)) {
+    return { path: relative, exists: false, content: '' };
+  }
+
+  return { path: relative, exists: true, content: fs.readFileSync(absolute, 'utf8') };
+};
+
+/**
+ * Create or update an editable application file.
+ * @param {string} applicationName
+ * @param {string} relativePath
+ * @param {string} content
+ */
+module.exports.writeAppFile = async (applicationName, relativePath, content) => {
+  const { absolute, relative } = await resolveAppFile(applicationName, relativePath);
+
+  fs.mkdirSync(path.dirname(absolute), { recursive: true });
+  fs.writeFileSync(absolute, content ?? '', 'utf8');
+
+  return { path: relative };
+};

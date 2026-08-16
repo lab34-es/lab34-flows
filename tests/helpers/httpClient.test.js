@@ -287,60 +287,49 @@ describe('httpClient', () => {
   });
 
   describe('Error handling', () => {
-    it('should handle network errors', async () => {
+    it('should reject on network errors without killing the process', async () => {
       const networkError = new Error('Network Error');
-      networkError.message = 'Network Error';
-      
+
       axios.request.mockRejectedValue(networkError);
 
-      try {
-        await httpClient.get(ctx, '/test');
-      } catch (error) {
-        // Expected to throw
-      }
+      await expect(httpClient.get(ctx, '/test')).rejects.toThrow('Network Error');
 
-      expect(process.exit).toHaveBeenCalledWith(1);
-      expect(console.error).toHaveBeenCalled();
+      expect(process.exit).not.toHaveBeenCalled();
+      expect(console.error).toHaveBeenCalledWith('Error:', 'Network Error');
     });
 
-    it('should handle HTTP error responses', async () => {
+    it('should return HTTP error responses as regular responses', async () => {
       const errorResponse = new Error('Request failed');
       errorResponse.response = {
         status: 404,
         headers: { 'content-type': 'application/json' },
         data: { error: 'Not Found' }
       };
-      
+
       axios.request.mockRejectedValue(errorResponse);
 
-      try {
-        await httpClient.get(ctx, '/notfound');
-      } catch (error) {
-        // Expected to throw
-      }
+      const [, status, body] = await httpClient.get(ctx, '/notfound');
 
-      expect(process.exit).toHaveBeenCalledWith(1);
-      expect(console.error).toHaveBeenCalledWith('Error:', JSON.stringify({ error: 'Not Found' }, null, 2));
+      expect(process.exit).not.toHaveBeenCalled();
+      expect(status).toBe(404);
+      expect(body).toEqual({ error: 'Not Found' });
     });
 
-    it('should handle error responses with string data', async () => {
+    it('should return error responses with string data', async () => {
       const errorResponse = new Error('Request failed');
       errorResponse.response = {
         status: 500,
         headers: { 'content-type': 'text/plain' },
         data: 'Internal Server Error'
       };
-      
+
       axios.request.mockRejectedValue(errorResponse);
 
-      try {
-        await httpClient.get(ctx, '/error');
-      } catch (error) {
-        // Expected to throw
-      }
+      const [, status, body] = await httpClient.get(ctx, '/error');
 
-      expect(process.exit).toHaveBeenCalledWith(1);
-      expect(console.error).toHaveBeenCalledWith('Error:', JSON.stringify('Internal Server Error', null, 2));
+      expect(process.exit).not.toHaveBeenCalled();
+      expect(status).toBe(500);
+      expect(body).toBe('Internal Server Error');
     });
   });
 

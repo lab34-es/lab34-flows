@@ -9,19 +9,25 @@ const app = express();
 const server = http.createServer(app);
 const defineRoutes = require('./routes');
 const ioHelper = require('../helpers/io');
+const bootstrap = require('../helpers/bootstrap');
 
 // Initialize Socket.IO with the server
 const socketIO = ioHelper.io(server);
 app.set('io', socketIO);
 
-module.exports.start = (options = {}) => {
+module.exports.start = async (options = {}) => {
   // Store context in app locals for access in routes
   if (options.context) {
     app.locals.context = options.context;
     console.log(`Using context directory: ${options.context}`);
   }
 
-  app.use(cors());
+  // Seed bundled example applications and flows on first run
+  await bootstrap.ensureDefaults();
+
+  // Same-origin and curl-style requests carry no Origin header and pass;
+  // cross-origin browser requests are only allowed from the tool's own UIs
+  app.use(cors({ origin: ioHelper.ALLOWED_ORIGINS }));
   app.use(bodyParser.json());
 
   app.use((req, res, next) => {

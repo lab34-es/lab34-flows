@@ -61,12 +61,12 @@ function showHelp() {
 Lab34 Flows CLI Tool v${packageJson.version}
 
 Usage:
-  lab34-flows --file <path-to-yaml-file> --env <environment> [--debug] [--help]
+  lab34-flows --file <path-to-flow-file> --env <environment> [--debug] [--help]
   lab34-flows --ai "<prompt>"
   lab34-flows --server [--context=<context>]
 
 Options:
-  --file          Path to the YAML flow definition file (required if not using --ai or --server)
+  --file          Path to the flow definition file (.md markdown flow or .yaml) (required if not using --ai or --server)
   --capabilities  List all available capabilities from the contents of ~/flows
   --ai            Generate a flow from a prompt using AI (required if not using --file or --server)
   --server        Start the web server with built frontend and API
@@ -159,25 +159,30 @@ async function validateFilePath(filePath) {
     exitWithError(`File not found: ${fullFilePath}`);
   }
 
-  const isYaml = ['yaml', 'yml'].some(ext => fullFilePath.toLowerCase().endsWith(`.${ext}`));
-  if (!isYaml) {
-    exitWithError('File must be a .yaml or .yml file');
+  const isSupported = ['yaml', 'yml', 'md', 'markdown'].some(ext => fullFilePath.toLowerCase().endsWith(`.${ext}`));
+  if (!isSupported) {
+    exitWithError('File must be a .md, .markdown, .yaml or .yml file');
   }
 
   return fullFilePath;
 }
 
 /**
- * Parse YAML file content
- * @param {string} filePath - Path to the YAML file
- * @returns {Object} Parsed YAML content
+ * Parse a flow file (markdown or YAML)
+ * @param {string} filePath - Path to the flow file
+ * @returns {Object} Parsed flow definition
  */
-async function parseYamlFile(filePath) {
+async function parseFlowFile(filePath) {
   try {
     const content = fs.readFileSync(filePath, 'utf8');
+    const isMarkdown = ['md', 'markdown'].some(ext => filePath.toLowerCase().endsWith(`.${ext}`));
+    if (isMarkdown) {
+      const markdownFlows = require('./helpers/markdownFlows');
+      return markdownFlows.toFlow(content);
+    }
     return YAML.parse(content);
   } catch (error) {
-    exitWithError(`Error parsing YAML file: ${error.message}`);
+    exitWithError(`Error parsing flow file: ${error.message}`);
   }
 }
 
@@ -312,9 +317,9 @@ async function main() {
     }
     
     // Validate file path
-    const yamlFilePath = await validateFilePath(args.file);
-    // Parse YAML file
-    const flowConfig = await parseYamlFile(yamlFilePath);
+    const flowFilePath = await validateFilePath(args.file);
+    // Parse the flow file (markdown or YAML)
+    const flowConfig = await parseFlowFile(flowFilePath);
 
     // Set up options
     const options = {
