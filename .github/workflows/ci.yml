@@ -1,0 +1,35 @@
+# Runs linting, unit tests, the frontend build and the offline example flow
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - name: Run the offline example flow
+        run: node src/cli.js --context examples/workspace --file flows/mimicking/offline-billing-demo.yaml --env local
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+        working-directory: frontend
+      - run: npx eslint .
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
