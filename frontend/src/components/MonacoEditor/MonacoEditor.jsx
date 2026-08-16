@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { Box } from '@mui/joy';
+import '../../monaco';
 
 const MonacoEditor = ({
   value,
@@ -10,6 +11,7 @@ const MonacoEditor = ({
   theme = 'vs-dark',
   options = {},
   readOnly = false,
+  sx = {},
   ...props
 }) => {
   const editorRef = useRef(null);
@@ -95,6 +97,7 @@ const MonacoEditor = ({
             backgroundColor: 'transparent',
           },
         },
+        ...sx,
       }}
       {...props}
     >

@@ -23,15 +23,23 @@ import {
   FilterAlt as FilterIcon,
   Clear as ClearIcon,
   OpenInNew as OpenIcon,
+  Add as AddIcon,
+  AutoAwesome as AIIcon,
 } from '@mui/icons-material';
 import { flowsApi } from '../../services/api';
+import NewFlowDialog from '../FlowDialogs/NewFlowDialog';
+import AIFlowDialog from '../FlowDialogs/AIFlowDialog';
 
 const FlowList = () => {
   const navigate = useNavigate();
   const [flows, setFlows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
+  // Creation dialogs
+  const [newFlowOpen, setNewFlowOpen] = useState(false);
+  const [aiFlowOpen, setAiFlowOpen] = useState(false);
+
   // Filter states
   const [searchText, setSearchText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -56,11 +64,18 @@ const FlowList = () => {
 
   const handleOpenFlow = (flow) => {
     // Navigate to the flow viewer page with the flow path as a query parameter
-    console.log('Opening flow:', flow);
-    console.log('Flow path:', flow.path);
     const flowPath = encodeURIComponent(flow.path);
-    console.log('Encoded flow path:', flowPath);
     navigate(`/flows/user?file=${flowPath}`);
+  };
+
+  const handleFlowCreated = (flow) => {
+    setNewFlowOpen(false);
+    setAiFlowOpen(false);
+    if (flow?.path) {
+      handleOpenFlow(flow);
+    } else {
+      fetchFlows();
+    }
   };
 
   // Get unique categories for the dropdown
@@ -104,15 +119,31 @@ const FlowList = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography level="h1">Flow Definitions</Typography>
-        <Button
-          startDecorator={<RefreshIcon />}
-          variant="outlined"
-          onClick={fetchFlows}
-        >
-          Refresh
-        </Button>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, gap: 2, flexWrap: 'wrap' }}>
+        <Typography level="h1">Flows</Typography>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Button
+            startDecorator={<RefreshIcon />}
+            variant="outlined"
+            color="neutral"
+            onClick={fetchFlows}
+          >
+            Refresh
+          </Button>
+          <Button
+            startDecorator={<AIIcon />}
+            variant="outlined"
+            onClick={() => setAiFlowOpen(true)}
+          >
+            Generate with AI
+          </Button>
+          <Button
+            startDecorator={<AddIcon />}
+            onClick={() => setNewFlowOpen(true)}
+          >
+            New flow
+          </Button>
+        </Box>
       </Box>
 
       {error && (
@@ -127,9 +158,12 @@ const FlowList = () => {
           <Typography level="title-md" sx={{ mb: 1 }}>
             No flows found
           </Typography>
-          <Typography level="body-sm" color="neutral">
+          <Typography level="body-sm" color="neutral" sx={{ mb: 2 }}>
             Create your first flow definition or check your flows directory.
           </Typography>
+          <Button startDecorator={<AddIcon />} onClick={() => setNewFlowOpen(true)}>
+            Create your first flow
+          </Button>
         </Sheet>
       ) : (
         <>
@@ -235,6 +269,16 @@ const FlowList = () => {
         </>
       )}
 
+      <NewFlowDialog
+        open={newFlowOpen}
+        onClose={() => setNewFlowOpen(false)}
+        onCreated={handleFlowCreated}
+      />
+      <AIFlowDialog
+        open={aiFlowOpen}
+        onClose={() => setAiFlowOpen(false)}
+        onCreated={handleFlowCreated}
+      />
     </Box>
   );
 };

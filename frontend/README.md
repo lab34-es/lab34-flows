@@ -1,101 +1,23 @@
-# Lab34 Flows Frontend
+# Lab34 Flows — frontend
 
-React frontend for the Lab34 Flows CLI tool, built with Vite and MUI Joy components.
-
-## Features
-
-- **Dashboard**: Overview of system status, flows, and applications
-- **Flow Management**: Browse and execute flow definitions
-- **Applications**: View and configure available applications
-- **AI Integration**: Generate flows using natural language prompts
-- **Real-time Updates**: Socket.IO integration for live flow execution monitoring
-
-## Technology Stack
-
-- **Vite** - Fast build tool and development server
-- **React 18** - Modern React with hooks
-- **MUI Joy** - Material-UI Joy design system
-- **React Router** - Client-side routing
-- **Socket.IO Client** - Real-time communication
-- **Axios** - HTTP client with interceptors
-
-## Environment Variables
-
-The application uses Vite's environment variable system:
-
-- `VITE_API_URL` - Backend API URL (default: http://localhost:5678)
-
-Create a `.env` file in the frontend directory to customize:
-
-```env
-VITE_API_URL=http://localhost:5678
-```
-
-## Development
-
-The frontend runs on port 3000 and proxies API requests to the backend on port 3001.
-
-### Available Scripts
-
-- `npm run dev` - Start Vite development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm test` - Run tests
-
-### Running with Backend
-
-From the root directory:
+React + [Joy UI](https://mui.com/joy-ui/getting-started/) + Vite single-page app
+for the Lab34 Flows GUI. It talks to the API on port 3001 (REST + Socket.IO).
 
 ```bash
-# Install frontend dependencies
+# from the repository root
 npm run install:frontend
+npm run dev:full          # API (:3001) + this app (:3000, hot reload)
 
-# Run both API and frontend together
-npm run dev:full
-
-# Or run separately:
-npm run dev        # API only (port 3001)
-npm run frontend   # Frontend only (port 3000)
+npm run build:frontend    # production build into frontend/dist,
+                          # served by `lab34-flows --server`
 ```
 
-## Project Structure
+Structure:
 
-```
-src/
-├── components/
-│   ├── Layout/           # Main layout with sidebar navigation
-│   ├── Dashboard/        # Dashboard with system overview
-│   ├── FlowList/         # Flow definitions browser
-│   └── ApplicationsList/ # Applications management
-├── services/
-│   └── api.js           # Axios configuration and API methods
-├── hooks/               # Custom React hooks
-└── utils/               # Utility functions
-```
+- `src/components/` — pages and building blocks (FlowList, FlowViewer,
+  ExecutionView, ApplicationsList, ...)
+- `src/context/EnvironmentContext.jsx` — globally selected environment
+- `src/services/api.js` — REST client (axios)
+- `src/services/socket.js` — Socket.IO client for live execution updates
 
-## API Integration
-
-The frontend communicates with the Lab34 Flows API through:
-
-- **REST endpoints** for data fetching (`/flows`, `/applications`)
-- **Environment-based configuration** using `VITE_API_URL`
-- **Proxy configuration** in Vite for seamless development
-- **Request/Response interceptors** for logging and error handling
-
-## Styling
-
-Uses MUI Joy's design system with:
-
-- **CSS-in-JS styling** with `sx` prop
-- **Responsive design** with Grid system
-- **Dark/light theme support** via CssVarsProvider
-- **Consistent spacing and typography**
-- **Modern component variants** (outlined, soft, solid)
-
-## Development Features
-
-- **Hot Module Replacement (HMR)** for instant updates
-- **Fast refresh** preserving component state
-- **TypeScript support** (can be enabled)
-- **ESLint integration** for code quality
-- **Optimized builds** with tree shaking and code splitting
+User-facing documentation lives in [`../docs/gui.md`](../docs/gui.md).

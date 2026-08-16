@@ -1,47 +1,72 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
   Button,
   Sheet,
-  Divider,
-  Card,
-  CardContent,
   Chip,
-  List,
-  ListItem,
-  ListItemContent,
-  ListItemDecorator,
-  Breadcrumbs,
   Link,
   Alert,
   CircularProgress,
+  Modal,
+  ModalDialog,
+  ModalClose,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Select,
+  Option,
+  FormControl,
+  FormLabel,
+  Snackbar,
+  Tabs,
+  TabList,
+  Tab,
 } from '@mui/joy';
+import { useColorScheme } from '@mui/joy/styles';
 import {
   Save as SaveIcon,
   PlayArrow as PlayIcon,
   AccountTree as FlowIcon,
-  Code as CodeIcon,
   ArrowBack as BackIcon,
-  Home as HomeIcon,
   Warning as WarningIcon,
 } from '@mui/icons-material';
 import MonacoEditor from '../MonacoEditor/MonacoEditor';
+import ExecutionView from '../ExecutionView/ExecutionView';
 import { flowsApi } from '../../services/api';
+import { getSocket, FLOW_EXECUTION_EVENT } from '../../services/socket';
+import { useEnvironment, getEnvironmentType } from '../../context/environment';
 import * as YAML from 'yaml';
 
 const FlowViewer = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const flowPath = searchParams.get('file');
-  
+  const { mode } = useColorScheme();
+  const { environments, environment, setEnvironment } = useEnvironment();
+
   const [flow, setFlow] = useState(null);
   const [flowContent, setFlowContent] = useState('');
+  const [savedContent, setSavedContent] = useState('');
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [snackbar, setSnackbar] = useState(null);
 
-  // Parse YAML content in real-time to update steps
+  // Execution state (fed by socket events)
+  const [activeTab, setActiveTab] = useState('steps');
+  const [runDialogOpen, setRunDialogOpen] = useState(false);
+  const [runEnvironment, setRunEnvironment] = useState('');
+  const [execution, setExecution] = useState(null);
+  const [execSteps, setExecSteps] = useState([]);
+  const [runError, setRunError] = useState(null);
+  const executingRef = useRef(false);
+
+  const isDirty = flowContent !== savedContent;
+  const isRunning = execution?.status === 'running';
+
+  // Parse YAML content in real-time to update the steps preview
   const parsedFlow = useMemo(() => {
     if (!flowContent.trim()) {
       return { ...flow, steps: [], parseError: null };
@@ -55,11 +80,11 @@ const FlowViewer = () => {
         steps: parsed?.steps || [],
         parseError: null
       };
-    } catch (error) {
+    } catch (parseError) {
       return {
         ...flow,
         steps: flow?.steps || [],
-        parseError: error.message
+        parseError: parseError.message
       };
     }
   }, [flowContent, flow]);
@@ -68,26 +93,60 @@ const FlowViewer = () => {
     if (flowPath) {
       fetchFlowContent();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowPath]);
 
+  // Live execution updates. The backend runs one execution at a time and
+  // emits "flowexecution:update" events with topics: execution, diagram, step.
+  useEffect(() => {
+    const socket = getSocket();
+
+    const handler = (event) => {
+      // Only track events once a run was started from this view
+      if (!event || !event.topic || !executingRef.current) { return; }
+
+      if (event.topic === 'execution') {
+        setExecution(event.data);
+      }
+
+      if (event.topic === 'diagram') {
+        if (event.data?.steps) { setExecSteps(event.data.steps); }
+        if (event.data?.execution) { setExecution(event.data.execution); }
+      }
+
+      if (event.topic === 'step' && event.data?.id) {
+        setExecSteps(prev => {
+          const next = [...prev];
+          const index = next.findIndex(s => s.id === event.data.id);
+          if (index >= 0) {
+            next[index] = event.data.data;
+          } else {
+            next.push(event.data.data);
+          }
+          return next;
+        });
+      }
+    };
+
+    socket.on(FLOW_EXECUTION_EVENT, handler);
+    return () => { socket.off(FLOW_EXECUTION_EVENT, handler); };
+  }, []);
+
   const fetchFlowContent = async () => {
-    if (!flowPath) return;
-    
+    if (!flowPath) { return; }
+
     setLoading(true);
     setError(null);
     try {
-      // Decode the flow path since it was encoded when navigating
       const decodedFlowPath = decodeURIComponent(flowPath);
-      console.log('Fetching flow content for path:', decodedFlowPath);
-      
       const response = await flowsApi.getUserFlow(decodedFlowPath);
       const flowData = response.data;
-      console.log('Flow data received:', flowData);
-      
+
       setFlow(flowData);
       setFlowContent(flowData?.plainText || '');
-    } catch (error) {
-      console.error('Error fetching flow content:', error);
+      setSavedContent(flowData?.plainText || '');
+    } catch (fetchError) {
+      console.error('Error fetching flow content:', fetchError);
       setError('Failed to load flow content');
     } finally {
       setLoading(false);
@@ -95,15 +154,55 @@ const FlowViewer = () => {
   };
 
   const handleSave = async () => {
-    // TODO: Implement save functionality
-    console.log('Saving flow content:', flowContent);
-    // You could add a success message here
+    if (!flow?.path) { return; }
+
+    setSaving(true);
+    try {
+      await flowsApi.save(flow.path, flowContent);
+      setSavedContent(flowContent);
+      setSnackbar({ color: 'success', message: 'Flow saved' });
+    } catch (saveError) {
+      setSnackbar({
+        color: 'danger',
+        message: saveError.response?.data?.error || 'Failed to save flow'
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleOpenRunDialog = () => {
+    setRunEnvironment(environment || '');
+    setRunDialogOpen(true);
   };
 
   const handleRun = async () => {
-    // TODO: Implement run functionality
-    console.log('Running flow:', flow);
-    alert(`Flow execution started: ${flow?.name || flow?.title}`);
+    setRunDialogOpen(false);
+
+    if (runEnvironment && runEnvironment !== environment) {
+      setEnvironment(runEnvironment);
+    }
+
+    // Reset the previous execution and switch to the execution tab
+    setExecution({ status: 'running' });
+    setExecSteps([]);
+    setRunError(null);
+    setActiveTab('execution');
+    executingRef.current = true;
+
+    try {
+      const response = await flowsApi.start({
+        value: flowContent,
+        environment: runEnvironment
+      });
+      // The socket usually delivers fresher data before this arrives;
+      // only set it if nothing came through yet.
+      setExecution(prev => (prev && prev.id) ? prev : response.data.execution);
+    } catch (startError) {
+      executingRef.current = false;
+      setExecution(null);
+      setRunError(startError.response?.data?.error || startError.message);
+    }
   };
 
   const handleBack = () => {
@@ -111,10 +210,9 @@ const FlowViewer = () => {
   };
 
   const renderFlowVisualization = () => {
-    // Show YAML parsing error if present
     if (parsedFlow?.parseError) {
       return (
-        <Box sx={{ height: '100%', p: 2 }}>
+        <Box sx={{ p: 2 }}>
           <Alert color="danger" startDecorator={<WarningIcon />}>
             <Box>
               <Typography level="title-sm" sx={{ mb: 1 }}>
@@ -146,10 +244,10 @@ const FlowViewer = () => {
     }
 
     return (
-      <Box sx={{ height: '100%', overflow: 'auto', p: 1 }}>
-        <Sheet 
-          variant="outlined" 
-          sx={{ 
+      <Box sx={{ p: 1 }}>
+        <Sheet
+          variant="outlined"
+          sx={{
             borderRadius: 'md',
             overflow: 'hidden',
             bgcolor: 'background.surface'
@@ -157,10 +255,10 @@ const FlowViewer = () => {
         >
           {parsedFlow.steps.map((step, index) => (
             <Box key={index}>
-              <Box sx={{ 
+              <Box sx={{
                 p: 3,
-                display: 'flex', 
-                alignItems: 'flex-start', 
+                display: 'flex',
+                alignItems: 'flex-start',
                 gap: 3,
                 borderBottom: index < parsedFlow.steps.length - 1 ? '1px solid' : 'none',
                 borderColor: 'divider',
@@ -168,7 +266,7 @@ const FlowViewer = () => {
                   bgcolor: 'background.level1'
                 }
               }}>
-                <Box sx={{ 
+                <Box sx={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -183,7 +281,7 @@ const FlowViewer = () => {
                 }}>
                   {index + 1}
                 </Box>
-                
+
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography level="title-sm" sx={{ mb: 1 }}>
                     {step.application ? (
@@ -209,7 +307,7 @@ const FlowViewer = () => {
                       'Unknown Application'
                     )}
                   </Typography>
-                  
+
                   <Typography level="body-sm" color="neutral" sx={{ mb: 1 }}>
                     <strong>Method:</strong> {step.method ? (
                       <Link
@@ -235,32 +333,32 @@ const FlowViewer = () => {
                       ' N/A'
                     )}
                   </Typography>
-                  
+
                   {step.description && (
                     <Typography level="body-sm" color="neutral" sx={{ mb: 1 }}>
                       <strong>Description:</strong> {step.description}
                     </Typography>
                   )}
-                  
+
                   {step.parameters && (
                     <Box sx={{ mt: 1.5 }}>
                       <Typography level="body-xs" color="neutral" sx={{ mb: 0.5 }}>
                         <strong>Parameters:</strong>
                       </Typography>
-                      <Sheet 
-                        variant="soft" 
-                        sx={{ 
-                          p: 1.5, 
+                      <Sheet
+                        variant="soft"
+                        sx={{
+                          p: 1.5,
                           borderRadius: 'sm',
                           bgcolor: 'background.level2',
                           border: '1px solid',
                           borderColor: 'neutral.outlinedBorder'
                         }}
                       >
-                        <Box 
-                          component="pre" 
-                          sx={{ 
-                            fontFamily: 'monospace', 
+                        <Box
+                          component="pre"
+                          sx={{
+                            fontFamily: 'monospace',
                             fontSize: 'xs',
                             lineHeight: 1.5,
                             margin: 0,
@@ -269,7 +367,7 @@ const FlowViewer = () => {
                             color: 'text.primary'
                           }}
                         >
-                          {typeof step.parameters === 'object' 
+                          {typeof step.parameters === 'object'
                             ? JSON.stringify(step.parameters, null, 2)
                             : step.parameters
                           }
@@ -277,16 +375,16 @@ const FlowViewer = () => {
                       </Sheet>
                     </Box>
                   )}
-                  
+
                   {step.test && (
                     <Box sx={{ mt: 1.5 }}>
                       <Typography level="body-xs" color="neutral" sx={{ mb: 0.5 }}>
                         <strong>Test:</strong>
                       </Typography>
-                      <Sheet 
-                        variant="soft" 
-                        sx={{ 
-                          p: 1.5, 
+                      <Sheet
+                        variant="soft"
+                        sx={{
+                          p: 1.5,
                           borderRadius: 'sm',
                           bgcolor: 'warning.softBg',
                           borderLeft: '3px solid',
@@ -295,10 +393,10 @@ const FlowViewer = () => {
                           borderLeftColor: 'warning.500'
                         }}
                       >
-                        <Box 
-                          component="pre" 
-                          sx={{ 
-                            fontFamily: 'monospace', 
+                        <Box
+                          component="pre"
+                          sx={{
+                            fontFamily: 'monospace',
                             fontSize: 'xs',
                             lineHeight: 1.5,
                             margin: 0,
@@ -307,7 +405,7 @@ const FlowViewer = () => {
                             color: 'text.primary'
                           }}
                         >
-                          {typeof step.test === 'object' 
+                          {typeof step.test === 'object'
                             ? JSON.stringify(step.test, null, 2)
                             : step.test
                           }
@@ -332,24 +430,11 @@ const FlowViewer = () => {
     );
   }
 
-  if (error) {
+  if (error || !flow) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert color="danger" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-        <Button startDecorator={<BackIcon />} onClick={handleBack}>
-          Back to Flows
-        </Button>
-      </Box>
-    );
-  }
-
-  if (!flow) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert color="warning" sx={{ mb: 3 }}>
-          Flow not found
+        <Alert color={error ? 'danger' : 'warning'} sx={{ mb: 3 }}>
+          {error || 'Flow not found'}
         </Alert>
         <Button startDecorator={<BackIcon />} onClick={handleBack}>
           Back to Flows
@@ -359,76 +444,161 @@ const FlowViewer = () => {
   }
 
   return (
-    <Box sx={{ 
-      display: 'flex', 
-      height: '100vh',
-      position: 'fixed',
-      top: 0,
-      left: '240px', // Account for sidebar width
-      right: 0,
-      bottom: 0,
-      zIndex: 999
-    }}>
-      {/* Left Panel - Monaco Editor */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <MonacoEditor
-          value={flowContent}
-          onChange={setFlowContent}
-          language="yaml"
-          height="100vh"
-        />
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 48px)', overflow: 'hidden' }}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Typography level="h3">
+              {parsedFlow?.title || parsedFlow?.name || flow?.name || flow?.title || 'Flow Editor'}
+            </Typography>
+            {isDirty && (
+              <Chip size="sm" color="warning" variant="soft">unsaved changes</Chip>
+            )}
+          </Box>
+          <Typography level="body-xs" color="neutral" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+            {flow.path}
+          </Typography>
+        </Box>
+
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Button
+            startDecorator={<BackIcon />}
+            variant="outlined"
+            color="neutral"
+            onClick={handleBack}
+          >
+            Back
+          </Button>
+          <Button
+            startDecorator={<SaveIcon />}
+            variant="outlined"
+            onClick={handleSave}
+            loading={saving}
+            disabled={!isDirty}
+          >
+            Save
+          </Button>
+          <Button
+            startDecorator={<PlayIcon />}
+            color="success"
+            onClick={handleOpenRunDialog}
+            disabled={Boolean(parsedFlow?.parseError) || isRunning}
+            loading={isRunning}
+          >
+            Run flow
+          </Button>
+        </Box>
       </Box>
 
-      <Divider orientation="vertical" />
+      {/* Editor + right panel */}
+      <Box sx={{ display: 'flex', flex: 1, minHeight: 0, gap: 2 }}>
+        <Sheet variant="outlined" sx={{ flex: 1, minWidth: 0, borderRadius: 'md', overflow: 'hidden' }}>
+          <MonacoEditor
+            value={flowContent}
+            onChange={setFlowContent}
+            language="yaml"
+            height="100%"
+            theme={mode === 'light' ? 'light' : 'vs-dark'}
+            sx={{ height: '100%' }}
+          />
+        </Sheet>
 
-      {/* Right Panel - Header, Buttons, and Flow Steps */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {/* Header */}
-        <Box sx={{ p: 3, pb: 2 }}>
-          <Typography level="h1" sx={{ mb: 2 }}>
-            {parsedFlow?.title || parsedFlow?.name || flow?.name || flow?.title || 'Flow Editor'}
-          </Typography>
+        <Sheet variant="outlined" sx={{ flex: 1, minWidth: 0, borderRadius: 'md', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <Tabs
+            value={activeTab}
+            onChange={(event, value) => setActiveTab(value)}
+            sx={{ bgcolor: 'transparent' }}
+          >
+            <TabList>
+              <Tab value="steps">Steps</Tab>
+              <Tab value="execution">
+                Execution
+                {execution && (
+                  <Chip
+                    size="sm"
+                    variant="soft"
+                    color={
+                      execution.status === 'passed' ? 'success' :
+                        execution.status === 'running' ? 'primary' : 'danger'
+                    }
+                    sx={{ ml: 1 }}
+                  >
+                    {execution.status}
+                  </Chip>
+                )}
+              </Tab>
+            </TabList>
+          </Tabs>
+          <Box sx={{ flex: 1, overflow: 'auto' }}>
+            {activeTab === 'steps'
+              ? renderFlowVisualization()
+              : <ExecutionView execution={execution} steps={execSteps} requestError={runError} />}
+          </Box>
+        </Sheet>
+      </Box>
 
-          {flow.relativePath && (
-            <Typography level="body-md" sx={{ mb: 3, color: 'text.secondary' }}>
-              {flow.relativePath}
+      {/* Run dialog */}
+      <Modal open={runDialogOpen} onClose={() => setRunDialogOpen(false)}>
+        <ModalDialog sx={{ minWidth: 360 }}>
+          <ModalClose />
+          <DialogTitle>Run flow</DialogTitle>
+          <DialogContent>
+            <Typography level="body-sm" sx={{ mb: 2 }}>
+              The flow will run with the environment variables of the selected
+              environment. Unsaved editor content is executed as-is.
             </Typography>
-          )}
-
-          {/* Buttons */}
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <FormControl>
+              <FormLabel>Environment</FormLabel>
+              <Select
+                value={runEnvironment || null}
+                onChange={(event, value) => setRunEnvironment(value || '')}
+                placeholder="Select environment"
+              >
+                {environments.map((env) => {
+                  const envType = getEnvironmentType(env);
+                  return (
+                    <Option key={env} value={env}>
+                      <Chip size="sm" color={envType.color} variant="soft">{envType.type}</Chip>
+                      {env}
+                    </Option>
+                  );
+                })}
+              </Select>
+            </FormControl>
+            {environments.length === 0 && (
+              <Alert color="warning" sx={{ mt: 2 }}>
+                No environments found. Add .env files to your applications first.
+              </Alert>
+            )}
+          </DialogContent>
+          <DialogActions>
             <Button
-              startDecorator={<SaveIcon />}
-              variant="outlined"
-              onClick={handleSave}
-              disabled={loading}
-            >
-              Save
-            </Button>
-            <Button
+              color="success"
               startDecorator={<PlayIcon />}
               onClick={handleRun}
-              disabled={loading}
+              disabled={!runEnvironment}
             >
-              Run Flow
+              Run
             </Button>
-            <Button
-              startDecorator={<BackIcon />}
-              variant="outlined"
-              onClick={handleBack}
-            >
-              Back to Flows
+            <Button variant="plain" color="neutral" onClick={() => setRunDialogOpen(false)}>
+              Cancel
             </Button>
-          </Box>
-        </Box>
+          </DialogActions>
+        </ModalDialog>
+      </Modal>
 
-        <Divider />
-
-        {/* Flow Steps */}
-        <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
-          {renderFlowVisualization()}
-        </Box>
-      </Box>
+      {/* Save feedback */}
+      <Snackbar
+        open={Boolean(snackbar)}
+        color={snackbar?.color}
+        variant="soft"
+        autoHideDuration={3000}
+        onClose={() => setSnackbar(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        {snackbar?.message}
+      </Snackbar>
     </Box>
   );
 };
