@@ -166,7 +166,7 @@ provider, the model and the API keys are configured.
 
 #### Configure a provider
 
-Open **Settings** in the sidebar and pick one of:
+Open **Settings › AI** in the sidebar and pick one of:
 
 |Provider|What you need|
 |-|-|
@@ -355,7 +355,15 @@ and open http://localhost:3001.
   stream in below its block: status, timing, request, response and
   assertions. Edit the raw Markdown in the **Source** tab and save.
 - The environment selector (sidebar footer) picks the environment used for
-  runs. Light and dark themes are available.
+  runs.
+- **Settings** has a sidebar of its own, with one section per concern:
+  - **AI** — provider, model and API keys.
+  - **Xray** — the Jira / Xray integration.
+  - **UI** — theme: light, dark or auto (follows your operating system, live).
+    The choice is kept in your browser.
+  - **Help** — every guide and reference the tool ships with, searchable:
+    writing flows, assertions, replacers, integrations, the CLI and
+    troubleshooting.
 
 ## Jira / Xray integration
 
@@ -403,7 +411,7 @@ and visualization only.
 
 ### Configuring it
 
-Open **Settings** in the Web UI and fill in the **Jira / Xray** card. The
+Open **Settings › Xray** in the Web UI and fill in the **Jira / Xray** card. The
 credentials are stored in your context folder, at `config/jira.json`, and
 never leave your machine except to reach Jira or Xray. Two flavours are
 supported:
