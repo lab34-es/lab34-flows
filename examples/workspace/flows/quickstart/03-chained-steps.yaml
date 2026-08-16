@@ -1,0 +1,43 @@
+title: Chained steps and memory
+description: >-
+  Steps can reference the requests and responses of previous steps
+  ({{ steps.<slug>... }}), and applications can store values in flow
+  memory ({{ memory.<key> }}) for later steps.
+
+steps:
+  - application: jsonplaceholder
+    method: createPost
+    slug: create
+    description: Create a post; the application stores the new id in memory
+    parameters:
+      body:
+        title: "Chained flow {{ randomInt0_9999 }}"
+        userId: 7
+    test:
+      status: 201
+      body:
+        userId: 7
+
+  - application: jsonplaceholder
+    method: getUser
+    slug: author
+    description: Fetch the author, reusing the userId sent in the previous step
+    parameters:
+      params:
+        id: "{{ steps.create.request.body.userId }}"
+    test:
+      status: 200
+      body:
+        id: 7
+
+  - application: jsonplaceholder
+    method: getPost
+    slug: read-created
+    description: >-
+      Read the created post via flow memory. JSONPlaceholder fakes writes,
+      so the API answers 404 - and the test asserts exactly that.
+    parameters:
+      params:
+        id: "{{ memory.createdPostId }}"
+    test:
+      status: 404

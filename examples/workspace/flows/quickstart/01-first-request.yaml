@@ -1,0 +1,17 @@
+title: First request
+description: >-
+  The smallest possible flow: call one HTTP endpoint and assert on the
+  response status and body. Run it with the "staging" environment.
+
+steps:
+  - application: jsonplaceholder
+    method: getPost
+    description: Fetch post 1 and check its author
+    parameters:
+      params:
+        id: 1
+    test:
+      status: 200
+      body:
+        id: 1
+        userId: 1

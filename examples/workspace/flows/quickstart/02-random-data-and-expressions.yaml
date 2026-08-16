@@ -1,0 +1,29 @@
+title: Random data and expressions
+description: >-
+  Replacers ({{ ... }}) generate fresh random data on every run, and $expr
+  tests make dynamic assertions with plain JavaScript.
+
+steps:
+  - application: jsonplaceholder
+    method: createPost
+    slug: create
+    description: Create a post with a random title and author
+    parameters:
+      body:
+        title: "Post {{ randomInt0_9999 }} by {{ randomName }}"
+        userId: "{{ randomInt0_10 }}"
+    test:
+      status: 201
+      body:
+        id: "$expr: typeof value === 'number' && value > 100"
+
+  - application: jsonplaceholder
+    method: listPosts
+    slug: list
+    description: List the posts of author 1 and assert the list shape
+    parameters:
+      query:
+        userId: 1
+    test:
+      status: 200
+      body: "$expr: Array.isArray(value) && value.length === 10"

@@ -1,0 +1,54 @@
+title: Offline mimicking demo
+description: >-
+  The billing API is impersonated by a local server started from
+  applications/billing/mimic.js, so this flow runs fully offline.
+  Per-step "conditions" force failure scenarios in the mimic.
+  Run it with the "local" environment.
+
+steps:
+  - application: billing
+    method: createInvoice
+    slug: create-ok
+    description: Create an invoice for a regular customer
+    parameters:
+      body:
+        customerId: 42
+        amount: 120.5
+    mimic:
+      - application: billing
+    test:
+      status: 200
+      body:
+        status: created
+        customerId: 42
+
+  - application: billing
+    method: createInvoice
+    slug: create-blocked
+    description: Customer 57 is blocked via mimic conditions - expect a business error
+    parameters:
+      body:
+        customerId: 57
+    mimic:
+      - application: billing
+        conditions:
+          failForCustomer:
+            - "57"
+    test:
+      status: 200
+      body:
+        error:
+          code: CUSTOMER_BLOCKED
+
+  - application: billing
+    method: getInvoice
+    slug: read-back
+    description: Read the first invoice back from the mimicked API
+    parameters:
+      params:
+        id: "{{ steps.create-ok.response.body.invoiceId }}"
+    test:
+      status: 200
+      body:
+        status: paid
+        invoiceId: "$expr: typeof value === 'string' && value.length > 0"
