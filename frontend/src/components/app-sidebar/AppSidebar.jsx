@@ -8,6 +8,7 @@ import {
   Moon,
   Plus,
   RefreshCw,
+  Settings,
   Sun,
   Upload,
   Workflow,
@@ -192,6 +193,19 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={location.pathname === '/settings'}
+              onClick={() => navigate('/settings')}
+              title="AI provider, model and API keys"
+            >
+              <Settings className="text-muted-foreground" />
+              <span>Settings</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+
         <div className="flex items-end gap-2 px-2 pb-1">
           <div className="grid flex-1 gap-1">
             <Label className="text-muted-foreground flex items-center gap-1 text-xs">

@@ -13,8 +13,8 @@ Features:
 - **Notebook-style UI**: run a flow and the execution details of each step (request, response, assertions, timings) appear right below its code block.
 - Web UI built with [shadcn/ui](https://ui.shadcn.com): sidebar with your flows (with live status indicators), folders, uploads, and your applications with their docs.
 - Ships with **example applications and flows** (calculator, httpbin, jsonplaceholder), seeded on first run.
-- Integrates with Google Gemini AI to generate test scenarios.
-- Generate flows automatically using AI with natural language prompts.
+- **Write flows with AI** from the web UI: describe the scenario and get a Markdown flow built from your own applications — or hand an existing flow to the magic wand to change it.
+- Bring your own model: **local Ollama**, **Google Gemini** or **Anthropic (Claude)**, configured in the Settings screen.
 - Define test cases for each step in a way that can be used for CI/CD automation.
 - Mimic and customise the behaviour of dependant applications. (i.e. fail scenarios under user defined circusnstances).
 - Test with randomly generated data - on each attempt.
@@ -32,7 +32,7 @@ Features:
   - [General info](#general-info)
   - [Setup](#setup)
   - [Usage](#usage)
-    - [AI Mode](#ai-mode)
+    - [Writing flows with AI](#writing-flows-with-ai)
   - [Web UI](#web-ui)
   - [Default examples](#default-examples)
   - [Application docs (JSDoc)](#application-docs-jsdoc)
@@ -133,17 +133,15 @@ lab34-flows --help
 lab34-flows --file <path-to-flow-file> --env <environment> [--debug] [--help]
 lab34-flows --server
 lab34-flows --capabilities
-lab34-flows --ai "<prompt>"
 ```
 
 ### Options
 
 |Parameter|Description|
 |-|-|
-|`--file`|Path to the flow definition file, `.md` or `.yaml` (required if not using --ai or --server)|
+|`--file`|Path to the flow definition file, `.md` or `.yaml` (required if not using --server)|
 |`--server`|Start the web UI (builds the frontend and serves it on http://localhost:3001)|
-|`--ai`|Generate a flow from a prompt using AI (required if not using --file)|
-|`--env`|Environment to run the flow in (required for --file, optional for --ai)|
+|`--env`|Environment to run the flow in (required for --file)|
 |`--debug`|Print debug information including environment variables and Node.js variables|
 |`--help`|Show help information|
 
@@ -159,52 +157,63 @@ Run a flow with debug information:
 lab34-flows --file flows/my-flow.md --env production --debug
 ```
 
-Generate and run a flow using AI:
-```bash
-lab34-flows --ai "Test login functionality with valid credentials"
-```
+### Writing flows with AI
 
-### AI Mode
+Flows can be written for you from a plain description of the scenario. This
+lives in the web UI (`lab34-flows --server`), not in the CLI: that is where the
+provider, the model and the API keys are configured.
 
-The AI mode allows you to generate flow definitions using natural language prompts. This feature leverages Google's Generative AI (Gemini) to create YAML flow definitions based on your description of the testing scenario.
+#### Configure a provider
 
-#### AI Configuration
+Open **Settings** in the sidebar and pick one of:
 
-Before using the AI feature, you need to set up your AI configuration:
+|Provider|What you need|
+|-|-|
+|**Ollama (local)**|A running Ollama and a pulled model (`ollama pull llama3.1`). Nothing leaves your machine.|
+|**Google Gemini**|An API key from [aistudio.google.com](https://aistudio.google.com/app/apikey).|
+|**Anthropic (Claude)**|An API key from [console.anthropic.com](https://console.anthropic.com). Defaults to `claude-opus-5`.|
 
-1. Create a file named `ai.json` in the `~/flows/config/` directory with the following structure:
+Use **Test connection** to check the settings before generating anything.
+
+Settings are stored in your context folder, at `config/ai.json`:
 
 ```json
 {
-  "defaultProvider": "gemini",
-  "gemini": {
-    "apiKey": "YOUR_GEMINI_API_KEY_HERE",
-    "model": "gemini-pro",
-    "temperature": 0.7,
-    "topP": 0.95,
-    "topK": 40
+  "provider": "anthropic",
+  "providers": {
+    "ollama": { "model": "llama3.1", "host": "http://127.0.0.1:11434" },
+    "gemini": { "model": "gemini-2.5-flash", "apiKey": "..." },
+    "anthropic": { "model": "claude-opus-5", "apiKey": "..." }
   }
 }
 ```
 
-2. Replace `YOUR_GEMINI_API_KEY_HERE` with your actual Gemini API key.
+Keys are never sent back to the browser: the UI only learns whether one is
+stored. An older `ai.json` written for the Gemini-only version is migrated
+automatically the first time it is read.
 
-#### Using AI Mode
+#### Create a flow with AI
 
-Once configured, you can use the AI mode to generate flows:
+When creating a flow, turn on **Create using AI** under the file name. The file
+is created first — so it exists whatever happens next — and a second dialog
+asks what it should test:
 
-```bash
-lab34-flows --ai "Test the user registration process with valid data"
-```
+> Create a post on jsonplaceholder with a random title, check it comes back
+> with a 201, and then fetch a post that does not exist.
 
-The tool will:
-1. Send your prompt to the AI service
-2. Generate a YAML flow definition based on your description
+What comes back is a Markdown flow: frontmatter, prose explaining each part and
+```` ```step ```` blocks built from the applications you actually have. The
+generated document is checked before it is saved — it has to parse, contain at
+least one step, and only use applications and methods that exist — and the
+model gets one chance to fix its own mistakes before the error reaches you.
 
-This feature is particularly useful for:
-- Quickly creating test flows without manually writing YAML
-- Exploring different testing scenarios
-- Generating comprehensive test cases from simple descriptions
+#### Edit a flow with AI
+
+Open any flow and use the **magic wand** next to the Document/Source toggle:
+describe the change ("also cover the unhappy path", "explain each section")
+and the whole document is rewritten. The result lands in the editor as an
+**unsaved** change, so you can read it — and reload to throw it away — before
+saving.
 
 ### Debug Mode
 
@@ -362,8 +371,8 @@ Examples are only copied when missing, so you can edit or delete them freely.
 
 Applications document themselves in their own code: there is no `docs.json`.
 The documentation is read from the JSDoc blocks of the application's
-`index.js`, and it is what the UI renders and what the AI mode uses to build
-flows.
+`index.js`, and it is what the UI renders and what the model is given when it
+writes a flow for you — the better the JSDoc, the better the generated flows.
 
 - The block at the **top of the file** describes the application.
 - The block **above each exported method** documents that method: its free

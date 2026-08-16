@@ -11,12 +11,19 @@ const api = axios.create({
   },
 });
 
+// Generating a flow means waiting for a model to write a whole document —
+// and, when the first answer is not valid, for a second attempt.
+const AI_TIMEOUT = 240000;
+
 // API methods
 export const flowsApi = {
   list: () => api.get('/api/flows'),
   tree: () => api.get('/api/flows/tree'),
   parse: (value, format) => api.post('/api/flows/parse', { value, format }),
-  create: (data) => api.post('/api/flows/create/ai', data),
+  createAI: (prompt) =>
+    api.post('/api/flows/create/ai', { prompt }, { timeout: AI_TIMEOUT }),
+  editAI: (prompt, content) =>
+    api.post('/api/flows/edit/ai', { prompt, content }, { timeout: AI_TIMEOUT }),
   start: (data) => api.post('/api/flows/start', data),
   getUserFlow: (path) => api.get(`/api/flows/user?path=${encodeURIComponent(path)}`),
   createFolder: (path) => api.post('/api/flows/folder', { path }),
@@ -43,6 +50,15 @@ export const applicationsApi = {
 
 export const environmentApi = {
   getAllPossible: () => api.get('/api/environment/all-possible'),
+};
+
+export const settingsApi = {
+  getAI: () => api.get('/api/settings/ai'),
+  saveAI: (settings) => api.put('/api/settings/ai', settings),
+  testAI: (provider) =>
+    api.post('/api/settings/ai/test', { provider }, { timeout: AI_TIMEOUT }),
+  listAIModels: (provider) =>
+    api.get(`/api/settings/ai/models/${encodeURIComponent(provider)}`),
 };
 
 export default api;
