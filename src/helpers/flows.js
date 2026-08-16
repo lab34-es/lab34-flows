@@ -5,10 +5,12 @@ const YAML = require('yaml');
 const paths = require('./paths');
 const apps = require('./applications');
 const configHelper = require('./config');
+const markdownFlows = require('./markdownFlows');
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const ALLOWED_FILE_FORMATS = ['yaml', 'yml'];
+const ALLOWED_FILE_FORMATS = ['md', 'markdown', 'yaml', 'yml'];
+const MARKDOWN_FORMATS = ['md', 'markdown'];
 
 module.exports.createAI = async (body) => {
   const {
@@ -100,44 +102,181 @@ module.exports.listCapabilities = async () => {
 };
 
 /**
- * Given the location of a yaml file, return its content
- * @param {*} path 
- * @returns 
+ * Build a human readable title from a flow file name.
+ * @param {string} fileName
+ * @returns {string}
+ */
+const titleFromFileName = (fileName) => {
+  return fileName
+    .replace(new RegExp(`\\.(${ALLOWED_FILE_FORMATS.join('|')})$`, 'i'), '')
+    .replace(/[_-]/g, ' ')
+    .replace(/\b\w/g, l => l.toUpperCase());
+};
+
+/**
+ * Whether a flow file path points to a markdown flow.
+ * @param {string} flowPath
+ * @returns {boolean}
+ */
+const isMarkdownPath = (flowPath) => {
+  const ext = path.extname(flowPath).toLowerCase().substring(1);
+  return MARKDOWN_FORMATS.includes(ext);
+};
+
+/**
+ * Parse raw flow content (markdown or YAML) into a normalized structure
+ * shared by the API and the UI:
+ * { format, title, description, segments, steps, errors }
+ *
+ * Segments describe the document in order, so the UI can render it as a
+ * notebook: markdown segments are plain content, step segments are the
+ * executable cells.
+ *
+ * @param {string} value - Raw file content
+ * @param {string|null} format - 'markdown' | 'yaml' | null (auto-detect)
+ * @returns {Object}
+ */
+const parseValue = (value, format = null) => {
+  const isMarkdown = format === 'markdown' ||
+    (format !== 'yaml' && markdownFlows.isMarkdownFlow(value));
+
+  if (isMarkdown) {
+    const parsed = markdownFlows.parse(value);
+    return {
+      format: 'markdown',
+      title: parsed.title,
+      description: parsed.description,
+      version: parsed.version,
+      segments: parsed.segments,
+      steps: parsed.steps,
+      errors: parsed.errors
+    };
+  }
+
+  // Classic YAML flow: synthesize one step segment per step so the UI can
+  // render YAML flows with the same notebook look.
+  let contents;
+  try {
+    contents = YAML.parse(value);
+  }
+  catch (ex) {
+    return {
+      format: 'yaml',
+      title: null,
+      description: null,
+      segments: [],
+      steps: [],
+      errors: [{ message: `Invalid YAML: ${ex.message}` }]
+    };
+  }
+
+  if (!contents || typeof contents !== 'object') {
+    return {
+      format: 'yaml',
+      title: null,
+      description: null,
+      segments: [],
+      steps: [],
+      errors: [{ message: 'Flow file must contain a YAML object' }]
+    };
+  }
+
+  const steps = Array.isArray(contents.steps) ? contents.steps : [];
+
+  const segments = [];
+  if (contents.description) {
+    segments.push({ type: 'markdown', content: contents.description });
+  }
+  steps.forEach((step, index) => {
+    segments.push({
+      type: 'step',
+      content: YAML.stringify(step).trim(),
+      info: 'step',
+      stepIndex: index
+    });
+  });
+
+  return {
+    format: 'yaml',
+    title: contents.title || null,
+    description: contents.description || null,
+    version: contents.version,
+    segments,
+    steps: steps.map((step, index) => {
+      if (step && typeof step === 'object' && !Array.isArray(step)) {
+        return { ...step, stepIndex: index };
+      }
+      return step;
+    }),
+    errors: []
+  };
+};
+
+module.exports.parseValue = parseValue;
+
+/**
+ * Given the location of a flow file (markdown or YAML), return its parsed
+ * content, or null when it cannot be parsed at all.
+ * @param {string} flowPath
+ * @returns {Object|null}
  */
 const getContent = (flowPath) => {
   const fileName = path.basename(flowPath);
-  
+
   let contents;
 
   try {
-    contents = YAML.parse(fs.readFileSync(flowPath, 'utf8'));
+    const raw = fs.readFileSync(flowPath, 'utf8');
+    const parsed = parseValue(raw, isMarkdownPath(flowPath) ? 'markdown' : 'yaml');
+
+    contents = {
+      format: parsed.format,
+      title: parsed.title,
+      description: parsed.description,
+      stepsCount: parsed.steps.length,
+      errors: parsed.errors
+    };
 
     if (!contents.title) {
-      // title = remove (ALLOWED_FILE_FORMATS) from the file name using regex
-      contents.title = fileName.replace(new RegExp(`\\.(${ALLOWED_FILE_FORMATS.join('|')})$`, 'i'), '');
-      contents.title = contents.title.replace(/_/g, ' ');
-      // switch to camel case all words
-      contents.title = contents.title.replace(/\b\w/g, l => l.toUpperCase());
+      contents.title = titleFromFileName(fileName);
     }
   }
-  catch (ex) {
+  catch {
     contents = null;
   }
 
   return contents;
 };
 
-module.exports.getUserFlow = (flowPath) => {
-  if (!fs.existsSync(flowPath)) {
-    return Promise.reject('Flow not found');
+module.exports.getUserFlow = async (flowPath) => {
+  if (!flowPath || !fs.existsSync(flowPath)) {
+    return Promise.reject(new Error('Flow not found'));
   }
 
-  const content = getContent(flowPath);
-  return Promise.resolve({
-    ...content,
+  const raw = fs.readFileSync(flowPath, 'utf8');
+  const parsed = parseValue(raw, isMarkdownPath(flowPath) ? 'markdown' : 'yaml');
+
+  // Relative path inside the flows directory (used by the UI to save the
+  // file); null when the flow lives elsewhere.
+  let relativePath = null;
+  try {
+    const flowsDir = await paths.contextDir(['flows']);
+    const relative = path.relative(flowsDir, flowPath);
+    if (relative && !relative.startsWith('..') && !path.isAbsolute(relative)) {
+      relativePath = relative.split(path.sep).join('/');
+    }
+  }
+  catch {
+    relativePath = null;
+  }
+
+  return {
+    ...parsed,
+    title: parsed.title || titleFromFileName(path.basename(flowPath)),
     path: flowPath,
-    plainText: fs.readFileSync(flowPath, 'utf8')
-  });
+    relativePath,
+    plainText: raw
+  };
 };
 
 /**
@@ -183,20 +322,183 @@ module.exports.list = async () => {
   };
   
   scanDirectory(flowsDir);
-  
+
   return flows;
 };
 
 /**
- * Method called from API 
- * 
- * @param {*} body 
- * @returns 
+ * Resolve a user-provided relative path inside the flows directory,
+ * rejecting any attempt to escape it.
+ * @param {string} relativePath
+ * @returns {Promise<{flowsDir: string, absolute: string, relative: string}>}
+ */
+const resolveWithinFlows = async (relativePath) => {
+  const flowsDir = await paths.contextDir(['flows']);
+  const absolute = path.resolve(flowsDir, relativePath || '.');
+
+  if (absolute !== flowsDir && !absolute.startsWith(flowsDir + path.sep)) {
+    throw new Error('Invalid path: outside of the flows directory');
+  }
+
+  return {
+    flowsDir,
+    absolute,
+    relative: path.relative(flowsDir, absolute)
+  };
+};
+
+module.exports.resolveWithinFlows = resolveWithinFlows;
+
+/**
+ * Return the flows directory as a nested tree of folders and flow files,
+ * including empty folders, so the UI can render a file explorer.
+ * @returns {Promise<Array>} tree nodes:
+ *   { type: 'folder', name, relativePath, children }
+ *   { type: 'flow', name, title, relativePath, path, format, stepsCount }
+ */
+module.exports.tree = async () => {
+  const flowsDir = await paths.contextDir(['flows']);
+
+  if (!fs.existsSync(flowsDir)) {
+    return [];
+  }
+
+  const scan = (dir, relativePath) => {
+    const nodes = [];
+    const items = fs.readdirSync(dir);
+
+    for (const item of items) {
+      if (item.startsWith('.')) { continue; }
+
+      const fullPath = path.join(dir, item);
+      const itemRelative = relativePath ? path.posix.join(relativePath, item) : item;
+      const stat = fs.statSync(fullPath);
+
+      if (stat.isDirectory()) {
+        nodes.push({
+          type: 'folder',
+          name: item,
+          relativePath: itemRelative,
+          children: scan(fullPath, itemRelative)
+        });
+        continue;
+      }
+
+      const ext = path.extname(item).toLowerCase().substring(1);
+      if (!ALLOWED_FILE_FORMATS.includes(ext)) { continue; }
+
+      const content = getContent(fullPath);
+      nodes.push({
+        type: 'flow',
+        name: item,
+        title: (content && content.title) || titleFromFileName(item),
+        relativePath: itemRelative,
+        path: fullPath,
+        format: content ? content.format : (isMarkdownPath(fullPath) ? 'markdown' : 'yaml'),
+        stepsCount: content ? content.stepsCount : 0,
+        hasErrors: Boolean(content && content.errors && content.errors.length)
+      });
+    }
+
+    // Folders first, then flows; alphabetical within each group
+    return nodes.sort((a, b) => {
+      if (a.type !== b.type) { return a.type === 'folder' ? -1 : 1; }
+      return a.name.localeCompare(b.name);
+    });
+  };
+
+  return scan(flowsDir, '');
+};
+
+/**
+ * Create a folder inside the flows directory.
+ * @param {string} relativePath
+ */
+module.exports.createFolder = async (relativePath) => {
+  if (!relativePath || !relativePath.trim()) {
+    throw new Error('Folder path is required');
+  }
+
+  const { absolute, relative } = await resolveWithinFlows(relativePath);
+
+  if (!relative) {
+    throw new Error('Folder path is required');
+  }
+
+  fs.mkdirSync(absolute, { recursive: true });
+  return { relativePath: relative };
+};
+
+/**
+ * Create or update a flow file inside the flows directory.
+ * @param {Object} options
+ * @param {string} options.relativePath - File path relative to the flows dir
+ * @param {string} options.content - File content
+ * @param {boolean} options.overwrite - Allow overwriting an existing file
+ */
+module.exports.saveFile = async ({ relativePath, content, overwrite = false }) => {
+  if (!relativePath || !relativePath.trim()) {
+    throw new Error('File path is required');
+  }
+
+  const ext = path.extname(relativePath).toLowerCase().substring(1);
+  if (!ALLOWED_FILE_FORMATS.includes(ext)) {
+    throw new Error(`Unsupported file format ".${ext}". Allowed: ${ALLOWED_FILE_FORMATS.join(', ')}`);
+  }
+
+  const { absolute, relative } = await resolveWithinFlows(relativePath);
+
+  if (fs.existsSync(absolute)) {
+    if (fs.statSync(absolute).isDirectory()) {
+      throw new Error('A folder with that name already exists');
+    }
+    if (!overwrite) {
+      const err = new Error('File already exists');
+      err.code = 'EEXISTS';
+      throw err;
+    }
+  }
+
+  fs.mkdirSync(path.dirname(absolute), { recursive: true });
+  fs.writeFileSync(absolute, content ?? '', 'utf8');
+
+  return { relativePath: relative, path: absolute };
+};
+
+/**
+ * Delete a flow file or folder inside the flows directory.
+ * @param {string} relativePath
+ */
+module.exports.remove = async (relativePath) => {
+  if (!relativePath || !relativePath.trim()) {
+    throw new Error('Path is required');
+  }
+
+  const { absolute, relative } = await resolveWithinFlows(relativePath);
+
+  if (!relative) {
+    throw new Error('Refusing to delete the flows directory itself');
+  }
+
+  if (!fs.existsSync(absolute)) {
+    throw new Error('Path not found');
+  }
+
+  fs.rmSync(absolute, { recursive: true, force: true });
+  return { relativePath: relative };
+};
+
+/**
+ * Method called from API
+ *
+ * @param {*} body
+ * @returns
  */
 module.exports.start = async (body, opts) => {
   const {
     value,
-    environment
+    environment,
+    format
   } = body;
 
   const {
@@ -206,10 +508,34 @@ module.exports.start = async (body, opts) => {
   const required = ['value', 'environment'];
 
   if (!required.every(key => body[key])) {
-    return Promise.reject('Invalid request');
+    return Promise.reject(new Error('Invalid request: "value" and "environment" are required'));
   }
 
-  const flowAsJson = YAML.parse(value);
+  const isMarkdown = format === 'markdown' ||
+    (format !== 'yaml' && markdownFlows.isMarkdownFlow(value));
+
+  let flowAsJson;
+
+  if (isMarkdown) {
+    // Throws a descriptive error when a step block contains invalid YAML
+    flowAsJson = markdownFlows.toFlow(value);
+  }
+  else {
+    try {
+      flowAsJson = YAML.parse(value);
+    }
+    catch (ex) {
+      return Promise.reject(new Error(`Invalid YAML flow: ${ex.message}`));
+    }
+  }
+
+  if (!flowAsJson || !Array.isArray(flowAsJson.steps) || !flowAsJson.steps.length) {
+    return Promise.reject(new Error('Flow has no steps to execute'));
+  }
+
+  // Make sure application methods are loaded (the CLI does this itself,
+  // but API-triggered runs need it too)
+  await apps.loadAll();
 
   const runner = require(`./runner/v${flowAsJson.version || '1'}`);
 

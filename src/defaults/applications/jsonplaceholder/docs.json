@@ -1,0 +1,61 @@
+{
+  "description": "A free fake REST API (jsonplaceholder.typicode.com) with posts and users. Demonstrates CRUD-style steps and passing data between steps via memory.",
+  "methods": {
+    "listPosts": {
+      "description": "GET /posts — lists posts, optionally filtered by user.",
+      "input": [
+        { "name": "query.userId", "type": "number", "required": false, "description": "Only return posts authored by this user (1-10)." }
+      ],
+      "output": {
+        "status": 200,
+        "body": [{ "userId": 1, "id": 1, "title": "…", "body": "…" }],
+        "description": "An array of posts."
+      },
+      "memory": [],
+      "example": "application: jsonplaceholder\nmethod: listPosts\nparameters:\n  query:\n    userId: 1\ntest:\n  status: 200\n  body: \"$expr: Array.isArray(value) && value.length === 10\""
+    },
+    "getPost": {
+      "description": "GET /posts/{id} — fetches a single post.",
+      "input": [
+        { "name": "params.id", "type": "number", "required": true, "description": "The post id (1-100)." }
+      ],
+      "output": {
+        "status": 200,
+        "body": { "userId": 1, "id": 1, "title": "…", "body": "…" },
+        "description": "The post object. Unknown ids return 404."
+      },
+      "memory": [],
+      "example": "application: jsonplaceholder\nmethod: getPost\nparameters:\n  params:\n    id: 1\ntest:\n  status: 200\n  body:\n    id: 1\n    userId: 1"
+    },
+    "createPost": {
+      "description": "POST /posts — creates a post (the fake API answers 201 with the new id, but does not persist it).",
+      "input": [
+        { "name": "body.title", "type": "string", "required": true, "description": "Post title." },
+        { "name": "body.body", "type": "string", "required": true, "description": "Post content." },
+        { "name": "body.userId", "type": "number", "required": true, "description": "Author id." }
+      ],
+      "output": {
+        "status": 201,
+        "body": { "id": 101, "title": "…", "body": "…", "userId": 1 },
+        "description": "The created post, including the id assigned by the API."
+      },
+      "memory": [
+        { "key": "lastPostId", "mode": "write", "description": "The id of the created post. Later steps can read it with {{ memory.lastPostId }}." }
+      ],
+      "example": "application: jsonplaceholder\nmethod: createPost\nparameters:\n  body:\n    title: \"{{ randomString }}\"\n    body: \"Written by {{ randomName }}\"\n    userId: 1\ntest:\n  status: 201"
+    },
+    "getUser": {
+      "description": "GET /users/{id} — fetches a user profile.",
+      "input": [
+        { "name": "params.id", "type": "number", "required": true, "description": "The user id (1-10)." }
+      ],
+      "output": {
+        "status": 200,
+        "body": { "id": 1, "name": "Leanne Graham", "email": "…", "company": {} },
+        "description": "The user object with address and company details."
+      },
+      "memory": [],
+      "example": "application: jsonplaceholder\nmethod: getUser\nparameters:\n  params:\n    id: 1\ntest:\n  status: 200\n  body:\n    id: 1"
+    }
+  }
+}

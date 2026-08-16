@@ -261,11 +261,19 @@ const parseApplications = async () => {
     if (fs.existsSync(appIndex)) {
 
       // Replace in appIndex "lab34-flows" with $NODE_PATH/@lab34/flows/
+      // When NODE_PATH is not set (or the global install is missing), fall
+      // back to this repository itself so applications work in development
+      // and when the tool runs its own bundled examples.
       const nodePath = process.env.NODE_PATH || '';
-      const flowsPath = path.join(nodePath, '@lab34', 'flows');
+      let flowsPath = nodePath ? path.join(nodePath, '@lab34', 'flows') : '';
+      if (!flowsPath || !fs.existsSync(flowsPath)) {
+        flowsPath = path.resolve(__dirname, '..', '..');
+      }
       const appIndexContentOriginal = fs.readFileSync(appIndex, 'utf8');
-      const appIndexContentModified = fs.readFileSync(appIndex, 'utf8')
-        .replace(/lab34-flows/g, flowsPath);
+      const appIndexContentModified = appIndexContentOriginal
+        .replace(/(['"])lab34-flows(\/[^'"]*)?\1/g, (match, quote, subpath) => {
+          return `${quote}${flowsPath}${subpath || ''}${quote}`;
+        });
 
       // Write the modified content to a temporary file
       fs.writeFileSync(appIndex, appIndexContentModified);
@@ -289,12 +297,61 @@ const parseApplications = async () => {
       }
     }
 
+    // Load the application README, if any
+    let readme = null;
+    const readmeFile = fs.readdirSync(appPath)
+      .find(file => file.toLowerCase() === 'readme.md');
+    if (readmeFile) {
+      try {
+        readme = fs.readFileSync(path.join(appPath, readmeFile), 'utf8');
+      }
+      catch (ex) {
+        errors.push({ message: `Error reading README: ${ex.message}` });
+      }
+    }
+
+    // Load the JSON docs (docs.json), if any. It documents each method:
+    // input parameters, output, memory usage, examples...
+    let docs = null;
+    const docsPath = path.join(appPath, 'docs.json');
+    if (fs.existsSync(docsPath)) {
+      try {
+        docs = JSON.parse(fs.readFileSync(docsPath, 'utf8'));
+      }
+      catch (ex) {
+        errors.push({ message: `Invalid docs.json: ${ex.message}` });
+      }
+    }
+
+    // Merge the self-described methods (from index.js) with the JSON docs.
+    // Methods present only in docs.json are included too, flagged as not
+    // implemented.
+    const docsMethods = (docs && docs.methods) || {};
+    const methodsByName = new Map();
+
+    methods.filter(Boolean).forEach(method => {
+      methodsByName.set(method.name, { ...method, implemented: true });
+    });
+
+    Object.keys(docsMethods).forEach(name => {
+      const existing = methodsByName.get(name) || { name, implemented: false };
+      const methodDocs = docsMethods[name] || {};
+      methodsByName.set(name, {
+        ...existing,
+        description: existing.description || methodDocs.description,
+        docs: methodDocs
+      });
+    });
+
     return {
       name: applicationName,
       slug: applicationName,
       path: appPath,
+      description: (docs && docs.description) || null,
+      readme,
+      docs,
       envFiles: envFilesWithPaths,
-      methods,
+      methods: Array.from(methodsByName.values()),
       errors
     };
   }));

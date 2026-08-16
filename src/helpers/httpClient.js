@@ -126,29 +126,28 @@ const formatResponse = async (ctx, response, meta) => {
       response.headers.get('content-type').includes('application/json');
   }
 
-  // Re-throw if the response is an error
-  if(response instanceof Error) {
-    try {
-      if (isJson && response.response && response.response.data) {
-        body = typeof response.response.data === 'string' ? JSON.parse(response.response.data) : response.response.data;
-      } else {
-        body = (response.response && response.response.data) || response.message || 'Unknown error';
-      }
-    } catch (error) {
-      // Fallback to raw data if parsing fails
-      body = (response.response && response.response.data) || response.message || 'Unknown error';
+  if (response instanceof Error) {
+    // HTTP errors (4xx / 5xx) are regular responses for a flow: the step
+    // tests decide whether the status code is expected or not.
+    if (response.response) {
+      return formatResponse(ctx, response.response, meta);
     }
-    console.error('Error:', JSON.stringify(body, null, 2));
-    process.exit(1);
+
+    // Network / setup errors: fail the step (the runner reports the error
+    // under the step) instead of killing the whole process.
+    console.error('Error:', response.message);
     throw response;
   }
 
   const headers = response.headers;
   const status = response.status;
 
-  // Re-determine if response is JSON for successful responses
-  isJson = headers.get('content-type') && 
-    headers.get('content-type').includes('application/json');
+  // Re-determine if response is JSON. Supports both AxiosHeaders (with a
+  // .get method) and plain header objects.
+  const contentType = headers
+    ? (typeof headers.get === 'function' ? headers.get('content-type') : headers['content-type'])
+    : null;
+  isJson = Boolean(contentType && contentType.includes('application/json'));
   
   // Parse response body according to content type
   try {

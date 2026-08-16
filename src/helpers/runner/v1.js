@@ -249,7 +249,7 @@ const processor = async (flow, opts) => {
         const [request, headers, status, body, memory] = await executeStep(flow, step);
 
         flow.steps[i].execution.times.end = Date.now();
-        flow.steps[i].execution.times.duration = (new Date() - flow.execution.times.start) / 1000;
+        flow.steps[i].execution.times.duration = (flow.steps[i].execution.times.end - flow.steps[i].execution.times.start) / 1000;
         flow.reporter.stepUpdate(id);
 
         flow.memory = Object.assign(flow.memory || {}, memory || {});
