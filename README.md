@@ -48,7 +48,9 @@ Features:
 This tool is intended to help you test E2E flows and behaviours.
 
 The list of steps to execute are defined in files called "flows", located in
-the `flows` folder of your context directory (`~/lab34-flows` by default).
+the `flows` folder of your context directory. The context directory is **the
+folder you run the command from**, so each project keeps its own flows and
+applications next to its code. See [Context directory](#context-directory).
 
 A flow is a **Markdown document**. You can write any content — headings,
 prose, lists, images — and turn any part of it into an executable step with a
@@ -105,9 +107,14 @@ Additionally:
 ## Setup
 
 ```bash
-# Install this repository, globally.
+# Install globally: this gives you the "flows" command.
 
 npm install -g @lab34/flows
+
+# Or run it without installing (note the scope — the unscoped "flows" package
+# on npm is someone else's):
+
+npx @lab34/flows
 
 # Extend NODE_PATH to npm's root, so your application scripts can access the library:
 # On Linux / MacOS:
@@ -130,19 +137,45 @@ The Lab34 Flows CLI tool provides a professional command-line interface for runn
 ### Usage
 
 ```bash
-lab34-flows --help
-lab34-flows --file <path-to-flow-file> --env <environment> [--debug] [--help]
-lab34-flows --server
-lab34-flows --capabilities
+cd my-project
+flows                     # opens the web UI on http://localhost:3001
+
+flows --help
+flows --file <path-to-flow-file> --env <environment> [--debug] [--help]
+flows --capabilities
 ```
+
+`lab34-flows` still works as an alias of `flows`.
+
+### Context directory
+
+The context directory holds `applications/`, `flows/` and `config/`. It is
+resolved in this order:
+
+1. `--context <dir>` (absolute, or relative to where you are)
+2. the `LAB34_FLOWS_CONTEXT` environment variable
+3. **the current working directory** (the default)
+
+Nothing is ever written outside it, and no folder is created in your home
+directory.
+
+Run `flows` in an **empty folder** and it sets that folder up as a workspace:
+the bundled example applications and flows are copied into it. Run it in a
+folder that already has `applications/` or `flows/` and nothing is seeded — it
+is your workspace, untouched.
+
+> Upgrading from an older version? Flows used to default to `~/lab34-flows`.
+> Move that folder into your project, or point at it with
+> `flows --context ~/lab34-flows` (or export `LAB34_FLOWS_CONTEXT`).
 
 ### Options
 
 |Parameter|Description|
 |-|-|
-|`--file`|Path to the flow definition file, `.md` or `.yaml` (required if not using --server)|
-|`--server`|Start the web UI (builds the frontend and serves it on http://localhost:3001)|
+|`--file`|Path to the flow definition file, `.md` or `.yaml`|
+|`--server`|Start the web UI on http://localhost:3001 (this is the default action)|
 |`--env`|Environment to run the flow in (required for --file)|
+|`--context`|Context directory (defaults to the current working directory)|
 |`--debug`|Print debug information including environment variables and Node.js variables|
 |`--help`|Show help information|
 
@@ -150,12 +183,17 @@ lab34-flows --capabilities
 
 Display help information:
 ```bash
-lab34-flows --help
+flows --help
 ```
 
 Run a flow with debug information:
 ```bash
-lab34-flows --file flows/my-flow.md --env production --debug
+flows --file flows/my-flow.md --env production --debug
+```
+
+Work on a context directory other than the current folder:
+```bash
+flows --context ~/my-other-project
 ```
 
 ### Writing flows with AI

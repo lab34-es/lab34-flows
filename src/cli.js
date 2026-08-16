@@ -15,8 +15,8 @@ const applications = require('./helpers/applications');
  *
  * Options:
  *   --file         Path to the flow definition file (.md or .yaml)
- *   --context      Context directory
- *   --capabilities List all available capabilities from the contents of ~/flows
+ *   --context      Context directory (defaults to the current working directory)
+ *   --capabilities List all available capabilities found in the context directory
  *   --env          Environment to run the flow in (required for --file)
  *   --server       Start the web server with built frontend and API
  *   --debug        Print debug information including environment variables
@@ -64,25 +64,31 @@ function showHelp() {
 Lab34 Flows CLI Tool v${packageJson.version}
 
 Usage:
-  lab34-flows --file <path-to-flow-file> --env <environment> [--debug] [--help]
-  lab34-flows --server [--context=<context>]
+  flows                                     Open the web UI on the current folder
+  flows --file <path-to-flow-file> --env <environment> [--debug] [--help]
+  flows --server [--context=<context>]
 
 Options:
-  --file          Path to the flow definition file (.md markdown flow or .yaml) (required if not using --server)
-  --capabilities  List all available capabilities from the contents of ~/flows
-  --server        Start the web server with built frontend and API
+  --file          Path to the flow definition file (.md markdown flow or .yaml)
+  --capabilities  List all available capabilities found in the context directory
+  --server        Start the web server with built frontend and API (default action)
   --env           Environment to run the flow in (required for --file)
-  --context       Context directory for server mode (optional)
+  --context       Context directory (defaults to the current working directory)
   --debug         Print debug information including environment variables
   --help          Show this help message
 
-Generating flows with AI is done from the web UI (--server): the provider,
-model and API keys are configured there, under Settings.
+The context directory is where "applications", "flows" and "config" live. It
+defaults to the folder you run the command from, so a project keeps its own
+flows next to its code. Run "flows" in an empty folder and the bundled example
+applications and flows are created there to get you started.
+
+Generating flows with AI is done from the web UI: the provider, model and API
+keys are configured there, under Settings.
 
 Examples:
-  lab34-flows --context my/context/folder --file flows/my-flow.md --env production
-  lab34-flows --context my/context/folder --capabilities
-  lab34-flows --server --context=myproject
+  cd my-project && flows
+  flows --file flows/my-flow.md --env production
+  flows --context my/context/folder --capabilities
   `);
   process.exit(0);
 }
@@ -156,7 +162,11 @@ async function validateFilePath(filePath) {
     exitWithError('No file specified. Use --file <path-to-yaml-file>');
   }
 
-  const fullFilePath = await paths.contextDir(filePath);
+  // An absolute path is taken as-is; a relative one is resolved inside the
+  // context directory, so "--file flows/x.md" works from the project folder
+  const fullFilePath = require('path').isAbsolute(filePath)
+    ? filePath
+    : await paths.contextDir(filePath);
 
   if (!fs.existsSync(fullFilePath)) {
     exitWithError(`File not found: ${fullFilePath}`);
@@ -221,27 +231,40 @@ async function runFlow(flowConfig, options) {
  * Start the web server with built frontend and API
  */
 async function startServer() {
-  console.log('Building frontend...');
-  
-  const { spawn } = require('child_process');
-  
-  // Build the frontend first
-  const buildProcess = spawn('npm', ['run', 'build:frontend'], {
-    stdio: 'inherit',
-    cwd: process.cwd()
-  });
-  
-  buildProcess.on('close', async (code) => {
-    if (code !== 0) {
-      exitWithError('Failed to build frontend');
+  const path = require('path');
+  const packageRoot = path.join(__dirname, '..');
+  const distPath = path.join(packageRoot, 'frontend', 'dist', 'index.html');
+
+  // Published packages ship a prebuilt frontend. Only a source checkout can
+  // (and needs to) build it on the fly.
+  if (!fs.existsSync(distPath)) {
+    const canBuild = fs.existsSync(path.join(packageRoot, 'frontend', 'package.json'));
+    if (!canBuild) {
+      exitWithError('Frontend assets are missing from this installation. Reinstall @lab34/flows.');
     }
-    
-    console.log('Frontend built successfully. Starting server...');
-    
-    // Start the API server which will serve the built frontend
-    const api = require('./api');
-    await api.start();
-  });
+
+    console.log('Building frontend...');
+    const { spawn } = require('child_process');
+    const buildProcess = spawn('npm', ['run', 'build:frontend'], {
+      stdio: 'inherit',
+      cwd: packageRoot,
+      shell: process.platform === 'win32'
+    });
+
+    await new Promise((resolve) => {
+      buildProcess.on('close', (code) => {
+        if (code !== 0) {
+          exitWithError('Failed to build frontend');
+        }
+        console.log('Frontend built successfully.');
+        resolve();
+      });
+    });
+  }
+
+  // Start the API server which will serve the built frontend
+  const api = require('./api');
+  await api.start();
 }
 
 /**
@@ -277,6 +300,7 @@ async function main() {
     );
   } else if (args.capabilities) {
     // List capabilities
+    await require('./helpers/bootstrap').ensureDefaults();
     await flows.listCapabilities();
     process.exit(0);
   } else if (args.server) {
@@ -304,7 +328,9 @@ async function main() {
     // Run the flow
     await runFlow(flowConfig, options);
   } else {
-    exitWithError('No flow source specified. Use either --file <path-to-flow-file> or --server');
+    // No explicit action: open the UI on the current folder, which is what
+    // running plain `flows` in a project directory is meant to do
+    await startServer();
   }
 }
 

@@ -1,0 +1,7 @@
+# The published contents are whitelisted by "files" in package.json.
+#
+# This file exists mainly so npm does NOT fall back to .gitignore when building
+# the tarball: .gitignore excludes "dist/**", which would strip the prebuilt
+# frontend the CLI needs to serve the UI.
+
+.DS_Store

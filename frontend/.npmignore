@@ -1,0 +1,7 @@
+# Deliberately empty of rules.
+#
+# frontend/.gitignore excludes "dist", and npm falls back to .gitignore when a
+# directory has no .npmignore. That would strip the prebuilt UI from the
+# published tarball, leaving the CLI with nothing to serve. This file exists to
+# shadow it; what actually gets published is the "files" whitelist in
+# package.json, which only lets frontend/dist through.

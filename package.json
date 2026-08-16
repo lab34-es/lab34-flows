@@ -13,10 +13,20 @@
     "install:frontend": "cd frontend && npm install",
     "test": "jest",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "prepack": "npm run install:frontend && npm run build:frontend"
   },
   "bin": {
+    "flows": "./src/cli.js",
     "lab34-flows": "./src/cli.js"
+  },
+  "files": [
+    "src/",
+    "frontend/dist/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
   },
   "author": "Jose Constela <jose@lab34.es>",
   "license": "MIT",
@@ -35,7 +45,6 @@
     "express": "4.21.2",
     "handlebars": "4.7.8",
     "https-proxy-agent": "7.0.6",
-    "is-wsl": "2.2.0",
     "mqtt": "5.14.1",
     "ollama": "0.5.18",
     "pg": "8.16.3",

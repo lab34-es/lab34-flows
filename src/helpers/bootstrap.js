@@ -6,27 +6,42 @@ const paths = require('./paths');
 const DEFAULTS_DIR = path.join(__dirname, '..', 'defaults');
 
 /**
- * Seed the user's context directory (~/lab34-flows by default, or the
+ * True when the context directory has never been used as a workspace: it has
+ * no `applications/` and no `flows/` folder yet. A folder that already holds
+ * either one belongs to the user, so nothing is seeded into it.
+ *
+ * @param {string} applicationsDir
+ * @param {string} flowsDir
+ * @returns {boolean}
+ */
+const isFreshWorkspace = (applicationsDir, flowsDir) =>
+  !fs.existsSync(applicationsDir) && !fs.existsSync(flowsDir);
+
+/**
+ * Seed the context directory (the current working directory by default, or the
  * --context directory) with the bundled example applications and flows.
  *
- * Copies are conservative: an example is only copied when its destination
- * does not exist yet, so user modifications and deletions of individual
- * files inside an already-copied example are preserved.
+ * Seeding only happens on a fresh workspace, so starting the tool inside an
+ * existing project never drops example files into it. Once seeded, a marker
+ * keeps the examples from coming back after the user deletes them.
  */
 const ensureDefaults = async () => {
   try {
-    // Make sure the base folders exist
     const applicationsDir = await paths.contextDir(['applications']);
     const flowsDir = await paths.contextDir(['flows']);
+    const markerPath = await paths.contextDir(['.examples-seeded']);
+
+    const fresh = isFreshWorkspace(applicationsDir, flowsDir);
+
+    // The runtime expects both folders to exist even when nothing is seeded
     fs.mkdirSync(applicationsDir, { recursive: true });
     fs.mkdirSync(flowsDir, { recursive: true });
 
-    // Only seed once: users must be able to delete examples without them
-    // coming back on every start
-    const markerPath = await paths.contextDir(['.examples-seeded']);
-    if (fs.existsSync(markerPath)) {
+    if (!fresh || fs.existsSync(markerPath)) {
       return;
     }
+
+    console.log(`Setting up a new Flows workspace in ${await paths.contextDir([])}`);
 
     // Example applications: copy each app folder if missing
     const defaultAppsDir = path.join(DEFAULTS_DIR, 'applications');

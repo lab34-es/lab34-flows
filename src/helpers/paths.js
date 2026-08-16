@@ -1,54 +1,47 @@
-const isWsl = require('is-wsl');
-const os = require('os');
 const path = require('path');
-const shell = require('./shell');
 const fs = require('fs');
 const argv = require('yargs-parser')(process.argv.slice(2));
 
-// Cache the Windows home directory when inside WSL
-let winDir;
-
 /**
- * Get the Windows home directory when inside WSL
- * @returns {Promise<string>} The Windows home directory
+ * Resolve the context directory: the folder holding `applications/`, `flows/`
+ * and `config/`.
+ *
+ * Resolution order:
+ *   1. `--context <dir>` argument (absolute, or relative to the cwd)
+ *   2. `LAB34_FLOWS_CONTEXT` environment variable
+ *   3. the current working directory
+ *
+ * The tool never writes outside the context directory, so running `flows` in a
+ * project folder keeps everything next to that project.
+ *
+ * @returns {string} The absolute context directory
  */
-const getWslWinHomeDir = async () => {
-  if (winDir) {return winDir;}
-  const windowsHomeRaw = await shell.run('cmd.exe /c "<nul set /p=%UserProfile%" 2>/dev/null', true);
-  winDir = await shell.run(`wslpath "${windowsHomeRaw}"`, true);
-  return winDir;
-};
+const resolveContextRoot = () => {
+  const context = argv.context || process.env.LAB34_FLOWS_CONTEXT;
 
-module.exports.contextDir = async (pathParts) => {
-  const baseDir = isWsl ? await getWslWinHomeDir() : os.homedir();
-  let context = argv.context;
-
-  let finalPathParts = [];
-
-  // Check if context argument is defined
-  if (context) {
-    const isAbsolute = path.isAbsolute(context);
-    
-    if (!isAbsolute) {
-      // If context is not absolute, resolve it relative to the current working directory
-      context = path.resolve(process.cwd(), context);
-    }
-
-    // Ensure the context directory exists
-    if (!fs.existsSync(context)) {
-      console.error(`Context directory does not exist: ${context}`);
-      process.exit(1);
-    }
-    
-    // Use the context as base and add pathParts
-    finalPathParts = [context].concat(pathParts || []);
-  } else {
-    // Use default: home folder + "lab34-flows" + pathParts
-    finalPathParts = [baseDir, 'lab34-flows'].concat(pathParts || []);
+  if (!context) {
+    return process.cwd();
   }
 
-  const finalPath = path.join.apply(null, finalPathParts);
-  return finalPath;
+  const resolved = path.isAbsolute(context)
+    ? context
+    : path.resolve(process.cwd(), context);
+
+  // An explicit context must exist: silently creating a mistyped path would
+  // hide the user's typo behind an empty workspace
+  if (!fs.existsSync(resolved)) {
+    console.error(`Context directory does not exist: ${resolved}`);
+    process.exit(1);
+  }
+
+  return resolved;
+};
+
+module.exports.contextRoot = resolveContextRoot;
+
+module.exports.contextDir = async (pathParts) => {
+  const finalPathParts = [resolveContextRoot()].concat(pathParts || []);
+  return path.join.apply(null, finalPathParts);
 };
 
 module.exports.createFolder = async (folderPath) => {
