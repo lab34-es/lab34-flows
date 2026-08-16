@@ -81,6 +81,13 @@ router.post('/file', (req, res) => {
     .catch(error => sendError(res, error));
 });
 
+// Rename or move a flow file or folder. { from, to }
+router.post('/rename', (req, res) => {
+  flows.rename(req.body.from, req.body.to)
+    .then(result => res.send({ success: true, ...result }))
+    .catch(error => sendError(res, error));
+});
+
 // Delete a flow file or folder. { path }
 router.delete('/file', (req, res) => {
   flows.remove(req.body.path || req.query.path)

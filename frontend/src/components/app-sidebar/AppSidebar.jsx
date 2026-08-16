@@ -5,6 +5,8 @@ import {
   FilePlus2,
   FolderPlus,
   Globe,
+  MoreHorizontal,
+  Pencil,
   Plus,
   RefreshCw,
   Settings,
@@ -22,6 +24,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -45,6 +48,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import FlowTree from '@/components/app-sidebar/FlowTree';
 import FlowDialogs from '@/components/app-sidebar/FlowDialogs';
+import ApplicationDialogs from '@/components/app-sidebar/ApplicationDialogs';
 import { useAppState } from '@/context/AppStateContext';
 import { flowsApi } from '@/services/api';
 
@@ -54,6 +58,7 @@ export function AppSidebar() {
   const { tree, treeLoading, refreshTree, applications, applicationsLoading, environments, environment, setEnvironment } = useAppState();
 
   const [action, setAction] = useState(null);
+  const [applicationAction, setApplicationAction] = useState(null);
   const uploadInputRef = useRef(null);
   const uploadTargetRef = useRef('');
 
@@ -178,7 +183,27 @@ export function AppSidebar() {
                       <AppWindow className="text-muted-foreground" />
                       <span>{app.name}</span>
                     </SidebarMenuButton>
-                    <SidebarMenuBadge>{app.methods?.length || 0}</SidebarMenuBadge>
+
+                    {/* The badge and the actions button share the same corner:
+                        hide the count while the row is being acted on */}
+                    <SidebarMenuBadge className="group-hover/menu-item:hidden group-focus-within/menu-item:hidden group-has-data-[state=open]/menu-item:hidden">
+                      {app.methods?.length || 0}
+                    </SidebarMenuBadge>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <SidebarMenuAction showOnHover aria-label={`Actions for application ${app.name}`}>
+                          <MoreHorizontal />
+                        </SidebarMenuAction>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent side="right" align="start">
+                        <DropdownMenuItem
+                          onClick={() => setApplicationAction({ type: 'rename-application', slug: app.slug })}
+                        >
+                          <Pencil /> Rename application
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>
@@ -230,6 +255,10 @@ export function AppSidebar() {
       />
 
       <FlowDialogs action={action} onClose={() => setAction(null)} />
+      <ApplicationDialogs
+        action={applicationAction}
+        onClose={() => setApplicationAction(null)}
+      />
     </Sidebar>
   );
 }

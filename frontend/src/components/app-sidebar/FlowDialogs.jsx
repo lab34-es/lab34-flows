@@ -21,9 +21,17 @@ import { useAppState } from '@/context/AppStateContext';
 
 const joinPath = (parent, name) => (parent ? `${parent}/${name}` : name);
 
+const parentOf = (relativePath) =>
+  (relativePath.includes('/') ? relativePath.slice(0, relativePath.lastIndexOf('/')) : '');
+
+const baseNameOf = (relativePath) => relativePath.split('/').pop();
+
+const FLOW_EXTENSION = /\.(md|markdown|yaml|yml)$/i;
+
 /**
- * Dialogs for the sidebar file actions: new flow, new folder and delete.
- * `action` is { type: 'new-flow' | 'new-folder' | 'delete', parentPath?, targetPath?, isFolder? }.
+ * Dialogs for the sidebar file actions: new flow, new folder, rename and
+ * delete. `action` is
+ * { type: 'new-flow' | 'new-folder' | 'rename' | 'delete', parentPath?, targetPath?, isFolder? }.
  *
  * When "Create using AI" is on, the flow file is created first (with the
  * usual template) and a second dialog then asks what it should test: that
@@ -44,7 +52,9 @@ export function FlowDialogs({ action, onClose }) {
   const [aiPrompt, setAiPrompt] = useState('');
 
   useEffect(() => {
-    setName('');
+    // Renaming starts from the current name, so only the part being changed
+    // has to be typed
+    setName(action?.type === 'rename' ? baseNameOf(action.targetPath) : '');
     setError(null);
     setBusy(false);
     setUseAI(false);
@@ -129,6 +139,45 @@ export function FlowDialogs({ action, onClose }) {
       await flowsApi.createFolder(joinPath(action.parentPath, trimmed));
       await refreshTree();
       onClose();
+    } catch (ex) {
+      setError(ex.response?.data?.error || ex.message);
+      setBusy(false);
+    }
+  };
+
+  const handleRename = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) { return; }
+
+    const from = action.targetPath;
+    // Flows keep their format unless the new name states another one
+    const fileName = action.isFolder || FLOW_EXTENSION.test(trimmed)
+      ? trimmed
+      : `${trimmed}${(from.match(FLOW_EXTENSION) || ['.md'])[0]}`;
+    const to = joinPath(parentOf(from), fileName);
+
+    if (to === from) {
+      onClose();
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await flowsApi.rename(from, to);
+      await refreshTree();
+      onClose();
+
+      // Follow the renamed flow (or the flow open inside the renamed folder)
+      // so the current page does not point at a path that no longer exists
+      if (location.pathname === '/flows/view') {
+        const openPath = new URLSearchParams(location.search).get('path') || '';
+        if (!action.isFolder && openPath.endsWith(`/${from}`)) {
+          navigate(`/flows/view?path=${encodeURIComponent(response.data.path)}`);
+        } else if (action.isFolder && openPath.includes(`/${from}/`)) {
+          navigate(`/flows/view?path=${encodeURIComponent(openPath.replace(`/${from}/`, `/${to}/`))}`);
+        }
+      }
     } catch (ex) {
       setError(ex.response?.data?.error || ex.message);
       setBusy(false);
@@ -298,6 +347,38 @@ export function FlowDialogs({ action, onClose }) {
           <DialogFooter>
             <Button variant="outline" onClick={close} disabled={busy}>Cancel</Button>
             <Button onClick={handleCreateFolder} disabled={busy || !name.trim()}>Create folder</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename */}
+      <Dialog open={action.type === 'rename'} onOpenChange={(open) => !open && close()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename {action.isFolder ? 'folder' : 'flow'}</DialogTitle>
+            <DialogDescription>
+              “{action.targetPath}” will be renamed
+              {action.isFolder ? ', together with everything inside it' : ''}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Label htmlFor="rename-name">New name</Label>
+            <Input
+              id="rename-name"
+              value={name}
+              autoFocus
+              disabled={busy}
+              onChange={(event) => setName(event.target.value)}
+              onKeyDown={(event) => event.key === 'Enter' && handleRename()}
+            />
+            {error && <p className="text-destructive text-sm">{error}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={close} disabled={busy}>Cancel</Button>
+            <Button onClick={handleRename} disabled={busy || !name.trim()}>
+              {busy && <Loader2 className="animate-spin" />}
+              Rename
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

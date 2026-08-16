@@ -424,6 +424,59 @@ module.exports.saveFile = async ({ relativePath, content, overwrite = false }) =
 };
 
 /**
+ * Rename (or move, when the new path has folders) a flow file or a folder
+ * inside the flows directory.
+ * @param {string} fromPath - Existing path, relative to the flows dir
+ * @param {string} toPath - New path, relative to the flows dir
+ */
+module.exports.rename = async (fromPath, toPath) => {
+  if (!fromPath || !fromPath.trim() || !toPath || !toPath.trim()) {
+    throw new Error('Both the current and the new path are required');
+  }
+
+  const from = await resolveWithinFlows(fromPath);
+  const to = await resolveWithinFlows(toPath);
+
+  if (!from.relative || !to.relative) {
+    throw new Error('Refusing to rename the flows directory itself');
+  }
+
+  if (!fs.existsSync(from.absolute)) {
+    throw new Error('Path not found');
+  }
+
+  const isFolder = fs.statSync(from.absolute).isDirectory();
+
+  if (!isFolder) {
+    const ext = path.extname(to.absolute).toLowerCase().substring(1);
+    if (!ALLOWED_FILE_FORMATS.includes(ext)) {
+      throw new Error(`Unsupported file format ".${ext}". Allowed: ${ALLOWED_FILE_FORMATS.join(', ')}`);
+    }
+  }
+
+  if (from.absolute === to.absolute) {
+    return { relativePath: to.relative, previousPath: from.relative, path: to.absolute };
+  }
+
+  // Changing only the casing is a no-op collision on case-insensitive file
+  // systems, so only guard against a genuinely different target
+  if (fs.existsSync(to.absolute) && from.absolute.toLowerCase() !== to.absolute.toLowerCase()) {
+    const error = new Error('A file or folder with that name already exists');
+    error.code = 'EEXISTS';
+    throw error;
+  }
+
+  if (isFolder && to.absolute.startsWith(from.absolute + path.sep)) {
+    throw new Error('Cannot move a folder inside itself');
+  }
+
+  fs.mkdirSync(path.dirname(to.absolute), { recursive: true });
+  fs.renameSync(from.absolute, to.absolute);
+
+  return { relativePath: to.relative, previousPath: from.relative, path: to.absolute };
+};
+
+/**
  * Delete a flow file or folder inside the flows directory.
  * @param {string} relativePath
  */
