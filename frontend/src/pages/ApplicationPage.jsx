@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { AlertCircle, AppWindow, BookOpen, Braces, ChevronDown, Database, FileWarning, SlidersHorizontal } from 'lucide-react';
+import { AlertCircle, BookOpen, Braces, ChevronDown, Database, FileWarning, SlidersHorizontal } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -36,10 +36,16 @@ function InputTable({ input }) {
             <tr key={param.name} className="border-t align-top">
               <td className="px-3 py-2 font-mono text-xs whitespace-nowrap">{param.name}</td>
               <td className="text-muted-foreground px-3 py-2 font-mono text-xs">{param.type || '-'}</td>
-              <td className="px-3 py-2">
+              <td className="px-3 py-2 whitespace-nowrap">
                 {param.required
                   ? <Badge variant="warning" className="text-[10px]">required</Badge>
                   : <span className="text-muted-foreground text-xs">optional</span>}
+                {/* @param {type} [name=value] documents a default */}
+                {param.default !== undefined && (
+                  <span className="text-muted-foreground ml-1.5 font-mono text-[10px]">
+                    = {param.default}
+                  </span>
+                )}
               </td>
               <td className="text-muted-foreground px-3 py-2 text-xs">{param.description || '-'}</td>
             </tr>
@@ -72,10 +78,20 @@ function MemoryList({ memory }) {
   );
 }
 
+// Descriptions come from JSDoc, so they are markdown wrapped over several
+// lines. The collapsed header shows the first paragraph as a single line.
+const collapseLines = (text) => (text || '').replace(/\s*\n\s*/g, ' ').trim();
+const firstParagraph = (text) => collapseLines((text || '').split(/\n\s*\n/)[0]);
+
 function MethodCard({ method, appSlug, highlighted }) {
   const [open, setOpen] = useState(highlighted);
   const ref = useRef(null);
   const docs = method.docs || {};
+
+  const summary = firstParagraph(method.description);
+  // Only render the full markdown when it says more than the summary
+  const hasLongDescription = Boolean(method.description) &&
+    collapseLines(method.description) !== summary;
 
   useEffect(() => {
     if (highlighted) {
@@ -98,13 +114,13 @@ function MethodCard({ method, appSlug, highlighted }) {
                 <Badge variant="warning" className="text-[10px]">documented only</Badge>
               )}
             </div>
-            {(method.description || docs.description) && (
-              <CardDescription className="pl-6">{method.description || docs.description}</CardDescription>
-            )}
+            {summary && <CardDescription className="pl-6">{summary}</CardDescription>}
           </CardHeader>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="space-y-5 pl-10">
+            {hasLongDescription && <Markdown className="text-sm">{method.description}</Markdown>}
+
             <section>
               <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <SlidersHorizontal className="size-3.5" /> Input parameters
@@ -118,15 +134,19 @@ function MethodCard({ method, appSlug, highlighted }) {
               </h4>
               {docs.output ? (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground">Status:</span>
-                    <Badge variant="secondary" className="font-mono">{String(docs.output.status)}</Badge>
-                  </div>
+                  {docs.output.status != null && docs.output.status !== '' && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">Status:</span>
+                      <Badge variant="secondary" className="font-mono">{String(docs.output.status)}</Badge>
+                    </div>
+                  )}
                   {docs.output.description && (
                     <p className="text-muted-foreground text-sm">{docs.output.description}</p>
                   )}
                   {docs.output.body !== undefined && (
-                    <CodeBlock code={JSON.stringify(docs.output.body, null, 2)} language="json" />
+                    typeof docs.output.body === 'string'
+                      ? <CodeBlock code={docs.output.body} />
+                      : <CodeBlock code={JSON.stringify(docs.output.body, null, 2)} language="json" />
                   )}
                 </div>
               ) : (
@@ -242,18 +262,22 @@ export function ApplicationPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 p-6">
-      {/* Header */}
-      <div className="space-y-1.5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-lg">
-              <AppWindow className="size-5" />
+    <div className="flex h-full min-h-0 flex-1 flex-col">
+      {/* Toolbar — same shape as the flow view so both headers line up */}
+      <div className="bg-background/95 sticky top-0 z-10 border-b px-6 py-3 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-4xl flex-wrap items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h1 className="truncate text-lg font-bold tracking-tight">{app.name}</h1>
+              <Badge variant="outline" className="text-[10px] uppercase">application</Badge>
+              {app.errors?.length > 0 && (
+                <Badge variant="destructive" className="gap-1">
+                  <FileWarning className="size-3" />
+                  {app.errors.length} problem{app.errors.length > 1 ? 's' : ''}
+                </Badge>
+              )}
             </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">{app.name}</h1>
-              <p className="text-muted-foreground font-mono text-xs">{app.path}</p>
-            </div>
+            <p className="text-muted-foreground truncate font-mono text-xs">{app.path}</p>
           </div>
 
           {/* Same Document / Source toggle as the flow view */}
@@ -264,8 +288,17 @@ export function ApplicationPage() {
             </TabsList>
           </Tabs>
         </div>
-        {app.description && <p className="text-muted-foreground text-sm">{app.description}</p>}
       </div>
+
+      {view === 'source' ? (
+        <div className="min-h-0 flex-1">
+          <ApplicationSource slug={slug} onSaved={handleSourceSaved} />
+        </div>
+      ) : (
+      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="mx-auto w-full max-w-4xl space-y-6 px-6 py-6">
+      {/* Application description: the JSDoc block at the top of its index.js */}
+      {app.description && <Markdown className="text-muted-foreground text-sm">{app.description}</Markdown>}
 
       {app.errors?.length > 0 && (
         <Alert variant="destructive">
@@ -279,10 +312,6 @@ export function ApplicationPage() {
         </Alert>
       )}
 
-      {view === 'source' ? (
-        <ApplicationSource slug={slug} onSaved={handleSourceSaved} />
-      ) : (
-      <>
       <Tabs key={`${slug}:${highlightedMethod || ''}`} defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="readme"><BookOpen /> README</TabsTrigger>
@@ -307,7 +336,7 @@ export function ApplicationPage() {
           )}
         </TabsContent>
 
-        {/* Methods, from the application's JSON docs */}
+        {/* Methods, from the JSDoc blocks of the application's index.js */}
         <TabsContent value="methods" className="space-y-4 pt-4">
           {(app.methods || []).length === 0 && (
             <p className="text-muted-foreground text-sm">No methods found for this application.</p>
@@ -359,10 +388,11 @@ export function ApplicationPage() {
 
       <Separator />
       <p className="text-muted-foreground text-xs">
-        Methods and their documentation come from the application's <span className="font-mono">docs.json</span> and
-        the self-description of <span className="font-mono">index.js</span>. Edit them in the <strong>Source</strong> view.
+        Methods and their documentation come from the JSDoc blocks of the application's{' '}
+        <span className="font-mono">index.js</span>. Edit them in the <strong>Source</strong> view.
       </p>
-      </>
+      </div>
+      </div>
       )}
     </div>
   );

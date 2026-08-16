@@ -24,7 +24,7 @@ router.get('/:application/files', (req, res) => {
     .catch(error => sendError(res, error));
 });
 
-// Read one editable file. ?path=README.md | docs.json | index.js | env/x.env
+// Read one editable file. ?path=README.md | index.js | env/x.env
 router.get('/:application/files/content', (req, res) => {
   apps.readAppFile(req.params.application, req.query.path)
     .then(file => res.send(file))

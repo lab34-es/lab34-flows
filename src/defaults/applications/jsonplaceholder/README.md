@@ -19,6 +19,18 @@ creation.
 > Note: JSONPlaceholder fakes writes — `POST /posts` answers `201` with a new
 > id, but the resource is not really persisted.
 
+## Methods
+
+| Method | Description |
+|-|-|
+| `listPosts` | `GET /posts`, optionally filtered by `query.userId` |
+| `getPost` | `GET /posts/{id}`, a single post |
+| `createPost` | `POST /posts`, writes the new id to `memory.lastPostId` |
+| `getUser` | `GET /users/{id}`, a user profile |
+
+See the **Methods** section in the UI (or the JSDoc blocks of `index.js`) for
+the full input / output / memory reference of each method.
+
 ## Environment
 
 | Variable | Description | Example |

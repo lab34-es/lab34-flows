@@ -16,6 +16,18 @@ against a real HTTP API.
 - **Slow responses** (`delay`) — combine with `retry` to practice retry /
   timeout handling.
 
+## Methods
+
+| Method | Description |
+|-|-|
+| `get` | `GET /get`, echoes query parameters and headers |
+| `post` | `POST /post`, echoes the JSON body under `json` |
+| `status` | `GET /status/{code}`, answers with that status code |
+| `delay` | `GET /delay/{seconds}`, waits before responding |
+
+See the **Methods** section in the UI (or the JSDoc blocks of `index.js`) for
+the full input / output / memory reference of each method.
+
 ## Environment
 
 | Variable | Description | Example |
