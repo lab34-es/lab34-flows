@@ -257,7 +257,7 @@ const processor = async (flow, opts) => {
         flow.steps[i].request = request;
         flow.steps[i].response = { headers, status, body };
         flow.reporter.response({ headers, status, body }, {
-          timing: flow.steps[i].execution.duration
+          timing: flow.steps[i].execution.times.duration
         });
 
         if (test || testlatentApplications) {
@@ -377,12 +377,14 @@ const processor = async (flow, opts) => {
 
 /**
  * Run the flow
- * @param {*} flow 
- * @param {Object} opts 
+ * @param {*} flow
+ * @param {Object} opts
  * @param {String} opts.environment
  * @param {Boolean} opts.cli
+ * @param {Function} release - Called when the flow finishes, to free the
+ *                             single-run lock
  */
-const run = async (flow, opts) => {
+const run = async (flow, opts, release) => {
   const executionId = uuidv4();
 
   const { cli } = opts;
@@ -403,38 +405,44 @@ const run = async (flow, opts) => {
   // Report it
   flow.reporter.execution();
 
-  // API request must reply with basic execution information
+  // API request must reply with basic execution information; the processor
+  // keeps running in the background and frees the lock when it finishes
   if (!cli) {
-    try {
-      processor(flow, opts);
-    }
-    catch (ex) {
-     
-    }
+    Promise.resolve()
+      .then(() => processor(flow, opts))
+      .catch(() => {})
+      .finally(release);
     return { execution: flow.execution };
   }
+
   // Invokations based on CLI must wait for processor to complete
-  else {
-    return processor(flow, opts);
+  try {
+    return await processor(flow, opts);
+  }
+  finally {
+    release();
   }
 };
 
 module.exports = {
   steps,
   run: async (flow, opts) => {
+    // Only one flow can run at a time: the runner and the reporter keep
+    // module-level state, so concurrent runs would cross-wire
     if (running) {
       console.error('Already running');
       return;
     }
     running = true;
+
+    const release = () => { running = false; };
+
     try {
-      return run(flow, opts);
+      return await run(flow, opts, release);
     }
     catch (ex) {
+      release();
       throw ex;
-    }
-    finally {
-      running = false;
     }
   }
 };

@@ -38,11 +38,20 @@ const YAML = require('yaml');
 const STEP_TOKENS = ['step', 'flow-step'];
 
 /**
+ * Normalize line endings (CRLF / lone CR) so the fence regexes work on
+ * documents written on any platform.
+ * @param {string} content
+ * @returns {string}
+ */
+const normalize = (content) => (content || '').replace(/\r\n?/g, '\n');
+
+/**
  * Extract the YAML frontmatter from a markdown document.
  * @param {string} content - Full markdown document
  * @returns {{meta: Object, body: string, bodyStartLine: number, error: string|null}}
  */
 const parseFrontmatter = (content) => {
+  content = normalize(content);
   const result = { meta: {}, body: content, bodyStartLine: 0, error: null };
 
   const lines = content.split('\n');
@@ -51,7 +60,9 @@ const parseFrontmatter = (content) => {
   }
 
   for (let i = 1; i < lines.length; i++) {
-    if (lines[i].trim() === '---' || lines[i].trim() === '...') {
+    // The closing marker must start at column 0 — indented '---' lines can
+    // legitimately appear inside YAML block scalars
+    if (/^(---|\.\.\.)\s*$/.test(lines[i])) {
       const raw = lines.slice(1, i).join('\n');
       try {
         const meta = YAML.parse(raw);
@@ -95,7 +106,7 @@ const isStepInfo = (info) => {
  *   { type: 'step', content, info, stepIndex, startLine, endLine, error? }
  */
 const splitSegments = (body, lineOffset = 0) => {
-  const lines = body.split('\n');
+  const lines = normalize(body).split('\n');
   const segments = [];
 
   let markdownBuffer = [];
@@ -180,9 +191,27 @@ const splitSegments = (body, lineOffset = 0) => {
 const findFirstHeading = (segments) => {
   for (const segment of segments) {
     if (segment.type !== 'markdown') { continue; }
-    const match = segment.content.match(/^ {0,3}#\s+(.+?)\s*#*\s*$/m);
-    if (match) {
-      return match[1].trim();
+
+    // Walk the lines tracking fenced code blocks, so '# comment' lines
+    // inside code blocks are not mistaken for headings
+    let openFence = null;
+    for (const line of segment.content.split('\n')) {
+      const fenceMatch = line.match(/^ {0,3}(`{3,}|~{3,})/);
+      if (fenceMatch) {
+        if (!openFence) {
+          openFence = fenceMatch[1];
+        }
+        else if (fenceMatch[1][0] === openFence[0] && fenceMatch[1].length >= openFence.length) {
+          openFence = null;
+        }
+        continue;
+      }
+      if (openFence) { continue; }
+
+      const match = line.match(/^ {0,3}#\s+(.+?)\s*#*\s*$/);
+      if (match) {
+        return match[1].trim();
+      }
     }
   }
   return null;

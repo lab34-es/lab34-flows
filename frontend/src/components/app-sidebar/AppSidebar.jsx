@@ -85,9 +85,12 @@ export function AppSidebar() {
     } catch (ex) {
       if (ex.response?.status === 409) {
         const replace = window.confirm(`“${relativePath}” already exists. Replace it?`);
-        if (replace) {
+        if (!replace) { return; }
+        try {
           await flowsApi.saveFile(relativePath, content, true);
           await refreshTree();
+        } catch (retryEx) {
+          window.alert(retryEx.response?.data?.error || retryEx.message);
         }
         return;
       }

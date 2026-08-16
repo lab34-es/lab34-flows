@@ -27,7 +27,7 @@ export function FlowPage() {
   const flowPath = searchParams.get('path');
 
   const { environment, refreshTree } = useAppState();
-  const { executions, startRun, anyRunning } = useExecutions();
+  const { executions, startRun, clearRun, anyRunning } = useExecutions();
   const { theme } = useTheme();
 
   const [flowData, setFlowData] = useState(null);
@@ -102,6 +102,8 @@ export function FlowPage() {
       const response = await flowsApi.getUserFlow(flowPath);
       setFlowData(response.data);
       setDraft(response.data.plainText || '');
+      // The old run's step mapping no longer matches the saved document
+      clearRun(flowPath);
       refreshTree();
     } catch (ex) {
       setSaveError(ex.response?.data?.error || ex.message);
@@ -194,7 +196,9 @@ export function FlowPage() {
 
           <Button
             onClick={handleRun}
-            disabled={anyRunning || !environment || parseErrors.length > 0}
+            // Stale parse errors must not block a run of edited (dirty)
+            // content: handleRun re-parses the draft and bails if needed
+            disabled={anyRunning || !environment || (!dirty && parseErrors.length > 0)}
             title={!environment ? 'Select an environment in the sidebar first' : `Run on “${environment}”`}
           >
             <Play /> Run{environment ? ` · ${environment}` : ''}

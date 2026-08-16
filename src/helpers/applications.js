@@ -271,7 +271,7 @@ const parseApplications = async () => {
       }
       const appIndexContentOriginal = fs.readFileSync(appIndex, 'utf8');
       const appIndexContentModified = appIndexContentOriginal
-        .replace(/(['"])lab34-flows(\/[^'"]*)?\1/g, (match, quote, subpath) => {
+        .replace(/(['"`])lab34-flows(\/[^'"`]*)?\1/g, (match, quote, subpath) => {
           return `${quote}${flowsPath}${subpath || ''}${quote}`;
         });
 

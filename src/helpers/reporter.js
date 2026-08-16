@@ -48,7 +48,7 @@ const stepStart = function (stepId) {
   const index = _flow.steps.findIndex(step => step.id === stepId);
 
   if (index === -1) {
-    throw new Error(`Step with id ${id} not found`);
+    throw new Error(`Step with id ${stepId} not found`);
   }
 
   const reportedStep = _flow.steps[index];
@@ -82,7 +82,7 @@ const stepUpdate = function (stepId) {
   const index = _flow.steps.findIndex(step => step.id === stepId);
 
   if (index === -1) {
-    throw new Error(`Step with id ${id} not found`);
+    throw new Error(`Step with id ${stepId} not found`);
   }
 
   const reportedStep = _flow.steps[index];

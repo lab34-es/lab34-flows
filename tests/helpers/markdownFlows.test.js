@@ -144,6 +144,15 @@ describe('markdownFlows', () => {
       const parsed = markdownFlows.parse('~~~step\napplication: a\nmethod: b\n~~~\n');
       expect(parsed.steps).toHaveLength(1);
     });
+
+    it('supports CRLF line endings', () => {
+      const doc = ['---', 'title: T', '---', '', '```step', 'application: a', 'method: b', '```', ''].join('\r\n');
+      const parsed = markdownFlows.parse(doc);
+      expect(parsed.title).toBe('T');
+      expect(parsed.steps).toHaveLength(1);
+      expect(parsed.steps[0]).toMatchObject({ application: 'a', method: 'b' });
+      expect(markdownFlows.isMarkdownFlow(doc)).toBe(true);
+    });
   });
 
   describe('isMarkdownFlow', () => {

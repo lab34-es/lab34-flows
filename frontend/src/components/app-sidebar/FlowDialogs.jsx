@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -24,6 +24,7 @@ const joinPath = (parent, name) => (parent ? `${parent}/${name}` : name);
  */
 export function FlowDialogs({ action, onClose }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { refreshTree } = useAppState();
   const [name, setName] = useState('');
   const [error, setError] = useState(null);
@@ -86,6 +87,16 @@ export function FlowDialogs({ action, onClose }) {
       await flowsApi.remove(action.targetPath);
       await refreshTree();
       onClose();
+
+      // If the deleted flow (or an ancestor folder) is currently open,
+      // leave the dead page
+      if (location.pathname === '/flows/view') {
+        const openPath = new URLSearchParams(location.search).get('path') || '';
+        const suffix = `/${action.targetPath}`;
+        if (openPath.endsWith(suffix) || openPath.includes(`${suffix}/`)) {
+          navigate('/');
+        }
+      }
     } catch (ex) {
       setError(ex.response?.data?.error || ex.message);
       setBusy(false);

@@ -25,7 +25,9 @@ module.exports.start = async (options = {}) => {
   // Seed bundled example applications and flows on first run
   await bootstrap.ensureDefaults();
 
-  app.use(cors());
+  // Same-origin and curl-style requests carry no Origin header and pass;
+  // cross-origin browser requests are only allowed from the tool's own UIs
+  app.use(cors({ origin: ioHelper.ALLOWED_ORIGINS }));
   app.use(bodyParser.json());
 
   app.use((req, res, next) => {

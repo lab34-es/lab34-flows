@@ -84,8 +84,33 @@ export function ExecutionProvider({ children }) {
       applyEvent(path, event);
     };
 
+    // If the connection drops mid-run we lose events for good: surface it
+    // instead of leaving flows in "running" forever (which would also keep
+    // the Run button disabled everywhere)
+    const onDisconnect = () => {
+      setExecutions((prev) => {
+        const next = { ...prev };
+        let changed = false;
+        Object.entries(next).forEach(([path, run]) => {
+          if (run.status === 'starting' || run.status === 'running') {
+            next[path] = {
+              ...run,
+              status: 'error',
+              startError: 'Connection to the server was lost while the flow was running.',
+            };
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    };
+
     socket.on('flowexecution:update', handler);
-    return () => socket.off('flowexecution:update', handler);
+    socket.on('disconnect', onDisconnect);
+    return () => {
+      socket.off('flowexecution:update', handler);
+      socket.off('disconnect', onDisconnect);
+    };
   }, [applyEvent]);
 
   const startRun = useCallback(async (flowPath, { value, environment, format }) => {

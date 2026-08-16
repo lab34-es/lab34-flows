@@ -15,24 +15,19 @@ export function Markdown({ children, className }) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          // Fenced code blocks arrive as <pre><code class="language-x">…</code></pre>.
+          // Replace the whole <pre> with the highlighted CodeBlock; inline
+          // code keeps the default <code> rendering.
           pre({ children: preChildren }) {
-            // Let the `code` renderer decide; avoid double <pre>
-            return <>{preChildren}</>;
-          },
-          code({ inline, className: codeClassName, children: codeChildren, ...props }) {
-            const match = /language-(\w+)/.exec(codeClassName || '');
-            const content = String(codeChildren ?? '').replace(/\n$/, '');
-            const isBlock = match || content.includes('\n');
-
-            if (!inline && isBlock) {
-              return <CodeBlock code={content} language={match ? match[1] : undefined} className="my-2" />;
+            const codeElement = React.Children.toArray(preChildren)[0];
+            if (codeElement && codeElement.props) {
+              const match = /language-(\w+)/.exec(codeElement.props.className || '');
+              const content = String(codeElement.props.children ?? '').replace(/\n$/, '');
+              return (
+                <CodeBlock code={content} language={match ? match[1] : undefined} className="my-2" />
+              );
             }
-
-            return (
-              <code className={codeClassName} {...props}>
-                {codeChildren}
-              </code>
-            );
+            return <pre>{preChildren}</pre>;
           },
           a({ children: linkChildren, ...props }) {
             return (

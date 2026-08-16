@@ -250,7 +250,7 @@ export function ApplicationPage() {
         </Alert>
       )}
 
-      <Tabs defaultValue={defaultTab}>
+      <Tabs key={`${slug}:${highlightedMethod || ''}`} defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="readme"><BookOpen /> README</TabsTrigger>
           <TabsTrigger value="methods">

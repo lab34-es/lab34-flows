@@ -21,6 +21,13 @@ const ensureDefaults = async () => {
     fs.mkdirSync(applicationsDir, { recursive: true });
     fs.mkdirSync(flowsDir, { recursive: true });
 
+    // Only seed once: users must be able to delete examples without them
+    // coming back on every start
+    const markerPath = await paths.contextDir(['.examples-seeded']);
+    if (fs.existsSync(markerPath)) {
+      return;
+    }
+
     // Example applications: copy each app folder if missing
     const defaultAppsDir = path.join(DEFAULTS_DIR, 'applications');
     if (fs.existsSync(defaultAppsDir)) {
@@ -60,6 +67,8 @@ const ensureDefaults = async () => {
 
       copyFlows(defaultFlowsDir);
     }
+
+    fs.writeFileSync(markerPath, JSON.stringify({ seededAt: new Date().toISOString() }, null, 2));
   }
   catch (ex) {
     // Seeding must never prevent the tool from starting

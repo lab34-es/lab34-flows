@@ -9,8 +9,11 @@ Heavily opinionated tool to help you test E2E flows and behaviours.
 
 Features:
 
+- Define flows as **Markdown documents**: write any content — prose, headings, lists — and mark the executable steps as ```` ```step ```` code blocks. (Legacy YAML flows keep working.)
+- **Notebook-style UI**: run a flow and the execution details of each step (request, response, assertions, timings) appear right below its code block.
+- Web UI built with [shadcn/ui](https://ui.shadcn.com): sidebar with your flows (with live status indicators), folders, uploads, and your applications with their docs.
+- Ships with **example applications and flows** (calculator, httpbin, jsonplaceholder), seeded on first run.
 - Integrates with Google Gemini AI to generate test scenarios.
-- Define flows in YAML format that can be shared across members and teams. (no need to explain failing cases verbally).
 - Generate flows automatically using AI with natural language prompts.
 - Define test cases for each step in a way that can be used for CI/CD automation.
 - Mimic and customise the behaviour of dependant applications. (i.e. fail scenarios under user defined circusnstances).
@@ -30,6 +33,9 @@ Features:
   - [Setup](#setup)
   - [Usage](#usage)
     - [AI Mode](#ai-mode)
+  - [Web UI](#web-ui)
+  - [Default examples](#default-examples)
+  - [Application docs (docs.json)](#application-docs-docsjson)
   - [Flows](#flows)
   - [Tests](#tests)
   - [Playwright](#playwright) (browser automation - experimental)
@@ -40,49 +46,60 @@ Features:
 
 This tool is intended to help you test E2E flows and behaviours.
 
-The list of steps to execute are defined is files called "flows".
+The list of steps to execute are defined in files called "flows", located in
+the `flows` folder of your context directory (`~/lab34-flows` by default).
 
-This files are written in YAML format, and are located in the `flows` folder in this repository. Though, you can have your own flows in your own computer / repository.
+A flow is a **Markdown document**. You can write any content — headings,
+prose, lists, images — and turn any part of it into an executable step with a
+fenced code block tagged as `step`. The content of a step block is YAML,
+using the same step schema as before (application, method, parameters, test,
+mimic, retry...).
 
-The tool will read the flows, and execute the steps in the order they are defined.
+````markdown
+---
+title: Fraud detection
+description: Fraud must be detected when the customer is flagged
+---
+
+# Fraud detection
+
+Any prose you want. Then, an executable step:
+
+```step
+application: "accounting"
+method: "getInvoice"
+parameters:
+  params:
+    customerId: "{{ randomInt0_100 }}"
+  query:
+    from: "2023-01-01"
+    to: "2023-01-31"
+mimic:
+  - application: "coinscrap"
+    url: "/fraud-detection"
+test:
+  status: 404
+  body:
+    error:
+      code: "ACCOUNTING_FRAUD_DETECTED"
+```
+````
+
+The tool reads the flow and executes the steps in the order they appear in
+the document. In the web UI, the execution details of each step (request,
+response, assertions, timings) are displayed right below its code block —
+like a notebook.
+
+Flow-level metadata goes in an optional YAML frontmatter at the top
+(`title`, `description`, `version`, `latentApplications`...). When there is
+no frontmatter title, the first `# heading` is used.
 
 Additionally:
 1. You can mimic the behaviour of dependant applications, by adding a *mimic* section to each step's definition.
 2. You can define test cases for each step, and the tool will execute them.
 
-En example of a flow file is:
-
-```yaml
-steps:
-  - application: "accounting"
-    method: "getInvoice"
-    parameters:
-      params:
-        customerId: "{{ randomInt0_100 }}"
-      query:
-        from: "2023-01-01"
-        to: "2023-01-31"
-      headers:
-        X-Vendor-Name: "ACME"
-    mimic:
-      - application: "marosavat"
-        url:
-          - "taxes"
-      - application: "coinscrap"
-        url: "/frau-detection"
-        conditions:
-          fraudForCustomer:
-            - "57"
-    test: 
-      status: 404
-      headers:
-        - Content-Type: "application/json"
-      body:
-        error:
-          httpStatusCode: 404
-          code: "ACCOUNTING_FRAUD_DETECTED"
-          message: "Fraud detected in accounting for customer 57"
-```
+> Legacy YAML flows (`.yaml` / `.yml` files with a `steps:` list) are still
+> fully supported, and are rendered in the same notebook UI.
 
 ## Setup
 
@@ -107,13 +124,14 @@ $env:NODE_PATH = "$env:NVM_SYMLINK\node_modules"
 
 ## Usage
 
-The Lab34 Flows CLI tool provides a professional command-line interface for running flow definitions from YAML files.
+The Lab34 Flows CLI tool provides a professional command-line interface for running flow definitions (Markdown or YAML), and a web UI.
 
 ### Usage
 
 ```bash
 lab34-flows --help
-lab34-flows --file <path-to-yaml-file> --env <environment> [--debug] [--help]
+lab34-flows --file <path-to-flow-file> --env <environment> [--debug] [--help]
+lab34-flows --server
 lab34-flows --capabilities
 lab34-flows --ai "<prompt>"
 ```
@@ -122,7 +140,8 @@ lab34-flows --ai "<prompt>"
 
 |Parameter|Description|
 |-|-|
-|`--file`|Path to the YAML flow definition file (required if not using --ai)|
+|`--file`|Path to the flow definition file, `.md` or `.yaml` (required if not using --ai or --server)|
+|`--server`|Start the web UI (builds the frontend and serves it on http://localhost:3001)|
 |`--ai`|Generate a flow from a prompt using AI (required if not using --file)|
 |`--env`|Environment to run the flow in (required for --file, optional for --ai)|
 |`--debug`|Print debug information including environment variables and Node.js variables|
@@ -137,7 +156,7 @@ lab34-flows --help
 
 Run a flow with debug information:
 ```bash
-lab34-flows --file flows/my-flow.yaml --env production --debug
+lab34-flows --file flows/my-flow.md --env production --debug
 ```
 
 Generate and run a flow using AI:
@@ -302,9 +321,72 @@ oneOf([array])
 
 You can contribute and add more replacers by modifying the `src/helpers/replacer.js` file.
 
+## Web UI
+
+Start it with `lab34-flows --server` (or `npm run dev:full` in development)
+and open http://localhost:3001.
+
+- **Left sidebar** with two sections:
+  - **Flows** — your flows tree, with a live status indicator per flow
+    (*standby*, *running*, *ok*, *error*). Create folders, create flows,
+    upload files and delete them from the `+` menu and each row's actions.
+  - **Applications** — every application in your context directory. Click
+    one to read its **README** and browse its **methods** (input parameters,
+    output, memory usage and examples, from its `docs.json`), plus its
+    environment files.
+- **Notebook view** — a flow renders as a document; each ```` ```step ````
+  block is a cell. Press **Run** and the execution details of each step
+  stream in below its block: status, timing, request, response and
+  assertions. Edit the raw Markdown in the **Source** tab and save.
+- The environment selector (sidebar footer) picks the environment used for
+  runs. Light and dark themes are available.
+
+## Default examples
+
+On first run, the tool seeds your context directory with example content:
+
+| Example | Type | What it shows |
+|-|-|-|
+| `calculator` | application | Fully offline; parameters, error scenarios, flow memory |
+| `httpbin` | application | HTTP testing against httpbin.org (query, body, status codes, delays) |
+| `jsonplaceholder` | application | CRUD-style fake REST API, memory between steps |
+| `examples/01-welcome.md` | flow | Guided tour of Markdown flows (works offline) |
+| `examples/02-http-basics.md` | flow | Query params, random data, error statuses |
+| `examples/03-posts-and-memory.md` | flow | Collections, `$expr` assertions, memory |
+
+Examples are only copied when missing, so you can edit or delete them freely.
+
+## Application docs (docs.json)
+
+Each application folder can include a `docs.json` describing its methods.
+The UI merges it with the methods self-described by `index.js`:
+
+```json
+{
+  "description": "What this application is",
+  "methods": {
+    "myMethod": {
+      "description": "What it does",
+      "input": [
+        { "name": "body.a", "type": "number", "required": true, "description": "..." }
+      ],
+      "output": { "status": 200, "body": { "example": true }, "description": "..." },
+      "memory": [
+        { "key": "lastResult", "mode": "write", "description": "..." }
+      ],
+      "example": "application: myApp\nmethod: myMethod\nparameters:\n  body:\n    a: 1"
+    }
+  }
+}
+```
+
+A `README.md` in the application folder is rendered in the UI as well.
+
 ## Flows
 
-Flows are defined in YAML format. Basic examples are available in the `flows` folder of the repository.
+Flows are defined in Markdown format (see [General info](#general-info));
+legacy YAML flows are still supported. Examples are seeded into the `flows`
+folder of your context directory.
 
 Though, you can have your own flows in your own computer / repository, and share them with your team.
 

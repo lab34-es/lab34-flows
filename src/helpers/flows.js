@@ -136,9 +136,33 @@ const isMarkdownPath = (flowPath) => {
  * @param {string|null} format - 'markdown' | 'yaml' | null (auto-detect)
  * @returns {Object}
  */
+/**
+ * Detect the format of raw flow content. A document containing ```step
+ * fences is markdown — unless it also parses as a YAML object with a
+ * `steps` list (e.g. a YAML flow whose strings embed markdown examples),
+ * in which case YAML wins.
+ * @param {string} value
+ * @returns {'markdown'|'yaml'}
+ */
+const detectFormat = (value) => {
+  if (!markdownFlows.isMarkdownFlow(value)) {
+    return 'yaml';
+  }
+  try {
+    const asYaml = YAML.parse(value);
+    if (asYaml && typeof asYaml === 'object' && Array.isArray(asYaml.steps)) {
+      return 'yaml';
+    }
+  }
+  catch {
+    // Not YAML at all: markdown
+  }
+  return 'markdown';
+};
+
 const parseValue = (value, format = null) => {
   const isMarkdown = format === 'markdown' ||
-    (format !== 'yaml' && markdownFlows.isMarkdownFlow(value));
+    (format !== 'yaml' && detectFormat(value) === 'markdown');
 
   if (isMarkdown) {
     const parsed = markdownFlows.parse(value);
@@ -253,28 +277,26 @@ module.exports.getUserFlow = async (flowPath) => {
     return Promise.reject(new Error('Flow not found'));
   }
 
-  const raw = fs.readFileSync(flowPath, 'utf8');
-  const parsed = parseValue(raw, isMarkdownPath(flowPath) ? 'markdown' : 'yaml');
+  // Only serve flow files that live inside the flows directory, with an
+  // allowed extension — this API must not read arbitrary files from disk.
+  const flowsDir = await paths.contextDir(['flows']);
+  const resolved = path.resolve(flowPath);
+  const relative = path.relative(flowsDir, resolved);
+  const isInside = relative && !relative.startsWith('..') && !path.isAbsolute(relative);
 
-  // Relative path inside the flows directory (used by the UI to save the
-  // file); null when the flow lives elsewhere.
-  let relativePath = null;
-  try {
-    const flowsDir = await paths.contextDir(['flows']);
-    const relative = path.relative(flowsDir, flowPath);
-    if (relative && !relative.startsWith('..') && !path.isAbsolute(relative)) {
-      relativePath = relative.split(path.sep).join('/');
-    }
+  const ext = path.extname(resolved).toLowerCase().substring(1);
+  if (!isInside || !ALLOWED_FILE_FORMATS.includes(ext)) {
+    return Promise.reject(new Error('Flow not found'));
   }
-  catch {
-    relativePath = null;
-  }
+
+  const raw = fs.readFileSync(resolved, 'utf8');
+  const parsed = parseValue(raw, isMarkdownPath(resolved) ? 'markdown' : 'yaml');
 
   return {
     ...parsed,
-    title: parsed.title || titleFromFileName(path.basename(flowPath)),
-    path: flowPath,
-    relativePath,
+    title: parsed.title || titleFromFileName(path.basename(resolved)),
+    path: resolved,
+    relativePath: relative.split(path.sep).join('/'),
     plainText: raw
   };
 };
@@ -372,7 +394,15 @@ module.exports.tree = async () => {
 
       const fullPath = path.join(dir, item);
       const itemRelative = relativePath ? path.posix.join(relativePath, item) : item;
-      const stat = fs.statSync(fullPath);
+
+      let stat;
+      try {
+        stat = fs.statSync(fullPath);
+      }
+      catch {
+        // Broken symlink or unreadable entry: skip it instead of failing
+        continue;
+      }
 
       if (stat.isDirectory()) {
         nodes.push({
@@ -480,7 +510,16 @@ module.exports.remove = async (relativePath) => {
     throw new Error('Refusing to delete the flows directory itself');
   }
 
-  if (!fs.existsSync(absolute)) {
+  // lstat instead of existsSync so broken symlinks can still be deleted
+  let exists = true;
+  try {
+    fs.lstatSync(absolute);
+  }
+  catch {
+    exists = false;
+  }
+
+  if (!exists) {
     throw new Error('Path not found');
   }
 
@@ -512,7 +551,7 @@ module.exports.start = async (body, opts) => {
   }
 
   const isMarkdown = format === 'markdown' ||
-    (format !== 'yaml' && markdownFlows.isMarkdownFlow(value));
+    (format !== 'yaml' && detectFormat(value) === 'markdown');
 
   let flowAsJson;
 
@@ -539,11 +578,18 @@ module.exports.start = async (body, opts) => {
 
   const runner = require(`./runner/v${flowAsJson.version || '1'}`);
 
-  return runner.run(flowAsJson, {
+  const result = await runner.run(flowAsJson, {
     environment,
     reporter: {
       cli: false,
       server: io
     }
   });
+
+  // The runner refuses to start when another flow is already running
+  if (!result) {
+    return Promise.reject(new Error('Another flow is already running. Wait for it to finish.'));
+  }
+
+  return result;
 };
