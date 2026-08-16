@@ -13,7 +13,7 @@ const sensitive = (input) => {
     return input.map(sensitive);
   }
 
-  const keysToHide = ['password', 'token', 'x-api-key', 'authorization'];
+  const keysToHide = ['password', 'token', 'secret', 'x-api-key', 'authorization'];
 
   if (typeof input === 'object') {
     const result = {};

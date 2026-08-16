@@ -59,6 +59,16 @@ export const settingsApi = {
     api.post('/api/settings/ai/test', { provider }, { timeout: AI_TIMEOUT }),
   listAIModels: (provider) =>
     api.get(`/api/settings/ai/models/${encodeURIComponent(provider)}`),
+  getJira: () => api.get('/api/settings/jira'),
+  saveJira: (settings) => api.put('/api/settings/jira', settings),
+  testJira: () => api.post('/api/settings/jira/test'),
+};
+
+export const jiraApi = {
+  // Xray data for the tests a flow points at. The backend caches every key
+  // for the life of the process, so this is cheap after the first call.
+  getTests: (keys) =>
+    api.get(`/api/jira/tests?keys=${encodeURIComponent(keys.join(','))}`),
 };
 
 export default api;

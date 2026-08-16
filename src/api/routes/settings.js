@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const ai = require('../../helpers/ai');
+const jira = require('../../helpers/jira');
 
 const sendError = (res, error, status = 400) => {
   const message = (error && error.message) || String(error);
@@ -33,6 +34,28 @@ router.post('/ai/test', (req, res) => {
 router.get('/ai/models/:provider', (req, res) => {
   ai.listModels(req.params.provider)
     .then(models => res.send({ models }))
+    .catch(error => sendError(res, error));
+});
+
+// Jira / Xray settings. Secrets are never sent back to the client.
+router.get('/jira', (req, res) => {
+  jira.getSettings()
+    .then(settings => res.send(settings))
+    .catch(error => sendError(res, error, 500));
+});
+
+// { kind, jiraBaseUrl, projectKey, cloud: { xrayBaseUrl, clientId, clientSecret },
+//   server: { personalAccessToken } }
+router.put('/jira', (req, res) => {
+  jira.saveSettings(req.body)
+    .then(settings => res.send(settings))
+    .catch(error => sendError(res, error));
+});
+
+// Use the stored credentials for real, to validate them
+router.post('/jira/test', (req, res) => {
+  jira.test()
+    .then(result => res.send({ success: true, ...result }))
     .catch(error => sendError(res, error));
 });
 

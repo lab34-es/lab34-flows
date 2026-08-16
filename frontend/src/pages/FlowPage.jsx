@@ -11,7 +11,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Markdown from '@/components/shared/Markdown';
 import AiEditDialog from '@/components/flow/AiEditDialog';
 import StepCell from '@/components/flow/StepCell';
-import { flowsApi } from '@/services/api';
+import XrayChip from '@/components/flow/XrayChip';
+import { flowsApi, jiraApi } from '@/services/api';
 import { useAppState } from '@/context/AppStateContext';
 import { useExecutions } from '@/context/ExecutionContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -39,6 +40,7 @@ export function FlowPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [aiOpen, setAiOpen] = useState(false);
+  const [xray, setXray] = useState({ jiraBaseUrl: '', tests: {} });
 
   const run = flowPath ? executions[flowPath] : undefined;
   const dirty = flowData ? draft !== flowData.plainText : false;
@@ -142,6 +144,54 @@ export function FlowPage() {
     }
   };
 
+  /**
+   * The Xray tests this document mentions: the flow's own one
+   * (frontmatter "xray.testKey") plus the "testKey" of each step.
+   */
+  const testKeys = useMemo(() => {
+    const keys = [];
+    if (flowData?.xray?.testKey) { keys.push(flowData.xray.testKey); }
+    (flowData?.steps || []).forEach((step) => {
+      if (step?.testKey) { keys.push(step.testKey); }
+    });
+    return [...new Set(keys.map((key) => String(key).trim()).filter(Boolean))];
+  }, [flowData]);
+
+  const testKeysParam = testKeys.join(',');
+
+  // Xray data is fetched after the document is rendered, and never blocks
+  // it: when the integration is off, or Jira is unreachable, the flow reads
+  // exactly as it did before.
+  useEffect(() => {
+    const keys = testKeysParam ? testKeysParam.split(',') : [];
+
+    if (!keys.length) {
+      setXray({ jiraBaseUrl: '', tests: {} });
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    jiraApi.getTests(keys)
+      .then((response) => {
+        if (cancelled) { return; }
+        setXray({
+          jiraBaseUrl: response.data.jiraBaseUrl || '',
+          tests: response.data.tests || {},
+        });
+      })
+      .catch(() => {
+        if (!cancelled) { setXray({ jiraBaseUrl: '', tests: {} }); }
+      });
+
+    return () => { cancelled = true; };
+  }, [testKeysParam]);
+
+  const xrayTestFor = useCallback(
+    (key) => (key ? xray.tests[String(key).trim().toUpperCase()] : undefined),
+    [xray]
+  );
+
   const runStatusMeta = run ? RUN_STATUS_META[run.status] : null;
 
   const parseErrors = flowData?.errors || [];
@@ -212,6 +262,13 @@ export function FlowPage() {
                 </Badge>
               )}
               {dirty && <Badge variant="warning" className="text-[10px]">unsaved</Badge>}
+              {flowData.xray?.testKey && (
+                <XrayChip
+                  testKey={flowData.xray.testKey}
+                  test={xrayTestFor(flowData.xray.testKey)}
+                  jiraBaseUrl={xray.jiraBaseUrl}
+                />
+              )}
             </div>
             {flowData.relativePath && (
               <p className="text-muted-foreground truncate font-mono text-xs">{flowData.relativePath}</p>
@@ -323,6 +380,8 @@ export function FlowPage() {
                     segment={segment}
                     step={step}
                     stepData={stepDataFor(segment)}
+                    xrayTest={xrayTestFor(step?.testKey)}
+                    jiraBaseUrl={xray.jiraBaseUrl}
                   />
                 );
               }

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, KeyRound, Loader2, RefreshCw, Save, Sparkles } from 'lucide-react';
+import { AlertCircle, CheckCircle2, KeyRound, Loader2, RefreshCw, Save, Sparkles, Ticket } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import JiraSettings from '@/components/settings/JiraSettings';
 import { settingsApi } from '@/services/api';
 
 const HINTS = {
@@ -120,25 +121,41 @@ export function SettingsPage() {
     }
   };
 
+  // The AI and the Jira sections load on their own: a failure in one of them
+  // must not hide the other.
+  const page = (children) => (
+    <div className="mx-auto w-full max-w-3xl space-y-6 p-6">
+      {children}
+
+      <div>
+        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+          <Ticket className="size-5" /> Integrations
+        </h1>
+        <p className="text-muted-foreground text-sm">
+          Connect your flows to the tools your team already uses.
+        </p>
+      </div>
+      <JiraSettings />
+    </div>
+  );
+
   if (loading) {
-    return (
-      <div className="mx-auto w-full max-w-3xl space-y-4 p-6">
+    return page(
+      <>
         <Skeleton className="h-8 w-1/3" />
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-32 w-full" />
-      </div>
+      </>
     );
   }
 
   if (loadError) {
-    return (
-      <div className="mx-auto w-full max-w-3xl p-6">
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertTitle>Could not load the settings</AlertTitle>
-          <AlertDescription>{loadError}</AlertDescription>
-        </Alert>
-      </div>
+    return page(
+      <Alert variant="destructive">
+        <AlertCircle />
+        <AlertTitle>Could not load the settings</AlertTitle>
+        <AlertDescription>{loadError}</AlertDescription>
+      </Alert>
     );
   }
 
@@ -147,8 +164,8 @@ export function SettingsPage() {
     || Object.entries(models).some(([id, model]) => model !== (settings.providers[id].model || ''))
     || Object.entries(hosts).some(([id, host]) => host !== (settings.providers[id].host || ''));
 
-  return (
-    <div className="mx-auto w-full max-w-3xl space-y-6 p-6">
+  return page(
+    <>
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
           <Sparkles className="size-5" /> AI settings
@@ -306,7 +323,7 @@ export function SettingsPage() {
           </span>
         )}
       </div>
-    </div>
+    </>
   );
 }
 

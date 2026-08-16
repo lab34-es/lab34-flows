@@ -34,6 +34,7 @@ Features:
   - [Usage](#usage)
     - [Writing flows with AI](#writing-flows-with-ai)
   - [Web UI](#web-ui)
+  - [Jira / Xray integration](#jira--xray-integration)
   - [Default examples](#default-examples)
   - [Application docs (JSDoc)](#application-docs-jsdoc)
   - [Flows](#flows)
@@ -351,6 +352,78 @@ and open http://localhost:3001.
   assertions. Edit the raw Markdown in the **Source** tab and save.
 - The environment selector (sidebar footer) picks the environment used for
   runs. Light and dark themes are available.
+
+## Jira / Xray integration
+
+Flows can be linked to [Xray](https://www.getxray.app/), the test management
+app for Jira. The mapping is:
+
+| lab34-flows | Xray |
+|-|-|
+| a flow (one Markdown document) | a **Test** issue |
+| every ```` ```step ```` block of that flow | a **step** of that test |
+
+The link is declared in the flow itself, so it travels with the document:
+
+- `xray.testKey` in the frontmatter — the Test this flow represents.
+- `testKey` inside a step block — optional, and informative only for now.
+
+````markdown
+---
+title: Fraud detection
+description: A payment above the limit is held for review
+xray:
+  testKey: BOP-1234
+---
+
+# Fraud detection
+
+The customer pays more than their daily limit.
+
+```step
+application: payments
+method: pay
+testKey: BOP-1235
+parameters:
+  body:
+    amount: 5000
+```
+````
+
+With the integration configured, opening the flow in the Web UI shows the
+Test's summary and status next to the title (and next to each step that has
+its own key), linked to the issue in Jira.
+
+**Uploading executions to Xray is not supported yet**: this is configuration
+and visualization only.
+
+### Configuring it
+
+Open **Settings** in the Web UI and fill in the **Jira / Xray** card. The
+credentials are stored in your context folder, at `config/jira.json`, and
+never leave your machine except to reach Jira or Xray. Two flavours are
+supported:
+
+- **Xray Cloud** — data comes from Xray's own API, authenticated with an API
+  key. Create it in Jira at **Apps > Xray > API Keys**, and paste the *client
+  id* and the *client secret*. Keep the default Xray URL
+  (`https://xray.cloud.getxray.app`) unless your instance uses a regional
+  endpoint (`https://eu.xray.cloud.getxray.app`,
+  `https://us.xray.cloud.getxray.app`).
+- **Jira Server / Data Center** — there is no external service: the data is
+  read from Jira itself with a **personal access token**, which you create in
+  Jira at **your profile > Personal Access Tokens**.
+
+In both cases, **Jira URL** (e.g. `https://your-company.atlassian.net`) is
+what every test key is linked to. **Project key** is optional and only kept
+for reference. **Test connection** validates the credentials for real, against
+Xray (Cloud) or against Jira's `myself` endpoint (Server/DC).
+
+Nothing is downloaded until a flow that mentions a test key is rendered, and
+every key is downloaded at most once per run of the tool. When the integration
+is not configured the UI shows no Xray information at all, and when Jira
+cannot be reached the key is shown as plain text with the error on hover — a
+flow never fails to render, or to run, because of Jira.
 
 ## Default examples
 

@@ -5,6 +5,7 @@ import { AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import CodeBlock from '@/components/shared/CodeBlock';
 import ExecutionOutput from '@/components/flow/ExecutionOutput';
+import XrayChip from '@/components/flow/XrayChip';
 import { cn } from '@/lib/utils';
 
 const STATUS_BORDERS = {
@@ -18,7 +19,7 @@ const STATUS_BORDERS = {
  * A notebook cell for a ```step block: the step definition (YAML) with its
  * live execution output right below, like In[]/Out[] in a Python notebook.
  */
-export function StepCell({ segment, step, stepData }) {
+export function StepCell({ segment, step, stepData, xrayTest, jiraBaseUrl }) {
   const application = step?.application;
   const method = step?.method;
   const executionStatus = stepData?.execution?.status;
@@ -58,6 +59,14 @@ export function StepCell({ segment, step, stepData }) {
         )}
         {step?.description && (
           <span className="text-muted-foreground truncate text-xs">— {step.description}</span>
+        )}
+        {step?.testKey && (
+          <XrayChip
+            testKey={step.testKey}
+            test={xrayTest}
+            jiraBaseUrl={jiraBaseUrl}
+            compact
+          />
         )}
       </div>
 
