@@ -374,17 +374,26 @@ const parseApplications = async () => {
 module.exports.parseApplications = parseApplications;
 
 /**
- * Files of an application that can be viewed and edited from the UI
- * (Source view): its README, its code (which also carries its
- * documentation, as JSDoc) and its environment files.
+ * Files an application is expected to have. They are always listed by the
+ * Source view — with an `exists` flag — so the UI can offer creating the
+ * missing ones: the README, and the code that also carries the documentation
+ * (as JSDoc).
  */
 const CANONICAL_APP_FILES = ['README.md', 'index.js'];
 
 /**
- * Resolve an editable file inside an application folder, rejecting anything
- * outside the whitelist or outside the application directory.
+ * Folders never shown nor written to from the Source view: they are either
+ * managed by other tools or big enough to make the explorer useless.
+ */
+const IGNORED_APP_SEGMENTS = ['node_modules', '.git'];
+
+const toPosix = (value) => (value || '').split('\\').join('/');
+
+/**
+ * Resolve a file inside an application folder, rejecting anything that would
+ * escape the application directory or touch an ignored folder.
  * @param {string} applicationName
- * @param {string} relativePath - e.g. "README.md", "index.js", "env/local.env"
+ * @param {string} relativePath - e.g. "README.md", "lib/http.js", "env/local.env"
  * @returns {Promise<{appPath: string, absolute: string, relative: string}>}
  */
 const resolveAppFile = async (applicationName, relativePath) => {
@@ -394,29 +403,65 @@ const resolveAppFile = async (applicationName, relativePath) => {
     throw new Error('Application not found');
   }
 
-  const normalized = (relativePath || '').split('\\').join('/');
+  const normalized = toPosix(relativePath).replace(/^\/+/, '').trim();
 
-  const isCanonical = CANONICAL_APP_FILES.some(
-    name => name.toLowerCase() === normalized.toLowerCase()
-  );
-  const isEnvFile = /^env\/[^/]+\.env$/i.test(normalized);
+  if (!normalized) {
+    throw new Error('File path is required');
+  }
 
-  if (!isCanonical && !isEnvFile) {
+  const segments = normalized.split('/').filter(segment => segment && segment !== '.');
+  if (segments.some(segment => IGNORED_APP_SEGMENTS.includes(segment.toLowerCase()))) {
     throw new Error(`Not an editable application file: ${normalized}`);
   }
 
   const absolute = path.resolve(appPath, normalized);
   if (!absolute.startsWith(appPath + path.sep)) {
-    throw new Error('Invalid path');
+    throw new Error('Invalid path: outside of the application directory');
   }
 
-  return { appPath, absolute, relative: normalized };
+  return { appPath, absolute, relative: toPosix(path.relative(appPath, absolute)) };
+};
+
+/** Collect every file under `dir`, depth-first, as posix relative paths. */
+const walkAppFiles = (dir, relativePath, collected) => {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir);
+  }
+  catch {
+    return collected;
+  }
+
+  for (const entry of entries) {
+    if (IGNORED_APP_SEGMENTS.includes(entry.toLowerCase())) { continue; }
+
+    const full = path.join(dir, entry);
+    const itemRelative = relativePath ? `${relativePath}/${entry}` : entry;
+
+    let stat;
+    try {
+      stat = fs.statSync(full);
+    }
+    catch {
+      // Broken symlink or unreadable entry: skip it instead of failing
+      continue;
+    }
+
+    if (stat.isDirectory()) {
+      walkAppFiles(full, itemRelative, collected);
+      continue;
+    }
+
+    collected.push({ path: itemRelative, exists: true });
+  }
+
+  return collected;
 };
 
 /**
- * List the editable files of an application. Canonical files (README.md,
- * index.js) are always listed with an `exists` flag so the UI
- * can offer creating the missing ones; env files are listed when present.
+ * List the files of an application. Every file on disk is listed, plus the
+ * canonical ones (README.md, index.js) when they are missing, so the UI can
+ * offer creating them.
  * @param {string} applicationName
  * @returns {Promise<Array<{path: string, exists: boolean}>>}
  */
@@ -427,19 +472,142 @@ module.exports.listAppFiles = async (applicationName) => {
     throw new Error('Application not found');
   }
 
-  const entries = fs.readdirSync(appPath);
+  const files = walkAppFiles(appPath, '', [])
+    .sort((a, b) => a.path.localeCompare(b.path, undefined, { sensitivity: 'base' }));
 
-  const files = CANONICAL_APP_FILES.map(name => {
-    // Respect the on-disk casing (readme.md vs README.md)
-    const actual = entries.find(entry => entry.toLowerCase() === name.toLowerCase());
-    return { path: actual || name, exists: Boolean(actual) };
-  });
+  // Canonical files that do not exist yet, first, so they are easy to spot
+  const missing = CANONICAL_APP_FILES
+    .filter(name => !files.some(file => file.path.toLowerCase() === name.toLowerCase()))
+    .map(name => ({ path: name, exists: false }));
 
-  for (const envFile of listEnvFiles(appPath)) {
-    files.push({ path: `env/${path.basename(envFile)}`, exists: true });
+  return [...missing, ...files];
+};
+
+/**
+ * Create a new file in an application. Fails when the path is already taken,
+ * so the UI never silently replaces an existing file.
+ * @param {string} applicationName
+ * @param {string} relativePath
+ * @param {string} content
+ */
+module.exports.createAppFile = async (applicationName, relativePath, content) => {
+  const { absolute, relative } = await resolveAppFile(applicationName, relativePath);
+
+  if (fs.existsSync(absolute)) {
+    const error = new Error('A file or folder with that name already exists');
+    error.code = 'EEXISTS';
+    throw error;
   }
 
-  return files;
+  fs.mkdirSync(path.dirname(absolute), { recursive: true });
+  fs.writeFileSync(absolute, content ?? '', 'utf8');
+
+  return { path: relative };
+};
+
+/**
+ * Rename (or move, when the new path has folders) a file or folder of an
+ * application.
+ * @param {string} applicationName
+ * @param {string} fromPath
+ * @param {string} toPath
+ */
+module.exports.renameAppFile = async (applicationName, fromPath, toPath) => {
+  const from = await resolveAppFile(applicationName, fromPath);
+  const to = await resolveAppFile(applicationName, toPath);
+
+  if (!fs.existsSync(from.absolute)) {
+    throw new Error(`File not found: ${from.relative}`);
+  }
+
+  if (from.absolute === to.absolute) {
+    return { path: to.relative, previousPath: from.relative };
+  }
+
+  // Renaming only the casing (readme.md → README.md) is a no-op collision on
+  // case-insensitive file systems, so only guard against a different file
+  if (fs.existsSync(to.absolute) && from.absolute.toLowerCase() !== to.absolute.toLowerCase()) {
+    const error = new Error('A file or folder with that name already exists');
+    error.code = 'EEXISTS';
+    throw error;
+  }
+
+  if (to.absolute.startsWith(from.absolute + path.sep)) {
+    throw new Error('Cannot move a folder inside itself');
+  }
+
+  fs.mkdirSync(path.dirname(to.absolute), { recursive: true });
+  fs.renameSync(from.absolute, to.absolute);
+
+  return { path: to.relative, previousPath: from.relative };
+};
+
+/**
+ * Delete a file or folder of an application.
+ * @param {string} applicationName
+ * @param {string} relativePath
+ */
+module.exports.deleteAppFile = async (applicationName, relativePath) => {
+  const { absolute, relative } = await resolveAppFile(applicationName, relativePath);
+
+  // lstat instead of existsSync so broken symlinks can still be deleted
+  try {
+    fs.lstatSync(absolute);
+  }
+  catch {
+    throw new Error(`File not found: ${relative}`);
+  }
+
+  fs.rmSync(absolute, { recursive: true, force: true });
+
+  return { path: relative };
+};
+
+/**
+ * Rename an application, i.e. its folder inside the applications directory.
+ * Flows reference applications by this name, so the UI warns about it.
+ * @param {string} applicationName
+ * @param {string} newName - A single folder name, no slashes
+ */
+module.exports.renameApplication = async (applicationName, newName) => {
+  const appsPath = await paths.contextDir(['applications']);
+  const from = path.join(appsPath, applicationName);
+
+  if (!fs.existsSync(from) || !fs.statSync(from).isDirectory()) {
+    throw new Error('Application not found');
+  }
+
+  const trimmed = (newName || '').trim();
+
+  if (!trimmed) {
+    throw new Error('Application name is required');
+  }
+
+  if (/[/\\]/.test(trimmed) || trimmed === '.' || trimmed === '..' || trimmed.startsWith('.')) {
+    throw new Error('Invalid application name');
+  }
+
+  const to = path.join(appsPath, trimmed);
+
+  if (to === from) {
+    return { name: trimmed, slug: trimmed, previousName: applicationName };
+  }
+
+  if (fs.existsSync(to) && from.toLowerCase() !== to.toLowerCase()) {
+    const error = new Error(`An application named “${trimmed}” already exists`);
+    error.code = 'EEXISTS';
+    throw error;
+  }
+
+  fs.renameSync(from, to);
+
+  // Applications are required by folder: drop the stale entries so the next
+  // parse loads the renamed one from its new location
+  Object.keys(require.cache)
+    .filter(key => key === from || key.startsWith(from + path.sep))
+    .forEach(key => delete require.cache[key]);
+
+  return { name: trimmed, slug: trimmed, previousName: applicationName };
 };
 
 /**

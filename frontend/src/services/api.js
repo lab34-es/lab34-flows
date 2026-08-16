@@ -30,6 +30,7 @@ export const flowsApi = {
   saveFile: (path, content, overwrite = false) =>
     api.post('/api/flows/file', { path, content, overwrite }),
   remove: (path) => api.delete('/api/flows/file', { data: { path } }),
+  rename: (from, to) => api.post('/api/flows/rename', { from, to }),
 };
 
 export const applicationsApi = {
@@ -40,6 +41,14 @@ export const applicationsApi = {
     api.get(`/api/applications/${encodeURIComponent(slug)}/files/content?path=${encodeURIComponent(path)}`),
   saveFile: (slug, path, content) =>
     api.put(`/api/applications/${encodeURIComponent(slug)}/files/content`, { path, content }),
+  createFile: (slug, path, content = '') =>
+    api.post(`/api/applications/${encodeURIComponent(slug)}/files`, { path, content }),
+  renameFile: (slug, from, to) =>
+    api.post(`/api/applications/${encodeURIComponent(slug)}/files/rename`, { from, to }),
+  deleteFile: (slug, path) =>
+    api.delete(`/api/applications/${encodeURIComponent(slug)}/files/content?path=${encodeURIComponent(path)}`),
+  rename: (slug, name) =>
+    api.put(`/api/applications/${encodeURIComponent(slug)}/rename`, { name }),
   getEnvs: (slug) => api.get(`/api/applications/${encodeURIComponent(slug)}/envs`),
   updateEnvVariable: (slug, env, key, value) =>
     api.put(`/api/applications/${encodeURIComponent(slug)}/envs/${env}/${key}`, { value }),

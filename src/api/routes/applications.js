@@ -6,7 +6,9 @@ const apps = require('../../helpers/applications');
 
 const sendError = (res, error, status = 400) => {
   const message = (error && error.message) || String(error);
-  const code = /not found/i.test(message) ? 404 : status;
+  let code = status;
+  if (error && error.code === 'EEXISTS') { code = 409; }
+  else if (/not found/i.test(message)) { code = 404; }
   res.status(code).send({ error: message });
 };
 
@@ -34,6 +36,34 @@ router.get('/:application/files/content', (req, res) => {
 // Create or update one editable file. { path, content }
 router.put('/:application/files/content', (req, res) => {
   apps.writeAppFile(req.params.application, req.body.path, req.body.content)
+    .then(result => res.send({ success: true, ...result }))
+    .catch(error => sendError(res, error));
+});
+
+// Create a new file, failing when the path is taken. { path, content }
+router.post('/:application/files', (req, res) => {
+  apps.createAppFile(req.params.application, req.body.path, req.body.content)
+    .then(result => res.send({ success: true, ...result }))
+    .catch(error => sendError(res, error));
+});
+
+// Rename or move a file or folder. { from, to }
+router.post('/:application/files/rename', (req, res) => {
+  apps.renameAppFile(req.params.application, req.body.from, req.body.to)
+    .then(result => res.send({ success: true, ...result }))
+    .catch(error => sendError(res, error));
+});
+
+// Delete a file or folder. ?path=lib/http.js
+router.delete('/:application/files/content', (req, res) => {
+  apps.deleteAppFile(req.params.application, req.query.path || req.body.path)
+    .then(result => res.send({ success: true, ...result }))
+    .catch(error => sendError(res, error));
+});
+
+// Rename an application, i.e. its folder. { name }
+router.put('/:application/rename', (req, res) => {
+  apps.renameApplication(req.params.application, req.body.name)
     .then(result => res.send({ success: true, ...result }))
     .catch(error => sendError(res, error));
 });

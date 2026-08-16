@@ -339,13 +339,17 @@ and open http://localhost:3001.
 - **Left sidebar** with two sections:
   - **Flows** — your flows tree, with a live status indicator per flow
     (*standby*, *running*, *ok*, *error*). Create folders, create flows,
-    upload files and delete them from the `+` menu and each row's actions.
+    upload files, and rename or delete them from the `+` menu and each row's
+    actions.
   - **Applications** — every application in your context directory. Click
     one to read its **README** and browse its **methods** (input parameters,
     output, memory usage and examples, from the JSDoc blocks of its
-    `index.js`), plus its environment files. Like flows, applications have a
-    **Document / Source** toggle: the Source view edits the application's
-    files (`README.md`, `index.js` and `env/*.env`) right from the UI.
+    `index.js`), plus its environment files. Each row's actions rename the
+    application, i.e. its folder. Like flows, applications have a
+    **Document / Source** toggle: the Source view is a file explorer over the
+    application folder, where every file (`README.md`, `index.js`,
+    `env/*.env` and anything else you add) can be edited, created, renamed
+    and deleted.
 - **Notebook view** — a flow renders as a document; each ```` ```step ````
   block is a cell. Press **Run** and the execution details of each step
   stream in below its block: status, timing, request, response and

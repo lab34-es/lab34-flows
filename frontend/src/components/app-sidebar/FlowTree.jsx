@@ -8,6 +8,7 @@ import {
   FolderPlus,
   MoreHorizontal,
   FilePlus2,
+  Pencil,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -64,6 +65,9 @@ function FolderNode({ node, onAction, children }) {
               <Upload /> Upload file
             </DropdownMenuItem>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onAction({ type: 'rename', targetPath: node.relativePath, isFolder: true })}>
+              <Pencil /> Rename folder
+            </DropdownMenuItem>
             <DropdownMenuItem
               variant="destructive"
               onClick={() => onAction({ type: 'delete', targetPath: node.relativePath, isFolder: true })}
@@ -112,6 +116,12 @@ function FlowNode({ node, onAction }) {
           </SidebarMenuAction>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="right" align="start">
+          <DropdownMenuItem
+            onClick={() => onAction({ type: 'rename', targetPath: node.relativePath, isFolder: false })}
+          >
+            <Pencil /> Rename flow
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
             onClick={() => onAction({ type: 'delete', targetPath: node.relativePath, isFolder: false })}

@@ -1,31 +1,26 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Editor from '@monaco-editor/react';
-import { AlertCircle, ChevronDown, FileCode2, FileText, Folder, Save, Settings2 } from 'lucide-react';
+import { AlertCircle, Save } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import SourceExplorer from '@/components/application/SourceExplorer';
+import SourceFileDialogs from '@/components/application/SourceFileDialogs';
 import { applicationsApi } from '@/services/api';
 import { useTheme } from '@/context/ThemeContext';
-import { cn } from '@/lib/utils';
 
 const LANGUAGES = {
   md: 'markdown',
   markdown: 'markdown',
   js: 'javascript',
+  json: 'json',
+  yml: 'yaml',
+  yaml: 'yaml',
   env: 'ini',
 };
 
-const FILE_ICONS = {
-  md: FileText,
-  js: FileCode2,
-  env: Settings2,
-};
-
 const extensionOf = (filePath) => (filePath.split('.').pop() || '').toLowerCase();
-
-const baseNameOf = (filePath) => filePath.split('/').pop();
 
 // Starting content offered when a canonical file does not exist yet
 const templateFor = (filePath, slug) => {
@@ -66,59 +61,27 @@ const templateFor = (filePath, slug) => {
   return `# ${slug}\n\nDescribe this application.\n`;
 };
 
-/**
- * Split the flat file list into root-level files and one entry per folder
- * (currently only env/), so the explorer can render a small tree.
- */
-const groupFiles = (files) => {
-  const roots = [];
-  const folders = new Map();
-
-  for (const file of files) {
-    const slash = file.path.indexOf('/');
-    if (slash === -1) {
-      roots.push(file);
-      continue;
-    }
-    const folder = file.path.slice(0, slash);
-    if (!folders.has(folder)) { folders.set(folder, []); }
-    folders.get(folder).push(file);
-  }
-
-  return { roots, folders: [...folders.entries()] };
+/** New path of `filePath` once `from` has been renamed to `to`. */
+const renamedPath = (filePath, from, to) => {
+  if (filePath === from) { return to; }
+  if (filePath.startsWith(`${from}/`)) { return `${to}${filePath.slice(from.length)}`; }
+  return filePath;
 };
 
-/** One row in the explorer tree. */
-function FileRow({ file, label, depth, isActive, isDirty, onSelect }) {
-  const Icon = FILE_ICONS[extensionOf(file.path)] || FileText;
+/** Same, over the keys of the drafts/originals maps. */
+const renameKeys = (map, from, to) => Object.fromEntries(
+  Object.entries(map).map(([key, value]) => [renamedPath(key, from, to), value])
+);
 
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(file)}
-      title={file.path}
-      className={cn(
-        'flex w-full items-center gap-1.5 py-1 pr-2 text-left font-mono text-xs',
-        'hover:bg-accent hover:text-accent-foreground',
-        isActive && 'bg-accent text-accent-foreground font-medium',
-        !file.exists && 'text-muted-foreground italic'
-      )}
-      style={{ paddingLeft: `${0.5 + depth * 0.75}rem` }}
-    >
-      <Icon className="size-3.5 shrink-0 opacity-70" />
-      <span className="truncate">{label}</span>
-      {isDirty && <span className="bg-warning size-1.5 shrink-0 rounded-full" />}
-      {!file.exists && (
-        <Badge variant="secondary" className="ml-auto shrink-0 px-1 py-0 text-[9px]">new</Badge>
-      )}
-    </button>
-  );
-}
+/** Drop every entry of a drafts/originals map under a deleted path. */
+const dropKeys = (map, target) => Object.fromEntries(
+  Object.entries(map).filter(([key]) => key !== target && !key.startsWith(`${target}/`))
+);
 
 /**
  * "Source" view of an application: a VS Code-like explorer listing its files
- * (README.md, index.js and env/*.env) next to the Monaco editor used for
- * flows.
+ * — where they can be created, renamed and deleted — next to the Monaco
+ * editor used for flows.
  */
 export function ApplicationSource({ slug, onSaved }) {
   const { theme } = useTheme();
@@ -130,6 +93,14 @@ export function ApplicationSource({ slug, onSaved }) {
   const [drafts, setDrafts] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [action, setAction] = useState(null);
+
+  const refreshFiles = useCallback(async () => {
+    const response = await applicationsApi.listFiles(slug);
+    const list = response.data || [];
+    setFiles(list);
+    return list;
+  }, [slug]);
 
   const openFile = useCallback(async (file, currentDrafts) => {
     setSelected(file.path);
@@ -157,6 +128,7 @@ export function ApplicationSource({ slug, onSaved }) {
     setOriginals({});
     setDrafts({});
     setError(null);
+    setAction(null);
 
     applicationsApi.listFiles(slug)
       .then((response) => {
@@ -176,8 +148,6 @@ export function ApplicationSource({ slug, onSaved }) {
     drafts[filePath] !== undefined && drafts[filePath] !== originals[filePath],
   [drafts, originals]);
 
-  const { roots, folders } = useMemo(() => groupFiles(files), [files]);
-
   const handleSave = async () => {
     if (!selected) { return; }
     setSaving(true);
@@ -195,6 +165,58 @@ export function ApplicationSource({ slug, onSaved }) {
       setSaving(false);
     }
   };
+
+  /**
+   * Run one explorer action and bring the local state in line with it. The
+   * dialog reports the error, so failures are rethrown as they are.
+   */
+  const handleAction = async (currentAction, value) => {
+    setError(null);
+
+    if (currentAction.type === 'new-file') {
+      await applicationsApi.createFile(slug, value, '');
+      await refreshFiles();
+      setOriginals((prev) => ({ ...prev, [value]: '' }));
+      setDrafts((prev) => ({ ...prev, [value]: '' }));
+      setSelected(value);
+      onSaved?.();
+      return;
+    }
+
+    if (currentAction.type === 'rename') {
+      const from = currentAction.targetPath;
+      const response = await applicationsApi.renameFile(slug, from, value);
+      const to = response.data.path || value;
+      await refreshFiles();
+      setDrafts((prev) => renameKeys(prev, from, to));
+      setOriginals((prev) => renameKeys(prev, from, to));
+      setSelected((current) => (current ? renamedPath(current, from, to) : current));
+      onSaved?.();
+      return;
+    }
+
+    if (currentAction.type === 'delete') {
+      const target = currentAction.targetPath;
+      await applicationsApi.deleteFile(slug, target);
+      const list = await refreshFiles();
+      setDrafts((prev) => dropKeys(prev, target));
+      setOriginals((prev) => dropKeys(prev, target));
+      setSelected((current) => {
+        const stillThere = current && current !== target && !current.startsWith(`${target}/`);
+        if (stillThere) { return current; }
+        return (list.find((file) => file.exists) || list[0])?.path || null;
+      });
+      onSaved?.();
+    }
+  };
+
+  // Opening the file a delete or rename left selected, when its content is
+  // not in the drafts yet
+  useEffect(() => {
+    if (!selected || drafts[selected] !== undefined) { return; }
+    const file = files.find((item) => item.path === selected);
+    if (file) { openFile(file, drafts); }
+  }, [selected, files, drafts, openFile]);
 
   if (loading) {
     return (
@@ -216,48 +238,13 @@ export function ApplicationSource({ slug, onSaved }) {
 
   return (
     <div className="flex h-full min-h-0">
-      {/* Explorer */}
-      {/* The application sidebar already uses --sidebar, so keep this one on
-          muted to avoid the two panels blending into one another. */}
-      <aside className="bg-muted/40 flex w-56 shrink-0 flex-col border-r">
-        <div className="text-muted-foreground shrink-0 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide">
-          Explorer
-        </div>
-        <div className="min-h-0 flex-1 overflow-auto pb-2">
-          {roots.map((file) => (
-            <FileRow
-              key={file.path}
-              file={file}
-              label={file.path}
-              depth={0}
-              isActive={file.path === selected}
-              isDirty={dirtyFor(file.path)}
-              onSelect={(target) => openFile(target, drafts)}
-            />
-          ))}
-
-          {folders.map(([folder, folderFiles]) => (
-            <div key={folder}>
-              <div className="text-muted-foreground flex items-center gap-1 px-2 py-1 font-mono text-xs">
-                <ChevronDown className="size-3.5 shrink-0" />
-                <Folder className="size-3.5 shrink-0 opacity-70" />
-                <span className="truncate">{folder}</span>
-              </div>
-              {folderFiles.map((file) => (
-                <FileRow
-                  key={file.path}
-                  file={file}
-                  label={baseNameOf(file.path)}
-                  depth={1.5}
-                  isActive={file.path === selected}
-                  isDirty={dirtyFor(file.path)}
-                  onSelect={(target) => openFile(target, drafts)}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-      </aside>
+      <SourceExplorer
+        files={files}
+        selected={selected}
+        isDirty={dirtyFor}
+        onSelect={(file) => openFile(file, drafts)}
+        onAction={setAction}
+      />
 
       {/* Editor pane */}
       <div className="flex min-w-0 flex-1 flex-col">
@@ -316,6 +303,12 @@ export function ApplicationSource({ slug, onSaved }) {
           code changes are picked up on the next run.
         </p>
       </div>
+
+      <SourceFileDialogs
+        action={action}
+        onSubmit={handleAction}
+        onClose={() => setAction(null)}
+      />
     </div>
   );
 }
