@@ -35,7 +35,7 @@ Features:
     - [AI Mode](#ai-mode)
   - [Web UI](#web-ui)
   - [Default examples](#default-examples)
-  - [Application docs (docs.json)](#application-docs-docsjson)
+  - [Application docs (JSDoc)](#application-docs-jsdoc)
   - [Flows](#flows)
   - [Tests](#tests)
   - [Playwright](#playwright) (browser automation - experimental)
@@ -332,10 +332,10 @@ and open http://localhost:3001.
     upload files and delete them from the `+` menu and each row's actions.
   - **Applications** — every application in your context directory. Click
     one to read its **README** and browse its **methods** (input parameters,
-    output, memory usage and examples, from its `docs.json`), plus its
-    environment files. Like flows, applications have a **Document / Source**
-    toggle: the Source view edits the application's files (`README.md`,
-    `docs.json`, `index.js` and `env/*.env`) right from the UI.
+    output, memory usage and examples, from the JSDoc blocks of its
+    `index.js`), plus its environment files. Like flows, applications have a
+    **Document / Source** toggle: the Source view edits the application's
+    files (`README.md`, `index.js` and `env/*.env`) right from the UI.
 - **Notebook view** — a flow renders as a document; each ```` ```step ````
   block is a cell. Press **Run** and the execution details of each step
   stream in below its block: status, timing, request, response and
@@ -358,28 +358,54 @@ On first run, the tool seeds your context directory with example content:
 
 Examples are only copied when missing, so you can edit or delete them freely.
 
-## Application docs (docs.json)
+## Application docs (JSDoc)
 
-Each application folder can include a `docs.json` describing its methods.
-The UI merges it with the methods self-described by `index.js`:
+Applications document themselves in their own code: there is no `docs.json`.
+The documentation is read from the JSDoc blocks of the application's
+`index.js`, and it is what the UI renders and what the AI mode uses to build
+flows.
 
-```json
-{
-  "description": "What this application is",
-  "methods": {
-    "myMethod": {
-      "description": "What it does",
-      "input": [
-        { "name": "body.a", "type": "number", "required": true, "description": "..." }
-      ],
-      "output": { "status": 200, "body": { "example": true }, "description": "..." },
-      "memory": [
-        { "key": "lastResult", "mode": "write", "description": "..." }
-      ],
-      "example": "application: myApp\nmethod: myMethod\nparameters:\n  body:\n    a: 1"
-    }
+- The block at the **top of the file** describes the application.
+- The block **above each exported method** documents that method: its free
+  text is the description (markdown), and its tags describe the rest.
+
+| Tag | Meaning |
+|-|-|
+| `@param {type} name - description` | An input parameter. `[name]` marks it optional, `[name=value]` adds a default |
+| `@returns {status} description` | The response. An optional fenced ```` ```json ```` block documents an example body |
+| `@memory {write\|read} key - description` | Flow memory the method writes or reads |
+| `@example` | An example step, in YAML, ready to paste inside a ```` ```step ```` block |
+
+```js
+/**
+ * What this application is.
+ */
+const { applications } = require('lab34-flows');
+
+/**
+ * Adds two numbers (a + b).
+ *
+ * @param {number} body.a - First operand.
+ * @param {number} [body.b=0] - Second operand.
+ * @returns {200} The operation performed and its result.
+ * ```json
+ * { "operation": "add", "result": 42 }
+ * ```
+ * @memory {write} lastResult - The result of the operation.
+ * @example
+ * application: myApp
+ * method: add
+ * parameters:
+ *   body:
+ *     a: 2
+ *     b: 40
+ */
+module.exports.add = applications.handler([
+  async (ctx, parameters) => {
+    const { a, b } = parameters.body;
+    return [{}, 200, { operation: 'add', result: a + b }, { lastResult: a + b }];
   }
-}
+], 'add');
 ```
 
 A `README.md` in the application folder is rendered in the UI as well.

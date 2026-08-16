@@ -7,6 +7,7 @@ const temp = require('temp');
 // temp.track(); // Automatically track and clean up temp files at exit
 
 const paths = require('./paths');
+const appDocs = require('./appDocs');
 
 const applications = {};
 
@@ -19,14 +20,21 @@ const description = (description) => {
 module.exports.description = description;
 
 // Helper function to convert array-style handlers to functions that can describe themselves
+//
+// The array holds the validation middlewares and, as its last item, the
+// function to execute. Documentation is not part of it: methods are
+// documented with a JSDoc block above them (see helpers/appDocs.js). A
+// leading string is still accepted as a description, for applications
+// written before documentation moved to JSDoc.
 const handler = (handlerArray, functionName) => {
+  const hasInlineDescription = typeof handlerArray[0] === 'string';
+
   // The actual function that will be called
   const handler = function (ctx, parameters, flow) {
     if (ctx === 'describe') {
-      // Extract description and validations
-      const description = handlerArray[0];
+      const description = hasInlineDescription ? handlerArray[0] : null;
       const validation = { };
-      
+
       // Find validation schemas
       handlerArray.forEach(item => {
         if (typeof item === 'function') {
@@ -37,26 +45,26 @@ const handler = (handlerArray, functionName) => {
           }
         }
       });
-      
+
       return {
         name: functionName,
         description,
         parameters: validation
       };
     }
-    
-    // Normal execution: run through all items in the array expect last and first
-    // (which are description and execution function)
-    for (let i = 1; i < handlerArray.length - 1; i++) {
+
+    // Normal execution: run every item except the last one (the execution
+    // function) and the optional leading description
+    for (let i = hasInlineDescription ? 1 : 0; i < handlerArray.length - 1; i++) {
       if (typeof handlerArray[i] === 'function') {
         handlerArray[i](ctx, parameters, flow);
       }
     }
-    
+
     // Execute the main handler (last item in array)
     return handlerArray[handlerArray.length - 1](ctx, parameters, flow);
   };
-  
+
   return handler;
 };
 
@@ -255,6 +263,7 @@ const parseApplications = async () => {
     // if index file exists load methods
     let methods = [];
     const errors = [];
+    let indexSource = null;
 
     if (fs.existsSync(appIndex)) {
 
@@ -268,6 +277,7 @@ const parseApplications = async () => {
         flowsPath = path.resolve(__dirname, '..', '..');
       }
       const appIndexContentOriginal = fs.readFileSync(appIndex, 'utf8');
+      indexSource = appIndexContentOriginal;
       const appIndexContentModified = appIndexContentOriginal
         .replace(/(['"`])lab34-flows(\/[^'"`]*)?\1/g, (match, quote, subpath) => {
           return `${quote}${flowsPath}${subpath || ''}${quote}`;
@@ -311,23 +321,25 @@ const parseApplications = async () => {
       }
     }
 
-    // Load the JSON docs (docs.json), if any. It documents each method:
-    // input parameters, output, memory usage, examples...
-    let docs = null;
-    const docsPath = path.join(appPath, 'docs.json');
-    if (fs.existsSync(docsPath)) {
-      try {
-        docs = JSON.parse(fs.readFileSync(docsPath, 'utf8'));
-      }
-      catch (ex) {
-        errors.push({ message: `Invalid docs.json: ${ex.message}` });
-      }
+    // Documentation lives in the JSDoc blocks of index.js: the block at the
+    // top of the file describes the application, and the block above each
+    // exported method documents its input, output, memory usage and an
+    // example step.
+    const parsedDocs = appDocs.parse(indexSource);
+    const docsMethods = parsedDocs.methods;
+
+    // docs.json is no longer read: warn instead of silently ignoring it
+    if (fs.existsSync(path.join(appPath, 'docs.json'))) {
+      errors.push({
+        message: 'docs.json is no longer used. Document the application and its ' +
+          'methods with JSDoc blocks in index.js, then delete docs.json.'
+      });
     }
 
-    // Merge the self-described methods (from index.js) with the JSON docs.
-    // Methods present only in docs.json are included too, flagged as not
-    // implemented.
-    const docsMethods = (docs && docs.methods) || {};
+    // Merge the self-described methods (from index.js) with their JSDoc.
+    // The JSDoc description wins over the one a handler may still declare
+    // inline. Documented methods that could not be loaded are included too,
+    // flagged as not implemented.
     const methodsByName = new Map();
 
     methods.filter(Boolean).forEach(method => {
@@ -336,10 +348,10 @@ const parseApplications = async () => {
 
     Object.keys(docsMethods).forEach(name => {
       const existing = methodsByName.get(name) || { name, implemented: false };
-      const methodDocs = docsMethods[name] || {};
+      const methodDocs = docsMethods[name];
       methodsByName.set(name, {
         ...existing,
-        description: existing.description || methodDocs.description,
+        description: methodDocs.description || existing.description || null,
         docs: methodDocs
       });
     });
@@ -348,9 +360,8 @@ const parseApplications = async () => {
       name: applicationName,
       slug: applicationName,
       path: appPath,
-      description: (docs && docs.description) || null,
+      description: parsedDocs.description,
       readme,
-      docs,
       envFiles: envFilesWithPaths,
       methods: Array.from(methodsByName.values()),
       errors
@@ -364,15 +375,16 @@ module.exports.parseApplications = parseApplications;
 
 /**
  * Files of an application that can be viewed and edited from the UI
- * (Source view): its docs, its code and its environment files.
+ * (Source view): its README, its code (which also carries its
+ * documentation, as JSDoc) and its environment files.
  */
-const CANONICAL_APP_FILES = ['README.md', 'docs.json', 'index.js'];
+const CANONICAL_APP_FILES = ['README.md', 'index.js'];
 
 /**
  * Resolve an editable file inside an application folder, rejecting anything
  * outside the whitelist or outside the application directory.
  * @param {string} applicationName
- * @param {string} relativePath - e.g. "README.md", "docs.json", "env/local.env"
+ * @param {string} relativePath - e.g. "README.md", "index.js", "env/local.env"
  * @returns {Promise<{appPath: string, absolute: string, relative: string}>}
  */
 const resolveAppFile = async (applicationName, relativePath) => {
@@ -403,7 +415,7 @@ const resolveAppFile = async (applicationName, relativePath) => {
 
 /**
  * List the editable files of an application. Canonical files (README.md,
- * docs.json, index.js) are always listed with an `exists` flag so the UI
+ * index.js) are always listed with an `exists` flag so the UI
  * can offer creating the missing ones; env files are listed when present.
  * @param {string} applicationName
  * @returns {Promise<Array<{path: string, exists: boolean}>>}

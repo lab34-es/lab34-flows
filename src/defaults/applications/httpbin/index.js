@@ -1,12 +1,34 @@
-// Example application: httpbin
-//
-// Demonstrates HTTP testing against https://httpbin.org, a public service
-// that echoes whatever you send to it. Great for exploring query
-// parameters, request bodies, headers and non-2xx status codes.
+/**
+ * A playground against httpbin.org: it echoes back query parameters, bodies
+ * and headers, and can answer with any status code or delay. Great for
+ * exploring HTTP testing without setting up a server.
+ */
 const { applications, httpClient } = require('lab34-flows');
 
+/**
+ * GET /get — httpbin echoes the query parameters and headers of the request.
+ *
+ * @param {object} [query.*] - Any key/value pairs, sent as query string
+ *   parameters. Echoed back under body.args.
+ * @param {object} [headers.*] - Extra request headers. Echoed back under
+ *   body.headers.
+ * @returns {200} The echoed request: args (query), headers and url.
+ * ```json
+ * { "args": { "q": "flows" }, "headers": {}, "url": "https://httpbin.org/get?q=flows" }
+ * ```
+ * @example
+ * application: httpbin
+ * method: get
+ * parameters:
+ *   query:
+ *     q: flows
+ * test:
+ *   status: 200
+ *   body:
+ *     args:
+ *       q: flows
+ */
 module.exports.get = applications.handler([
-  'Performs a GET request to /get. httpbin echoes the query parameters and headers back.',
   async (ctx, parameters) => {
     const { query, headers } = parameters || {};
     return httpClient.get(ctx, '/get', {
@@ -16,8 +38,30 @@ module.exports.get = applications.handler([
   }
 ], 'get');
 
+/**
+ * POST /post — httpbin echoes the JSON body back under "json".
+ *
+ * @param {object} [body.*] - Any JSON payload. Replacers such as
+ *   {{ randomEmail }} are handy here.
+ * @param {object} [headers.*] - Extra request headers.
+ * @returns {200} The echoed request; the parsed JSON payload is available
+ *   under body.json.
+ * ```json
+ * { "json": { "email": "user@example.com" } }
+ * ```
+ * @example
+ * application: httpbin
+ * method: post
+ * parameters:
+ *   body:
+ *     email: "{{ randomEmail }}"
+ * test:
+ *   status: 200
+ *   body:
+ *     json:
+ *       email: "$expr: typeof value === 'string' && value.includes('@')"
+ */
 module.exports.post = applications.handler([
-  'Performs a POST request to /post. httpbin echoes the JSON body back under "json".',
   async (ctx, parameters) => {
     const { body, headers } = parameters || {};
     return httpClient.post(ctx, '/post', {
@@ -27,8 +71,22 @@ module.exports.post = applications.handler([
   }
 ], 'post');
 
+/**
+ * GET /status/{code} — httpbin answers with exactly that HTTP status code.
+ * Useful to test error scenarios.
+ *
+ * @param {number} [params.code=200] - The HTTP status code to receive (e.g. 200, 404, 503).
+ * @returns {code} Exactly the status code you asked for, with an empty body.
+ * @example
+ * application: httpbin
+ * method: status
+ * parameters:
+ *   params:
+ *     code: 404
+ * test:
+ *   status: 404
+ */
 module.exports.status = applications.handler([
-  'Requests /status/{code}, which responds with that HTTP status code. Useful to test error scenarios.',
   async (ctx, parameters) => {
     const params = (parameters || {}).params || {};
     const code = params.code || 200;
@@ -36,8 +94,25 @@ module.exports.status = applications.handler([
   }
 ], 'status');
 
+/**
+ * GET /delay/{seconds} — httpbin waits before responding (max 10 seconds).
+ * Useful to test timeouts and retries.
+ *
+ * @param {number} [params.seconds=1] - Seconds to wait before the response (0-10).
+ * @returns {200} Same echo format as /get, after the delay.
+ * ```json
+ * { "url": "https://httpbin.org/delay/2" }
+ * ```
+ * @example
+ * application: httpbin
+ * method: delay
+ * parameters:
+ *   params:
+ *     seconds: 2
+ * test:
+ *   status: 200
+ */
 module.exports.delay = applications.handler([
-  'Requests /delay/{seconds}, which waits before responding. Useful to test timeouts and retries.',
   async (ctx, parameters) => {
     const params = (parameters || {}).params || {};
     const seconds = params.seconds || 1;

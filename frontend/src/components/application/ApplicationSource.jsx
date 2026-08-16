@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Editor from '@monaco-editor/react';
-import { AlertCircle, FileCode2, FileJson2, FileText, Save, Settings2 } from 'lucide-react';
+import { AlertCircle, ChevronDown, FileCode2, FileText, Folder, Save, Settings2 } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -13,37 +13,48 @@ import { cn } from '@/lib/utils';
 const LANGUAGES = {
   md: 'markdown',
   markdown: 'markdown',
-  json: 'json',
   js: 'javascript',
   env: 'ini',
 };
 
 const FILE_ICONS = {
   md: FileText,
-  json: FileJson2,
   js: FileCode2,
   env: Settings2,
 };
 
 const extensionOf = (filePath) => (filePath.split('.').pop() || '').toLowerCase();
 
+const baseNameOf = (filePath) => filePath.split('/').pop();
+
 // Starting content offered when a canonical file does not exist yet
 const templateFor = (filePath, slug) => {
   const ext = extensionOf(filePath);
 
-  if (ext === 'json') {
-    return JSON.stringify({
-      description: 'What this application is',
-      methods: {},
-    }, null, 2) + '\n';
-  }
-
   if (ext === 'js') {
     return [
+      '/**',
+      ` * ${slug} — what this application is.`,
+      ' */',
       "const { applications } = require('lab34-flows');",
       '',
+      '/**',
+      ' * What this method does.',
+      ' *',
+      ' * @param {string} body.example - What this parameter is for.',
+      ' * @returns {200} What comes back.',
+      ' * ```json',
+      ' * { "ok": true }',
+      ' * ```',
+      ' * @memory {write} lastValue - What this method writes to the flow memory.',
+      ' * @example',
+      ` * application: ${slug}`,
+      ' * method: myMethod',
+      ' * parameters:',
+      ' *   body:',
+      ' *     example: "hello"',
+      ' */',
       'module.exports.myMethod = applications.handler([',
-      "  'What this method does',",
       '  async (ctx, parameters) => {',
       '    return [{}, 200, { ok: true }, {}];',
       '  }',
@@ -56,8 +67,58 @@ const templateFor = (filePath, slug) => {
 };
 
 /**
- * "Source" view of an application: browse and edit its files (README.md,
- * docs.json, index.js and env/*.env) with the same editor used for flows.
+ * Split the flat file list into root-level files and one entry per folder
+ * (currently only env/), so the explorer can render a small tree.
+ */
+const groupFiles = (files) => {
+  const roots = [];
+  const folders = new Map();
+
+  for (const file of files) {
+    const slash = file.path.indexOf('/');
+    if (slash === -1) {
+      roots.push(file);
+      continue;
+    }
+    const folder = file.path.slice(0, slash);
+    if (!folders.has(folder)) { folders.set(folder, []); }
+    folders.get(folder).push(file);
+  }
+
+  return { roots, folders: [...folders.entries()] };
+};
+
+/** One row in the explorer tree. */
+function FileRow({ file, label, depth, isActive, isDirty, onSelect }) {
+  const Icon = FILE_ICONS[extensionOf(file.path)] || FileText;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(file)}
+      title={file.path}
+      className={cn(
+        'flex w-full items-center gap-1.5 py-1 pr-2 text-left font-mono text-xs',
+        'hover:bg-accent hover:text-accent-foreground',
+        isActive && 'bg-accent text-accent-foreground font-medium',
+        !file.exists && 'text-muted-foreground italic'
+      )}
+      style={{ paddingLeft: `${0.5 + depth * 0.75}rem` }}
+    >
+      <Icon className="size-3.5 shrink-0 opacity-70" />
+      <span className="truncate">{label}</span>
+      {isDirty && <span className="bg-warning size-1.5 shrink-0 rounded-full" />}
+      {!file.exists && (
+        <Badge variant="secondary" className="ml-auto shrink-0 px-1 py-0 text-[9px]">new</Badge>
+      )}
+    </button>
+  );
+}
+
+/**
+ * "Source" view of an application: a VS Code-like explorer listing its files
+ * (README.md, index.js and env/*.env) next to the Monaco editor used for
+ * flows.
  */
 export function ApplicationSource({ slug, onSaved }) {
   const { theme } = useTheme();
@@ -111,8 +172,11 @@ export function ApplicationSource({ slug, onSaved }) {
     return () => { cancelled = true; };
   }, [slug, openFile]);
 
-  const dirtyFor = (filePath) =>
-    drafts[filePath] !== undefined && drafts[filePath] !== originals[filePath];
+  const dirtyFor = useCallback((filePath) =>
+    drafts[filePath] !== undefined && drafts[filePath] !== originals[filePath],
+  [drafts, originals]);
+
+  const { roots, folders } = useMemo(() => groupFiles(files), [files]);
 
   const handleSave = async () => {
     if (!selected) { return; }
@@ -134,9 +198,15 @@ export function ApplicationSource({ slug, onSaved }) {
 
   if (loading) {
     return (
-      <div className="space-y-3 pt-4">
-        <Skeleton className="h-8 w-2/3" />
-        <Skeleton className="h-80 w-full" />
+      <div className="flex h-full min-h-0">
+        <div className="w-56 shrink-0 space-y-2 border-r p-3">
+          <Skeleton className="h-5 w-full" />
+          <Skeleton className="h-5 w-4/5" />
+          <Skeleton className="h-5 w-3/5" />
+        </div>
+        <div className="flex-1 p-3">
+          <Skeleton className="h-full w-full" />
+        </div>
       </div>
     );
   }
@@ -145,76 +215,107 @@ export function ApplicationSource({ slug, onSaved }) {
   const language = selected ? LANGUAGES[extensionOf(selected)] : 'plaintext';
 
   return (
-    <div className="space-y-3 pt-4">
-      {/* File picker + save */}
-      <div className="flex flex-wrap items-center gap-2">
-        {files.map((file) => {
-          const Icon = FILE_ICONS[extensionOf(file.path)] || FileText;
-          const isActive = file.path === selected;
-          return (
-            <Button
+    <div className="flex h-full min-h-0">
+      {/* Explorer */}
+      {/* The application sidebar already uses --sidebar, so keep this one on
+          muted to avoid the two panels blending into one another. */}
+      <aside className="bg-muted/40 flex w-56 shrink-0 flex-col border-r">
+        <div className="text-muted-foreground shrink-0 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide">
+          Explorer
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto pb-2">
+          {roots.map((file) => (
+            <FileRow
               key={file.path}
-              variant={isActive ? 'secondary' : 'outline'}
-              size="sm"
-              className={cn('font-mono text-xs', !file.exists && 'border-dashed')}
-              onClick={() => openFile(file, drafts)}
-            >
-              <Icon className="size-3.5" />
-              {file.path}
-              {dirtyFor(file.path) && <span className="bg-warning size-1.5 rounded-full" />}
-              {!file.exists && <Badge variant="secondary" className="text-[10px]">new</Badge>}
-            </Button>
-          );
-        })}
+              file={file}
+              label={file.path}
+              depth={0}
+              isActive={file.path === selected}
+              isDirty={dirtyFor(file.path)}
+              onSelect={(target) => openFile(target, drafts)}
+            />
+          ))}
 
-        <div className="flex-1" />
+          {folders.map(([folder, folderFiles]) => (
+            <div key={folder}>
+              <div className="text-muted-foreground flex items-center gap-1 px-2 py-1 font-mono text-xs">
+                <ChevronDown className="size-3.5 shrink-0" />
+                <Folder className="size-3.5 shrink-0 opacity-70" />
+                <span className="truncate">{folder}</span>
+              </div>
+              {folderFiles.map((file) => (
+                <FileRow
+                  key={file.path}
+                  file={file}
+                  label={baseNameOf(file.path)}
+                  depth={1.5}
+                  isActive={file.path === selected}
+                  isDirty={dirtyFor(file.path)}
+                  onSelect={(target) => openFile(target, drafts)}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </aside>
 
-        <Button
-          size="sm"
-          onClick={handleSave}
-          disabled={saving || !selected || (!dirtyFor(selected) && selectedExists)}
-        >
-          <Save /> {saving ? 'Saving…' : selectedExists ? 'Save' : 'Create file'}
-        </Button>
-      </div>
+      {/* Editor pane */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
+          <span className="text-muted-foreground truncate font-mono text-xs">
+            {selected || 'No file selected'}
+          </span>
+          {selected && dirtyFor(selected) && (
+            <span className="bg-warning size-1.5 shrink-0 rounded-full" title="Unsaved changes" />
+          )}
+          <div className="flex-1" />
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={saving || !selected || (!dirtyFor(selected) && selectedExists)}
+          >
+            <Save /> {saving ? 'Saving…' : selectedExists ? 'Save' : 'Create file'}
+          </Button>
+        </div>
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertTitle>Something went wrong</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Editor */}
-      <div className="h-[65vh] min-h-[400px] overflow-hidden rounded-lg border">
-        {selected && drafts[selected] !== undefined ? (
-          <Editor
-            height="100%"
-            path={`${slug}/${selected}`}
-            language={language}
-            theme={theme === 'dark' ? 'vs-dark' : 'light'}
-            value={drafts[selected]}
-            onChange={(value) => setDrafts((prev) => ({ ...prev, [selected]: value ?? '' }))}
-            options={{
-              minimap: { enabled: false },
-              fontSize: 13,
-              wordWrap: 'on',
-              scrollBeyondLastLine: false,
-              automaticLayout: true,
-            }}
-          />
-        ) : (
-          <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-            Select a file to edit
-          </div>
+        {error && (
+          <Alert variant="destructive" className="m-3 w-auto">
+            <AlertCircle />
+            <AlertTitle>Something went wrong</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
-      </div>
 
-      <p className="text-muted-foreground text-xs">
-        Changes to <span className="font-mono">docs.json</span> and <span className="font-mono">README.md</span> update
-        the Document view on save; <span className="font-mono">index.js</span> changes are picked up on the next run.
-      </p>
+        <div className="min-h-0 flex-1">
+          {selected && drafts[selected] !== undefined ? (
+            <Editor
+              height="100%"
+              path={`${slug}/${selected}`}
+              language={language}
+              theme={theme === 'dark' ? 'vs-dark' : 'light'}
+              value={drafts[selected]}
+              onChange={(value) => setDrafts((prev) => ({ ...prev, [selected]: value ?? '' }))}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 13,
+                wordWrap: 'on',
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+              }}
+            />
+          ) : (
+            <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+              Select a file to edit
+            </div>
+          )}
+        </div>
+
+        <p className="text-muted-foreground shrink-0 border-t px-3 py-2 text-xs">
+          The JSDoc blocks of <span className="font-mono">index.js</span> and{' '}
+          <span className="font-mono">README.md</span> update the Document view on save;
+          code changes are picked up on the next run.
+        </p>
+      </div>
     </div>
   );
 }

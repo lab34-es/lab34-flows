@@ -21,11 +21,30 @@ module.exports.createAI = async (body) => {
     return Promise.reject('Invalid request');
   }
 
+  // Applications describe themselves through the JSDoc blocks of their
+  // index.js: the description of the application and, per method, its
+  // description, input parameters, output, memory usage and example step.
   const papps = await apps.parseApplications();
   const appsDefinition = papps.map(app => {
     return {
       name: app.name,
-      methods: app.methods
+      description: app.description || undefined,
+      methods: (app.methods || [])
+        .filter(method => method.implemented !== false)
+        .map(method => {
+          const docs = method.docs || {};
+          return {
+            name: method.name,
+            description: method.description || undefined,
+            input: docs.input && docs.input.length ? docs.input : undefined,
+            output: docs.output || undefined,
+            memory: docs.memory && docs.memory.length ? docs.memory : undefined,
+            example: docs.example || undefined,
+            parameters: method.parameters && Object.keys(method.parameters).length
+              ? method.parameters
+              : undefined
+          };
+        })
     };
   });
 
@@ -51,7 +70,10 @@ module.exports.createAI = async (body) => {
     'You MUST respect the format of the parameters. Strings must be enclosed in double quotes, numbers must be plain numbers, and booleans must be true or false.',
     'Avoid repeating steps.',
 
-    'Below, the list of applications you can interact with, and their methods:',
+    'Below, the list of applications you can interact with, and their methods.',
+    'Each method documents its description, its "input" parameters (with the ' +
+      'exact name to use, e.g. "body.a" means parameters.body.a), its "output", ' +
+      'the flow "memory" it reads or writes, and an "example" step:',
     '------------------',
     JSON.stringify(appsDefinition),
     '------------------',
