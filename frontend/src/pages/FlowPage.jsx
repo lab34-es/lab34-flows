@@ -40,7 +40,8 @@ export function FlowPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [aiOpen, setAiOpen] = useState(false);
-  const [xray, setXray] = useState({ jiraBaseUrl: '', tests: {} });
+  // configured: null while unknown (loading / unreachable), then a boolean
+  const [xray, setXray] = useState({ configured: null, jiraBaseUrl: '', tests: {} });
 
   const run = flowPath ? executions[flowPath] : undefined;
   const dirty = flowData ? draft !== flowData.plainText : false;
@@ -166,7 +167,7 @@ export function FlowPage() {
     const keys = testKeysParam ? testKeysParam.split(',') : [];
 
     if (!keys.length) {
-      setXray({ jiraBaseUrl: '', tests: {} });
+      setXray({ configured: null, jiraBaseUrl: '', tests: {} });
       return undefined;
     }
 
@@ -176,12 +177,13 @@ export function FlowPage() {
       .then((response) => {
         if (cancelled) { return; }
         setXray({
+          configured: Boolean(response.data.configured),
           jiraBaseUrl: response.data.jiraBaseUrl || '',
           tests: response.data.tests || {},
         });
       })
       .catch(() => {
-        if (!cancelled) { setXray({ jiraBaseUrl: '', tests: {} }); }
+        if (!cancelled) { setXray({ configured: null, jiraBaseUrl: '', tests: {} }); }
       });
 
     return () => { cancelled = true; };
@@ -262,13 +264,6 @@ export function FlowPage() {
                 </Badge>
               )}
               {dirty && <Badge variant="warning" className="text-[10px]">unsaved</Badge>}
-              {flowData.xray?.testKey && (
-                <XrayChip
-                  testKey={flowData.xray.testKey}
-                  test={xrayTestFor(flowData.xray.testKey)}
-                  jiraBaseUrl={xray.jiraBaseUrl}
-                />
-              )}
             </div>
             {flowData.relativePath && (
               <p className="text-muted-foreground truncate font-mono text-xs">{flowData.relativePath}</p>
@@ -332,6 +327,28 @@ export function FlowPage() {
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-4xl space-y-1 px-6 py-6">
+            {/* The Xray Test this flow maps to (frontmatter "xray.testKey"):
+                a live chip when Jira answered, a gray notice otherwise */}
+            {flowData.xray?.testKey && (
+              <div className="mb-4">
+                {xrayTestFor(flowData.xray.testKey) ? (
+                  <XrayChip
+                    testKey={flowData.xray.testKey}
+                    test={xrayTestFor(flowData.xray.testKey)}
+                    jiraBaseUrl={xray.jiraBaseUrl}
+                  />
+                ) : (
+                  <p className="text-muted-foreground text-xs">
+                    <span className="font-mono">{flowData.xray.testKey}</span>
+                    {' — '}
+                    {xray.configured === false
+                      ? 'the Jira / Xray integration is not configured. Set it up in Settings › Xray to see this test.'
+                      : 'no details from Jira yet.'}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Problems */}
             {saveError && (
               <Alert variant="destructive" className="mb-4">

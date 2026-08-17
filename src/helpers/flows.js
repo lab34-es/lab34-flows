@@ -88,6 +88,22 @@ const detectFormat = (value) => {
   return 'markdown';
 };
 
+/**
+ * The flow-level Xray link, out of the raw frontmatter/YAML "xray" block.
+ * Only a trimmed, non-empty testKey makes it through: anything else is as
+ * good as no link at all.
+ * @param {*} source - Whatever the "xray" key holds in the file
+ * @returns {Object|null} { testKey } or null
+ */
+const flowXray = (source) => {
+  if (!source || typeof source !== 'object' || Array.isArray(source)) {
+    return null;
+  }
+
+  const testKey = String(source.testKey || '').trim();
+  return testKey ? { testKey } : null;
+};
+
 const parseValue = (value, format = null) => {
   const isMarkdown = format === 'markdown' ||
     (format !== 'yaml' && detectFormat(value) === 'markdown');
@@ -99,6 +115,7 @@ const parseValue = (value, format = null) => {
       title: parsed.title,
       description: parsed.description,
       version: parsed.version,
+      xray: flowXray(parsed.xray),
       segments: parsed.segments,
       steps: parsed.steps,
       errors: parsed.errors
@@ -153,6 +170,7 @@ const parseValue = (value, format = null) => {
     title: contents.title || null,
     description: contents.description || null,
     version: contents.version,
+    xray: flowXray(contents.xray),
     segments,
     steps: steps.map((step, index) => {
       if (step && typeof step === 'object' && !Array.isArray(step)) {

@@ -30,6 +30,12 @@ const CLOUD_SETTINGS = {
   cloud: { clientId: 'client-id', clientSecret: 'client-secret' }
 };
 
+const BASIC_SETTINGS = {
+  kind: 'basic',
+  jiraBaseUrl: 'https://acme.atlassian.net',
+  basic: { email: 'jane@acme.com', apiToken: 'api-token' }
+};
+
 const SERVER_SETTINGS = {
   kind: 'server',
   jiraBaseUrl: 'https://jira.acme.com',
@@ -94,6 +100,16 @@ describe('jira.isConfigured', () => {
     expect(jira.isConfigured(jira.normalize(CLOUD_SETTINGS))).toBe(true);
   });
 
+  test('basic needs a Jira URL, an email and an API token', () => {
+    expect(jira.isConfigured(jira.normalize({ kind: 'basic', basic: { email: 'jane@acme.com' } })))
+      .toBe(false);
+    expect(jira.isConfigured(jira.normalize({
+      kind: 'basic',
+      basic: { email: 'jane@acme.com', apiToken: 't' }
+    }))).toBe(false);
+    expect(jira.isConfigured(jira.normalize(BASIC_SETTINGS))).toBe(true);
+  });
+
   test('server needs a Jira URL and a token', () => {
     expect(jira.isConfigured(jira.normalize({ kind: 'server', server: { personalAccessToken: 't' } })))
       .toBe(false);
@@ -107,15 +123,20 @@ describe('jira.getSettings', () => {
       kind: 'cloud',
       jiraBaseUrl: 'https://acme.atlassian.net',
       cloud: { clientId: 'client-id', clientSecret: 'super-secret' },
+      basic: { email: 'jane@acme.com', apiToken: 'super-api-token' },
       server: { personalAccessToken: 'super-token' }
     });
 
     const settings = await jira.getSettings();
 
     expect(JSON.stringify(settings)).not.toContain('super-secret');
+    expect(JSON.stringify(settings)).not.toContain('super-api-token');
     expect(JSON.stringify(settings)).not.toContain('super-token');
     expect(settings.cloud.clientSecret).toBeUndefined();
     expect(settings.cloud.hasClientSecret).toBe(true);
+    expect(settings.basic.apiToken).toBeUndefined();
+    expect(settings.basic.hasApiToken).toBe(true);
+    expect(settings.basic.email).toBe('jane@acme.com');
     expect(settings.server.personalAccessToken).toBeUndefined();
     expect(settings.server.hasToken).toBe(true);
     expect(settings.cloud.clientId).toBe('client-id');
@@ -127,6 +148,7 @@ describe('jira.getSettings', () => {
 
     expect(settings.configured).toBe(false);
     expect(settings.cloud.hasClientSecret).toBe(false);
+    expect(settings.basic.hasApiToken).toBe(false);
     expect(settings.server.hasToken).toBe(false);
   });
 });
@@ -335,6 +357,37 @@ describe('jira.getTests, on Jira Server/DC', () => {
   });
 });
 
+describe('jira.getTests, on Jira Cloud with Basic auth', () => {
+  beforeEach(() => { configHelper.__set(BASIC_SETTINGS); });
+
+  test('reads the issue with email + API token as Basic auth', async () => {
+    axios.get.mockResolvedValueOnce({
+      data: {
+        id: '10001',
+        key: 'BOP-1',
+        fields: { summary: 'Login works', status: { name: 'Done' }, issuetype: { name: 'Test' } }
+      }
+    });
+
+    const result = await jira.getTests(['BOP-1']);
+
+    expect(axios.get).toHaveBeenCalledTimes(1);
+    const [url, options] = axios.get.mock.calls[0];
+    expect(url).toBe('https://acme.atlassian.net/rest/api/2/issue/BOP-1');
+    const expected = Buffer.from('jane@acme.com:api-token', 'utf8').toString('base64');
+    expect(options.headers.Authorization).toBe(`Basic ${expected}`);
+    expect(result.tests['BOP-1']).toEqual({
+      key: 'BOP-1',
+      found: true,
+      summary: 'Login works',
+      status: 'Done',
+      issueType: 'Test',
+      testType: null,
+      issueId: '10001'
+    });
+  });
+});
+
 describe('jira.test', () => {
   test('explains what is missing instead of calling Jira', async () => {
     await expect(jira.test()).rejects.toThrow(/client id and client secret/);
@@ -349,6 +402,19 @@ describe('jira.test', () => {
 
     expect(result.kind).toBe('cloud');
     expect(result.message).toMatch(/xray.cloud.getxray.app/);
+  });
+
+  test('asks Jira Cloud who we are, with Basic auth', async () => {
+    configHelper.__set(BASIC_SETTINGS);
+    axios.get.mockResolvedValueOnce({ data: { displayName: 'Jane Tester' } });
+
+    const result = await jira.test();
+
+    const [url, options] = axios.get.mock.calls[0];
+    expect(url).toBe('https://acme.atlassian.net/rest/api/2/myself');
+    expect(options.headers.Authorization).toMatch(/^Basic /);
+    expect(result.kind).toBe('basic');
+    expect(result.user).toBe('Jane Tester');
   });
 
   test('asks Jira Server who we are', async () => {

@@ -492,12 +492,16 @@ document:
 
 \`testKey\` can also be set inside a step block; that one is informative for now.
 
-Configure it in **Settings › Xray**. Two flavours are supported:
+Configure it in **Settings › Xray**. Three flavours are supported:
 
 - **Xray Cloud** — data comes from Xray's API, authenticated with an API key
   you create in Jira at *Apps › Xray › API Keys* (client id + client secret).
   Keep the default Xray URL unless your instance uses a regional endpoint
   (\`https://eu.xray.cloud.getxray.app\`, \`https://us.xray.cloud.getxray.app\`).
+- **Jira Cloud (API token)** — for when you cannot get an Xray API key (it
+  needs Jira admin rights): the data is read from Jira with your **email** and
+  an **Atlassian API token**, created at *id.atlassian.com › Security › API
+  tokens*. Xray-only data, like the test type, is not available this way.
 - **Jira Server / Data Center** — no external service: the data is read from
   Jira with a **personal access token**, created at *your profile › Personal
   Access Tokens*.

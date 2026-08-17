@@ -60,7 +60,7 @@ describe('GET /api/settings/jira', () => {
 
     expect(response.body.kind).toBe('cloud');
     expect(response.body.configured).toBe(false);
-    expect(response.body.available.map(item => item.id)).toEqual(['cloud', 'server']);
+    expect(response.body.available.map(item => item.id)).toEqual(['cloud', 'basic', 'server']);
   });
 });
 

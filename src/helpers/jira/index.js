@@ -18,12 +18,13 @@
  *     "projectKey": "BOP",
  *     "cloud":  { "xrayBaseUrl": "https://xray.cloud.getxray.app",
  *                 "clientId": "...", "clientSecret": "..." },
+ *     "basic":  { "email": "me@acme.com", "apiToken": "..." },
  *     "server": { "personalAccessToken": "..." }
  *   }
  *
  * Secrets never leave the machine through this module: everything the UI
  * reads goes through `getSettings`, which replaces them with the
- * "hasClientSecret" / "hasToken" booleans.
+ * "hasClientSecret" / "hasApiToken" / "hasToken" booleans.
  */
 
 const configHelper = require('../config');
@@ -39,6 +40,11 @@ const KINDS = [
     id: 'cloud',
     label: 'Xray Cloud',
     hint: 'Jira Cloud + Xray. Create an API key in Jira > Apps > Xray > API Keys.'
+  },
+  {
+    id: 'basic',
+    label: 'Jira Cloud (API token)',
+    hint: 'Jira Cloud without an Xray API key: sign in with your email and an Atlassian API token from id.atlassian.com > Security > API tokens. Xray test types are not available this way.'
   },
   {
     id: 'server',
@@ -64,6 +70,7 @@ const cleanUrl = (value) => String(value || '').trim().replace(/\/+$/, '');
 const normalize = (raw) => {
   const source = (raw && typeof raw === 'object') ? raw : {};
   const cloud = (source.cloud && typeof source.cloud === 'object') ? source.cloud : {};
+  const basic = (source.basic && typeof source.basic === 'object') ? source.basic : {};
   const server = (source.server && typeof source.server === 'object') ? source.server : {};
 
   return {
@@ -74,6 +81,10 @@ const normalize = (raw) => {
       xrayBaseUrl: cleanUrl(cloud.xrayBaseUrl) || DEFAULT_XRAY_BASE_URL,
       clientId: String(cloud.clientId || '').trim(),
       clientSecret: cloud.clientSecret || undefined
+    },
+    basic: {
+      email: String(basic.email || '').trim(),
+      apiToken: basic.apiToken || undefined
     },
     server: {
       personalAccessToken: server.personalAccessToken || undefined
@@ -99,6 +110,10 @@ const isConfigured = (settings) => {
     return Boolean(settings.cloud.xrayBaseUrl && settings.cloud.clientId && settings.cloud.clientSecret);
   }
 
+  if (settings.kind === 'basic') {
+    return Boolean(settings.jiraBaseUrl && settings.basic.email && settings.basic.apiToken);
+  }
+
   return Boolean(settings.jiraBaseUrl && settings.server.personalAccessToken);
 };
 
@@ -117,6 +132,10 @@ const getSettings = async () => {
       xrayBaseUrl: settings.cloud.xrayBaseUrl,
       clientId: settings.cloud.clientId,
       hasClientSecret: Boolean(settings.cloud.clientSecret)
+    },
+    basic: {
+      email: settings.basic.email,
+      hasApiToken: Boolean(settings.basic.apiToken)
     },
     server: {
       hasToken: Boolean(settings.server.personalAccessToken)
@@ -145,6 +164,7 @@ const nextSecret = (incoming, stored) => {
  *
  * @param {Object} body - { kind, jiraBaseUrl, projectKey,
  *                          cloud: { xrayBaseUrl, clientId, clientSecret },
+ *                          basic: { email, apiToken },
  *                          server: { personalAccessToken } }
  * @returns {Promise<Object>} The public settings, as returned by getSettings
  */
@@ -157,6 +177,7 @@ const saveSettings = async (body) => {
   }
 
   const inputCloud = (input.cloud && typeof input.cloud === 'object') ? input.cloud : {};
+  const inputBasic = (input.basic && typeof input.basic === 'object') ? input.basic : {};
   const inputServer = (input.server && typeof input.server === 'object') ? input.server : {};
 
   const next = {
@@ -173,6 +194,12 @@ const saveSettings = async (body) => {
         ? current.cloud.clientId
         : String(inputCloud.clientId || '').trim(),
       clientSecret: nextSecret(inputCloud.clientSecret, current.cloud.clientSecret)
+    },
+    basic: {
+      email: inputBasic.email === undefined
+        ? current.basic.email
+        : String(inputBasic.email || '').trim(),
+      apiToken: nextSecret(inputBasic.apiToken, current.basic.apiToken)
     },
     server: {
       personalAccessToken: nextSecret(inputServer.personalAccessToken, current.server.personalAccessToken)
@@ -204,9 +231,13 @@ const test = async () => {
   const settings = await loadSettings();
 
   if (!isConfigured(settings)) {
-    throw new Error(settings.kind === 'cloud'
-      ? 'Add the Xray client id and client secret first.'
-      : 'Add the Jira URL and a personal access token first.');
+    if (settings.kind === 'cloud') {
+      throw new Error('Add the Xray client id and client secret first.');
+    }
+    if (settings.kind === 'basic') {
+      throw new Error('Add the Jira URL, your email and an API token first.');
+    }
+    throw new Error('Add the Jira URL and a personal access token first.');
   }
 
   return client.verify(settings);

@@ -200,14 +200,31 @@ const fetchCloudTests = async (settings, keys) => {
 };
 
 /**
- * Fetch issues from Jira Server/DC, one request per key (there is no Xray
- * service to batch against on Server/DC).
+ * The Authorization header for plain Jira REST access: Basic auth (email +
+ * Atlassian API token) on Jira Cloud, Bearer (personal access token) on
+ * Server/DC.
+ * @param {Object} settings - Full Jira settings
+ * @returns {Object} Headers for axios
+ */
+const jiraRestHeaders = (settings) => {
+  if (settings.kind === 'basic') {
+    const pair = `${settings.basic.email}:${settings.basic.apiToken}`;
+    return { Authorization: `Basic ${Buffer.from(pair, 'utf8').toString('base64')}` };
+  }
+
+  return { Authorization: `Bearer ${settings.server.personalAccessToken}` };
+};
+
+/**
+ * Fetch issues through the plain Jira REST API, one request per key (there is
+ * no Xray GraphQL service to batch against). Used for Jira Server/DC and for
+ * Jira Cloud with Basic auth: on both, testType stays null.
  * @param {Object} settings - Full Jira settings
  * @param {Array<string>} keys - Jira issue keys
  * @returns {Promise<Object>} Tests, keyed by issue key
  */
-const fetchServerTests = async (settings, keys) => {
-  const headers = { Authorization: `Bearer ${settings.server.personalAccessToken}` };
+const fetchJiraTests = async (settings, keys) => {
+  const headers = jiraRestHeaders(settings);
 
   const issues = await Promise.all(keys.map(key => axios
     .get(`${settings.jiraBaseUrl}/rest/api/2/issue/${encodeURIComponent(key)}`, {
@@ -250,7 +267,7 @@ const fetchServerTests = async (settings, keys) => {
  */
 const fetchTests = (settings, keys) => (settings.kind === 'cloud'
   ? fetchCloudTests(settings, keys)
-  : fetchServerTests(settings, keys));
+  : fetchJiraTests(settings, keys));
 
 /**
  * Validate the stored credentials by actually using them.
@@ -266,13 +283,13 @@ const verify = async (settings) => {
   const response = await axios
     .get(`${settings.jiraBaseUrl}/rest/api/2/myself`, {
       timeout: TIMEOUT,
-      headers: { Authorization: `Bearer ${settings.server.personalAccessToken}` }
+      headers: jiraRestHeaders(settings)
     })
     .catch(error => { throw describeError(error, 'reach Jira'); });
 
   const user = (response.data && (response.data.displayName || response.data.name)) || 'unknown user';
 
-  return { kind: 'server', user, message: `Connected to ${settings.jiraBaseUrl} as ${user}` };
+  return { kind: settings.kind, user, message: `Connected to ${settings.jiraBaseUrl} as ${user}` };
 };
 
 module.exports = {

@@ -19,6 +19,7 @@ import { settingsApi } from '@/services/api';
 
 const CREDENTIAL_HINTS = {
   cloud: 'Create an API key in Jira > Apps > Xray > API Keys, then paste the client id and secret here.',
+  basic: 'Create an API token at id.atlassian.com > Security > Create API token, then use it with your Atlassian account email.',
   server: 'Create a token in Jira > your profile > Personal Access Tokens.',
 };
 
@@ -39,6 +40,8 @@ export function JiraSettings() {
   const [xrayBaseUrl, setXrayBaseUrl] = useState('');
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  const [email, setEmail] = useState('');
+  const [apiToken, setApiToken] = useState('');
   const [token, setToken] = useState('');
 
   const [saving, setSaving] = useState(false);
@@ -56,6 +59,8 @@ export function JiraSettings() {
     setXrayBaseUrl(data.cloud.xrayBaseUrl || '');
     setClientId(data.cloud.clientId || '');
     setClientSecret('');
+    setEmail(data.basic?.email || '');
+    setApiToken('');
     setToken('');
   }, []);
 
@@ -85,10 +90,12 @@ export function JiraSettings() {
         jiraBaseUrl,
         projectKey,
         cloud: { xrayBaseUrl, clientId },
+        basic: { email },
         server: {},
       };
       // Secrets are only sent when the user typed a new one
       if (clientSecret) { payload.cloud.clientSecret = clientSecret; }
+      if (apiToken) { payload.basic.apiToken = apiToken; }
       if (token) { payload.server.personalAccessToken = token; }
 
       const response = await settingsApi.saveJira(payload);
@@ -133,7 +140,9 @@ export function JiraSettings() {
     || projectKey !== (settings.projectKey || '')
     || xrayBaseUrl !== (settings.cloud.xrayBaseUrl || '')
     || clientId !== (settings.cloud.clientId || '')
+    || email !== (settings.basic?.email || '')
     || Boolean(clientSecret)
+    || Boolean(apiToken)
     || Boolean(token);
 
   return (
@@ -221,6 +230,39 @@ export function JiraSettings() {
                   ? 'Stored — type to replace it'
                   : 'Paste the API key’s client secret'}
                 onChange={(event) => setClientSecret(event.target.value)}
+              />
+            </div>
+          </>
+        ) : kind === 'basic' ? (
+          <>
+            <div className="grid gap-2">
+              <Label htmlFor="jira-email">Email</Label>
+              <Input
+                id="jira-email"
+                type="email"
+                autoComplete="off"
+                value={email}
+                placeholder="you@your-company.com"
+                onChange={(event) => setEmail(event.target.value)}
+              />
+              <p className="text-muted-foreground text-xs">
+                The email of your Atlassian account.
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="jira-api-token">
+                <KeyRound className="size-3.5" /> API token
+              </Label>
+              <Input
+                id="jira-api-token"
+                type="password"
+                autoComplete="off"
+                value={apiToken}
+                placeholder={settings.basic?.hasApiToken
+                  ? 'Stored — type to replace it'
+                  : 'Paste your Atlassian API token'}
+                onChange={(event) => setApiToken(event.target.value)}
               />
             </div>
           </>
