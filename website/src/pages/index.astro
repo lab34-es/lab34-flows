@@ -93,7 +93,7 @@ test:
 
 <BaseLayout
   title="lab34-flows — executable Markdown for E2E testing"
-  description="A UI and CLI tool for testing end-to-end flows: write them as Markdown documents, run them like notebooks, ship them through your pipeline."
+  description="Shareable end-to-end tests the whole team can read, understand and run: flows are Markdown documents with executable steps, run like notebooks in a UI or headlessly in CI."
   jsonLd={jsonLd}
 >
   <!-- Hero -->
@@ -113,7 +113,8 @@ test:
       <p class="mt-6 max-w-2xl text-lg text-muted-foreground">
         Write a test flow the way you would write a document. Every fenced
         <code class="rounded bg-muted px-1.5 py-0.5 text-sm">step</code> block is executed
-        against your own applications, and everything else is documentation.
+        against your own applications, and everything else is documentation —
+        E2E flows the whole team can read, understand, learn from and run.
       </p>
       <div class="mt-10 flex flex-wrap items-center gap-3">
         <a
@@ -136,6 +137,69 @@ test:
       >
         <span class="select-none text-muted-foreground">$</span>
         <span>npm install -g @lab34/flows</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Positioning: shared, readable E2E flows -->
+  <section class="border-b border-border">
+    <div class="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6">
+      <h2 class="max-w-3xl text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+        End-to-end tests as a shared asset — not code only its author can read
+      </h2>
+      <p class="mt-4 max-w-3xl text-muted-foreground">
+        In most organizations, E2E tests are source code: the knowledge they
+        encode — how the business actually behaves across systems — is locked
+        away from everyone but the engineer who wrote them. lab34-flows treats a
+        test as a document first. The prose explains the scenario, the
+        executable steps sit inside it, and the whole organization works from
+        the same file.
+      </p>
+      <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="rounded-xl border border-border bg-card p-6 shadow-xs">
+          <div class="mb-4 flex size-9 items-center justify-center rounded-lg bg-muted text-foreground">
+            <Icon name="book-open" />
+          </div>
+          <h3 class="font-semibold">Readable by everyone</h3>
+          <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+            A flow is plain Markdown. Engineering, QA, product and support open
+            the same document and see what is verified and why — no programming
+            required to follow it.
+          </p>
+        </div>
+        <div class="rounded-xl border border-border bg-card p-6 shadow-xs">
+          <div class="mb-4 flex size-9 items-center justify-center rounded-lg bg-muted text-foreground">
+            <Icon name="check" />
+          </div>
+          <h3 class="font-semibold">Documentation that cannot lie</h3>
+          <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+            The document is what runs. It cannot drift from reality: every
+            execution re-verifies that the described behaviour is the actual
+            behaviour.
+          </p>
+        </div>
+        <div class="rounded-xl border border-border bg-card p-6 shadow-xs">
+          <div class="mb-4 flex size-9 items-center justify-center rounded-lg bg-muted text-foreground">
+            <Icon name="rocket" />
+          </div>
+          <h3 class="font-semibold">A way to learn the system</h3>
+          <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+            The suite doubles as onboarding material: new joiners read the
+            flows to learn how your systems actually behave — and press Run to
+            watch it happen.
+          </p>
+        </div>
+        <div class="rounded-xl border border-border bg-card p-6 shadow-xs">
+          <div class="mb-4 flex size-9 items-center justify-center rounded-lg bg-muted text-foreground">
+            <Icon name="play" />
+          </div>
+          <h3 class="font-semibold">Runnable by anyone</h3>
+          <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+            One click in the web UI, one command in CI — the same document.
+            Flows live in the repository and travel through pull requests, a
+            durable asset owned by the team.
+          </p>
+        </div>
       </div>
     </div>
   </section>
@@ -183,10 +247,6 @@ test:
       <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">
         See it in action
       </h2>
-      <p class="mt-4 max-w-2xl text-muted-foreground">
-        Captured from the running tool — and shown here in the same light or
-        dark theme you are reading this page in.
-      </p>
 
       <figure class="mt-10">
         <ThemedShot
