@@ -1,12 +1,16 @@
 ---
-import { Image } from 'astro:assets';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from '../components/Icon.astro';
+import ThemedShot from '../components/ThemedShot.astro';
 import { withBase } from '../lib/help.js';
-import notebookRun from '../assets/screenshots/notebook-run.png';
-import flowDocument from '../assets/screenshots/flow-document.png';
-import applicationDocs from '../assets/screenshots/application-docs.png';
-import folderView from '../assets/screenshots/folder-view.png';
+import flowDark from '../assets/screenshots/flow-dark.png';
+import flowLight from '../assets/screenshots/flow-light.png';
+import folderDark from '../assets/screenshots/folder-dark.png';
+import folderLight from '../assets/screenshots/folder-light.png';
+import aiCreateDark from '../assets/screenshots/ai-create-dark.png';
+import aiCreateLight from '../assets/screenshots/ai-create-light.png';
+import aiEditDark from '../assets/screenshots/ai-edit-dark.png';
+import aiEditLight from '../assets/screenshots/ai-edit-light.png';
 
 const features = [
   {
@@ -153,71 +157,84 @@ test:
         See it in action
       </h2>
       <p class="mt-4 max-w-2xl text-muted-foreground">
-        The web UI, running the offline welcome flow that ships with the tool.
-        Every step streams its request, response and assertions right below its
-        block — like a notebook.
+        Captured from the running tool — and shown here in the same light or
+        dark theme you are reading this page in.
       </p>
 
       <figure class="mt-10">
-        <div class="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-          <Image
-            src={notebookRun}
-            alt="A flow after a run: below the step block, the execution details show a Passed badge, the HTTP 200 response body and the assertion results."
-            widths={[720, 1200, 2200]}
-            sizes="(min-width: 1152px) 1104px, 100vw"
-            class="w-full"
-          />
-        </div>
+        <ThemedShot
+          light={flowLight}
+          dark={flowDark}
+          alt="A flow after a run: below the step block, the execution details show a Passed badge, the HTTP 200 response body and the assertion results."
+          widths={[720, 1200, 2200]}
+          sizes="(min-width: 1152px) 1104px, 100vw"
+        />
         <figcaption class="mt-3 text-sm text-muted-foreground">
-          A step after a run: response body, timings and
+          <span class="font-medium text-foreground">This is a flow.</span>
+          A Markdown document run like a notebook: below each step, the response
+          body, the timings and
           <span class="font-medium text-foreground">all assertions passed</span> —
           including a value read from flow memory.
         </figcaption>
       </figure>
 
-      <div class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <figure>
-          <div class="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-            <Image
-              src={flowDocument}
-              alt="A flow rendered as a document, with frontmatter properties, prose and step blocks, and a green Passed badge in the toolbar."
-              widths={[480, 960]}
-              sizes="(min-width: 1024px) 352px, (min-width: 640px) 50vw, 100vw"
-              class="w-full"
+      <figure class="mt-10">
+        <ThemedShot
+          light={folderLight}
+          dark={folderDark}
+          alt="A folder view listing nine payment flows as a table, with one column per frontmatter property: owner, priority, tags, reviewed, due date, a computed coverage column and the step count."
+          widths={[720, 1200, 2200]}
+          sizes="(min-width: 1152px) 1104px, 100vw"
+        />
+        <figcaption class="mt-3 text-sm text-muted-foreground">
+          <span class="font-medium text-foreground">This is a folder of flows.</span>
+          Every frontmatter property — owner, priority, tags, review status, due
+          date, even computed columns — becomes a sortable, filterable column in
+          saved views the whole team shares.
+        </figcaption>
+      </figure>
+
+      <div class="mt-14">
+        <h3 class="flex items-center gap-2 text-xl font-semibold tracking-tight">
+          <Icon name="sparkles" class="size-5" />
+          Whole flows — and changes to them — written by AI
+        </h3>
+        <p class="mt-3 max-w-2xl text-muted-foreground">
+          Describe the scenario in plain words and a complete flow is generated
+          from the applications you actually have; open any existing flow and the
+          magic wand rewrites it. Everything is validated, and edits land unsaved
+          so you review them before they touch disk.
+        </p>
+        <div class="mt-8 grid gap-6 lg:grid-cols-2">
+          <figure>
+            <ThemedShot
+              light={aiCreateLight}
+              dark={aiCreateDark}
+              alt="The 'What should this flow test?' dialog after creating a flow with AI: a plain-words prompt describes a chargeback scenario, with a Generate flow button."
+              widths={[560, 1100]}
+              sizes="(min-width: 1024px) 540px, 100vw"
             />
-          </div>
-          <figcaption class="mt-2.5 text-sm text-muted-foreground">
-            Flows are Markdown documents, rendered as a notebook.
-          </figcaption>
-        </figure>
-        <figure>
-          <div class="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-            <Image
-              src={applicationDocs}
-              alt="An application page showing the calculator example: its README, environment variables and the methods it exposes."
-              widths={[480, 960]}
-              sizes="(min-width: 1024px) 352px, (min-width: 640px) 50vw, 100vw"
-              class="w-full"
+            <figcaption class="mt-2.5 text-sm text-muted-foreground">
+              <span class="font-medium text-foreground">Create a whole flow:</span>
+              describe what it should test, and the steps are written against
+              your applications' own documentation.
+            </figcaption>
+          </figure>
+          <figure>
+            <ThemedShot
+              light={aiEditLight}
+              dark={aiEditDark}
+              alt="The 'Edit with AI' dialog over an open flow: an instruction asks to also cover the dispute case, with a Rewrite flow button and suggested example instructions."
+              widths={[560, 1100]}
+              sizes="(min-width: 1024px) 540px, 100vw"
             />
-          </div>
-          <figcaption class="mt-2.5 text-sm text-muted-foreground">
-            Applications document themselves from their JSDoc.
-          </figcaption>
-        </figure>
-        <figure class="sm:col-span-2 lg:col-span-1">
-          <div class="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-            <Image
-              src={folderView}
-              alt="A folder view listing the example flows as a table with name, title, description and step count columns, plus search, sort and filter controls."
-              widths={[480, 960]}
-              sizes="(min-width: 1024px) 352px, (min-width: 640px) 50vw, 100vw"
-              class="w-full"
-            />
-          </div>
-          <figcaption class="mt-2.5 text-sm text-muted-foreground">
-            Folders become tables you can search, sort and filter.
-          </figcaption>
-        </figure>
+            <figcaption class="mt-2.5 text-sm text-muted-foreground">
+              <span class="font-medium text-foreground">Adapt an existing one:</span>
+              the magic wand rewrites the open flow, and the result stays unsaved
+              until you have read it.
+            </figcaption>
+          </figure>
+        </div>
       </div>
     </div>
   </section>
