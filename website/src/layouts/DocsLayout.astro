@@ -1,0 +1,41 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import DocsNav from '../components/DocsNav.astro';
+import Icon from '../components/Icon.astro';
+
+const { title, description, activeId = null } = Astro.props;
+---
+
+<BaseLayout title={title} description={description}>
+  <div
+    class="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-10 sm:px-6 lg:flex-row"
+  >
+    <!-- Sidebar -->
+    <aside class="w-full shrink-0 lg:w-60">
+      <!-- Mobile: collapsible menu -->
+      <details class="group lg:hidden">
+        <summary
+          class="flex cursor-pointer list-none items-center justify-between rounded-md border border-border px-3 py-2 text-sm font-medium"
+        >
+          Documentation menu
+          <Icon
+            name="chevron-right"
+            class="size-4 transition-transform group-open:rotate-90"
+          />
+        </summary>
+        <div class="pt-4">
+          <DocsNav activeId={activeId} />
+        </div>
+      </details>
+      <!-- Desktop: always visible -->
+      <div class="hidden lg:sticky lg:top-24 lg:block">
+        <DocsNav activeId={activeId} />
+      </div>
+    </aside>
+
+    <!-- Content -->
+    <div class="min-w-0 flex-1">
+      <slot />
+    </div>
+  </div>
+</BaseLayout>

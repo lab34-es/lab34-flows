@@ -1,0 +1,11 @@
+---
+import { ICONS } from '../lib/icons.js';
+
+const { name, class: className = 'size-4' } = Astro.props;
+const svg = ICONS[name];
+if (!svg) {
+  throw new Error(`Unknown icon: ${name}`);
+}
+---
+
+<span class={`icon inline-block shrink-0 ${className}`} set:html={svg} />

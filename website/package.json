@@ -1,0 +1,19 @@
+{
+  "name": "lab34-flows-website",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Documentation website for lab34-flows. Not part of the CLI package.",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.13",
+    "astro": "^5.13.0",
+    "lucide-static": "^0.544.0",
+    "marked": "^15.0.0",
+    "tailwindcss": "^4.1.13"
+  }
+}

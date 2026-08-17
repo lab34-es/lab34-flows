@@ -7,6 +7,7 @@ module.exports = [
     ignores: [
       'node_modules/**',
       'frontend/**',
+      'website/**',
       'dist/**',
       'build/**',
       '*.min.js',

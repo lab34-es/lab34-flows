@@ -1,0 +1,58 @@
+# Builds the documentation website (website/) and publishes it to GitHub Pages.
+#
+# The site's docs are generated from the app's Help section
+# (frontend/src/components/settings/help/helpContent.js), so changes to that
+# file also trigger a deploy.
+#
+# One-time setup: in the repository settings, under Pages, set
+# "Build and deployment > Source" to "GitHub Actions".
+
+name: Deploy website
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'website/**'
+      - 'frontend/src/components/settings/help/helpContent.js'
+      - '.github/workflows/deploy-website.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: website
+      - name: Build site
+        run: npm run build
+        working-directory: website
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: website/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
