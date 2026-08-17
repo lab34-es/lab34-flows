@@ -45,6 +45,32 @@ const features = [
   },
 ];
 
+const siteUrl = new URL(withBase('/'), Astro.site).href;
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'lab34-flows',
+    url: siteUrl,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'lab34-flows',
+    description:
+      'A UI and CLI tool for testing end-to-end flows: write them as Markdown documents with executable step blocks, run them like notebooks, ship them through your pipeline.',
+    url: siteUrl,
+    applicationCategory: 'DeveloperApplication',
+    operatingSystem: 'Windows, macOS, Linux',
+    softwareRequirements: 'Node.js',
+    license: 'https://opensource.org/licenses/MIT',
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
+    downloadUrl: 'https://www.npmjs.com/package/@lab34/flows',
+    codeRepository: 'https://github.com/lab34-es/lab34-flows',
+    author: { '@type': 'Person', name: 'Jose Constela' },
+  },
+];
+
 const exampleFlow = `---
 title: Create and read back
 ---
@@ -68,6 +94,7 @@ test:
 <BaseLayout
   title="lab34-flows — executable Markdown for E2E testing"
   description="A UI and CLI tool for testing end-to-end flows: write them as Markdown documents, run them like notebooks, ship them through your pipeline."
+  jsonLd={jsonLd}
 >
   <!-- Hero -->
   <section class="border-b border-border">

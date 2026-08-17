@@ -3,10 +3,10 @@ import BaseLayout from './BaseLayout.astro';
 import DocsNav from '../components/DocsNav.astro';
 import Icon from '../components/Icon.astro';
 
-const { title, description, activeId = null } = Astro.props;
+const { title, description, activeId = null, ogType = 'website', jsonLd = null } = Astro.props;
 ---
 
-<BaseLayout title={title} description={description}>
+<BaseLayout title={title} description={description} ogType={ogType} jsonLd={jsonLd}>
   <div
     class="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-10 sm:px-6 lg:flex-row"
   >

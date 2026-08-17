@@ -2,11 +2,27 @@
 import DocsLayout from '../../layouts/DocsLayout.astro';
 import Icon from '../../components/Icon.astro';
 import { groupedTopics, withBase } from '../../lib/help.js';
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: 'lab34-flows documentation',
+  description:
+    'Everything about writing, running and integrating lab34-flows: the same articles the tool ships in its Help section.',
+  url: new URL(Astro.url.pathname, Astro.site).href,
+  inLanguage: 'en',
+  isPartOf: {
+    '@type': 'WebSite',
+    name: 'lab34-flows',
+    url: new URL(withBase('/'), Astro.site).href,
+  },
+};
 ---
 
 <DocsLayout
   title="Documentation — lab34-flows"
   description="Everything about writing, running and integrating lab34-flows: the same articles the tool ships in its Help section."
+  jsonLd={jsonLd}
 >
   <header class="mb-10">
     <h1 class="text-3xl font-semibold tracking-tight">Documentation</h1>

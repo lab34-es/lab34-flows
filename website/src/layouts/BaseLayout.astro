@@ -4,8 +4,13 @@ import { withBase } from '../lib/help.js';
 import Icon from '../components/Icon.astro';
 import ThemeToggle from '../components/ThemeToggle.astro';
 
-const { title, description } = Astro.props;
+const { title, description, ogType = 'website', jsonLd = null } = Astro.props;
 const repoUrl = 'https://github.com/lab34-es/lab34-flows';
+
+// Absolute, trailing-slash canonical URL of this page.
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const ogImage = new URL(withBase('/og-image.png'), Astro.site).href;
+const jsonLdBlocks = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
 ---
 
 <!doctype html>
@@ -15,7 +20,34 @@ const repoUrl = 'https://github.com/lab34-es/lab34-flows';
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content={ogType} />
+    <meta property="og:site_name" content="lab34-flows" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="lab34-flows — executable Markdown for end-to-end testing" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <link rel="sitemap" href={withBase('/sitemap-index.xml')} />
     <link rel="icon" type="image/svg+xml" href={withBase('/favicon.svg')} />
+    {
+      jsonLdBlocks.map((block) => (
+        <script type="application/ld+json" set:html={JSON.stringify(block)} />
+      ))
+    }
     <script is:inline>
       // Apply the saved theme before first paint to avoid a flash.
       const theme =

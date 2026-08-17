@@ -17,12 +17,53 @@ export function getStaticPaths() {
 
 const { topic, prev, next } = Astro.props;
 const html = renderMarkdown(topic.body);
+
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'TechArticle',
+    headline: topic.title,
+    description: topic.summary,
+    url: canonical,
+    inLanguage: 'en',
+    articleSection: topic.categoryLabel,
+    keywords: topic.keywords.join(', '),
+    isPartOf: {
+      '@type': 'WebSite',
+      name: 'lab34-flows',
+      url: new URL(withBase('/'), Astro.site).href,
+    },
+    author: { '@type': 'Person', name: 'Jose Constela' },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'lab34-flows',
+        item: new URL(withBase('/'), Astro.site).href,
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Documentation',
+        item: new URL(withBase('/docs/'), Astro.site).href,
+      },
+      { '@type': 'ListItem', position: 3, name: topic.title, item: canonical },
+    ],
+  },
+];
 ---
 
 <DocsLayout
   title={`${topic.title} — lab34-flows docs`}
   description={topic.summary}
   activeId={topic.id}
+  ogType="article"
+  jsonLd={jsonLd}
 >
   <article>
     <header class="mb-8">
