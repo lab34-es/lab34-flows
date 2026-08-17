@@ -30,6 +30,7 @@
 const configHelper = require('../config');
 const client = require('./client');
 const cache = require('./cache');
+const pull = require('./pull');
 
 const CONFIG_NAME = 'jira';
 
@@ -270,6 +271,23 @@ const getTests = async (keys) => {
   return answer;
 };
 
+/**
+ * Download every test of the configured project into the flows folder. See
+ * ./pull for what lands where.
+ *
+ * @param {Object} [options] - { io } - the socket.io server, when there is one
+ * @returns {Promise<Object>} The progress, as it stands at the first tick
+ */
+const startPull = async (options) => {
+  const settings = await loadSettings();
+
+  if (!isConfigured(settings)) {
+    throw new Error('Configure the Jira / Xray integration first.');
+  }
+
+  return pull.start(settings, options);
+};
+
 module.exports = {
   loadSettings,
   getSettings,
@@ -278,6 +296,9 @@ module.exports = {
   normalize,
   test,
   getTests,
+  startPull,
+  cancelPull: pull.cancel,
+  pullStatus: pull.status,
   clearCache: cache.clear,
   KIND_IDS,
   KINDS,

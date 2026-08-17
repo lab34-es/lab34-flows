@@ -529,14 +529,15 @@ With the integration configured, opening the flow in the Web UI shows the
 Test's summary and status next to the title (and next to each step that has
 its own key), linked to the issue in Jira.
 
-**Uploading executions to Xray is not supported yet**: this is configuration
-and visualization only.
+Tests can also be **pulled** from Xray into your flows folder — see [Pulling
+tests](#pulling-tests) below. **Uploading executions to Xray is not supported
+yet**: nothing this integration does ever writes to Jira.
 
 ### Configuring it
 
 Open **Settings › Xray** in the Web UI and fill in the **Jira / Xray** card. The
 credentials are stored in your context folder, at `config/jira.json`, and
-never leave your machine except to reach Jira or Xray. Two flavours are
+never leave your machine except to reach Jira or Xray. Three flavours are
 supported:
 
 - **Xray Cloud** — data comes from Xray's own API, authenticated with an API
@@ -545,20 +546,86 @@ supported:
   (`https://xray.cloud.getxray.app`) unless your instance uses a regional
   endpoint (`https://eu.xray.cloud.getxray.app`,
   `https://us.xray.cloud.getxray.app`).
+- **Jira Cloud (API token)** — Jira Cloud without an Xray API key: your
+  Atlassian account **email** and an **API token**, created at
+  **id.atlassian.com > Security > API tokens**. Everything comes from Jira
+  itself, so Xray test types and the Test Repository are not available.
 - **Jira Server / Data Center** — there is no external service: the data is
   read from Jira itself with a **personal access token**, which you create in
   Jira at **your profile > Personal Access Tokens**.
 
-In both cases, **Jira URL** (e.g. `https://your-company.atlassian.net`) is
-what every test key is linked to. **Project key** is optional and only kept
-for reference. **Test connection** validates the credentials for real, against
-Xray (Cloud) or against Jira's `myself` endpoint (Server/DC).
+In all three cases, **Jira URL** (e.g. `https://your-company.atlassian.net`) is
+what every test key is linked to. **Project key** is what a pull downloads, and
+is only kept for reference otherwise. **Test connection** validates the
+credentials for real, against Xray (Cloud) or against Jira's `myself` endpoint.
 
 Nothing is downloaded until a flow that mentions a test key is rendered, and
 every key is downloaded at most once per run of the tool. When the integration
 is not configured the UI shows no Xray information at all, and when Jira
 cannot be reached the key is shown as plain text with the error on hover — a
 flow never fails to render, or to run, because of Jira.
+
+### Pulling tests
+
+**Settings › Xray › Pull tests** downloads every Test of the configured project
+into an `xray` folder inside your flows, one Markdown document per test, and
+shows what it is doing in a modal while it runs. The pull happens on the
+server, so closing the modal does not stop it.
+
+Each document is a normal Markdown flow with **no `step` blocks yet**: Jira
+owns the title and the description, you write the steps.
+
+````markdown
+---
+title: Pay with an expired card
+xray:
+  testKey: BOP-123
+  status: To Do
+  issueType: Test
+  feature: BOP-10
+  userStory: BOP-42
+  url: https://acme.atlassian.net/browse/BOP-123
+---
+
+# Pay with an expired card
+
+<!-- xray:description -->
+The description, as written in Jira.
+<!-- /xray:description -->
+````
+
+How the folders are laid out depends on what the integration can see:
+
+- **Xray Cloud** and **Jira Server / Data Center** know their own Test
+  Repository, so the folders on disk are the folders you see in Xray:
+
+  ```
+  xray/Authentication/Login/BOP-200_login-with-valid-credentials.md
+  ```
+
+- **Jira Cloud (API token)** has no Xray API to ask, so the layout is rebuilt
+  from Jira's own hierarchy — the feature and the user story of every test:
+
+  ```
+  xray/<FEATURE>_<slug>/<STORY>_<slug>/<TEST>_<slug>.md
+  xray/BOP-10_checkout/BOP-42_pay-with-a-card/BOP-123_pay-with-an-expired-card.md
+  ```
+
+  A test that is a child of a story or an epic is filed under it. A test that
+  is a child of nothing is filed by its **related work** instead: the issue
+  links, with Xray's own *tests* link preferred over a plain *relates to*.
+  What still cannot be resolved lands in `_no-feature` / `_no-user-story`
+  rather than being dropped.
+
+Pulling again is safe, and is the point:
+
+- Only the frontmatter and the block between the `xray:description` markers
+  are rewritten. Every step you added, and every property of your own, is kept.
+- A test that moved in Jira is **moved** on disk, not written twice, and the
+  folders it left behind are removed.
+- A pull that finds nothing new leaves every file byte for byte as it was, so
+  `git diff` after a pull shows what Jira changed and nothing else.
+- Tests deleted in Jira are never deleted here.
 
 ## Default examples
 

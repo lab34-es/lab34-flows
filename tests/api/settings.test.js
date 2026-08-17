@@ -99,6 +99,23 @@ describe('POST /api/settings/jira/test', () => {
   });
 });
 
+describe('/api/settings/jira/pull', () => {
+  test('answers 400 without touching the disk when nothing is configured', async () => {
+    const response = await request(app).post('/api/settings/jira/pull').expect(400);
+
+    expect(response.body.error).toMatch(/Configure the Jira \/ Xray integration/);
+    expect(axios.get).not.toHaveBeenCalled();
+    expect(axios.post).not.toHaveBeenCalled();
+  });
+
+  test('reports an idle pull before any has run', async () => {
+    const response = await request(app).get('/api/settings/jira/pull').expect(200);
+
+    expect(response.body.running).toBe(false);
+    expect(response.body.folder).toBe('xray');
+  });
+});
+
 describe('GET /api/settings/ai', () => {
   test('never sends the API keys to the client', async () => {
     configHelper.__set({

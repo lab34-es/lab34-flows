@@ -604,8 +604,8 @@ change, so you can read it — and reload to throw it away — before saving.
     category: 'integrations',
     icon: 'ticket',
     title: 'Jira / Xray',
-    summary: 'Link a flow to a Test issue and see its status in the UI.',
-    keywords: ['jira', 'xray', 'test key', 'testKey', 'cloud', 'server', 'data center', 'token', 'issue'],
+    summary: 'Link a flow to a Test issue, and pull the tests of a project.',
+    keywords: ['jira', 'xray', 'test key', 'testKey', 'cloud', 'server', 'data center', 'token', 'issue', 'pull', 'sync', 'download', 'test repository', 'feature', 'user story'],
     body: `
 A flow maps to an Xray **Test** issue, and every step block to a **step** of
 that test. The link is declared in the flow itself, so it travels with the
@@ -637,8 +637,22 @@ Configure it in **Settings › Xray**. Three flavours are supported:
 until a flow that mentions a test key is rendered, and every key is downloaded
 at most once per run of the tool.
 
-> Uploading executions back to Xray is **not supported yet**: this is
-> configuration and visualization only.
+**Pull tests** downloads every Test of the project into an \`xray\` folder in
+your flows — one Markdown document per test, with the Jira description as its
+content and no step blocks yet. With an Xray API key (Cloud) or on Server/DC
+the folders mirror the **Test Repository**; with a Jira API token there is no
+Test Repository to read, so they are rebuilt from Jira's hierarchy:
+
+    xray/<FEATURE>_<slug>/<STORY>_<slug>/<TEST>_<slug>.md
+
+A test that is a child of nothing gets its feature and story from its
+**related work** — the issue links — and whatever cannot be resolved lands in
+\`_no-feature\` / \`_no-user-story\`. Pulling again rewrites only the frontmatter
+and the description block: the steps you wrote stay, a test that moved in Jira
+is moved rather than duplicated, and nothing is ever deleted.
+
+> Uploading executions back to Xray is **not supported yet**: nothing this
+> integration does ever writes to Jira.
 
 When Jira cannot be reached, the key is shown as plain text with the error on
 hover — a flow never fails to render, or to run, because of Jira.

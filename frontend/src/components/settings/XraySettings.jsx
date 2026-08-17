@@ -2,6 +2,7 @@ import React from 'react';
 import { Ticket } from 'lucide-react';
 
 import JiraSettings from '@/components/settings/JiraSettings';
+import XrayPull from '@/components/settings/XrayPull';
 
 /**
  * The Jira / Xray section of the Settings screen. The card below loads on its
@@ -21,6 +22,7 @@ export function XraySettings() {
       </div>
 
       <JiraSettings />
+      <XrayPull />
     </div>
   );
 }

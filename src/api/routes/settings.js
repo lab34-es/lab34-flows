@@ -59,4 +59,23 @@ router.post('/jira/test', (req, res) => {
     .catch(error => sendError(res, error));
 });
 
+// Download every test of the project into the flows "xray" folder. Answers as
+// soon as the pull has started: the progress is pushed over the socket as
+// "xraypull:update", and can be read back from GET /jira/pull.
+router.post('/jira/pull', (req, res) => {
+  jira.startPull({ io: req.app.get('io') })
+    .then(progress => res.send(progress))
+    .catch(error => sendError(res, error));
+});
+
+// How the running (or last) pull is doing
+router.get('/jira/pull', (req, res) => {
+  res.send(jira.pullStatus());
+});
+
+// Stop the running pull. Whatever it already wrote stays on disk.
+router.delete('/jira/pull', (req, res) => {
+  res.send(jira.cancelPull());
+});
+
 module.exports = router;

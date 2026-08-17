@@ -83,6 +83,12 @@ export const settingsApi = {
   getJira: () => api.get('/api/settings/jira'),
   saveJira: (settings) => api.put('/api/settings/jira', settings),
   testJira: () => api.post('/api/settings/jira/test'),
+  // The pull answers as soon as it starts; its progress arrives over the
+  // socket as "xraypull:update", and getJiraPull() is the fallback for a UI
+  // that opened halfway through
+  pullJira: () => api.post('/api/settings/jira/pull'),
+  getJiraPull: () => api.get('/api/settings/jira/pull'),
+  cancelJiraPull: () => api.delete('/api/settings/jira/pull'),
 };
 
 export const jiraApi = {

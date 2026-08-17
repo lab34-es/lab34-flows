@@ -10,8 +10,15 @@ const axios = require('axios');
 // Jira/Xray are external services: never let a hung request block a render
 const TIMEOUT = 15000;
 
+// A pull walks whole projects: those requests are allowed to take longer
+// than the ones a render waits for
+const PULL_TIMEOUT = 60000;
+
 // Xray Cloud's GraphQL API caps getTests at 100 results per call
 const MAX_KEYS_PER_QUERY = 100;
+
+// Jira's search endpoints cap a page at 100 issues too
+const SEARCH_PAGE_SIZE = 100;
 
 const TESTS_QUERY = `query getTests($jql: String!, $limit: Int!) {
   getTests(jql: $jql, limit: $limit) {
@@ -20,6 +27,23 @@ const TESTS_QUERY = `query getTests($jql: String!, $limit: Int!) {
       issueId
       testType { name }
       jira(fields: ["key", "summary", "status", "issuetype"])
+    }
+  }
+}`;
+
+// The same query, page by page and with everything a pulled file needs: the
+// Test Repository folder it sits in, and the description that becomes the
+// body of the Markdown document
+const ALL_TESTS_QUERY = `query allTests($jql: String!, $limit: Int!, $start: Int!) {
+  getTests(jql: $jql, limit: $limit, start: $start) {
+    total
+    start
+    limit
+    results {
+      issueId
+      testType { name }
+      folder { path }
+      jira(fields: ["key", "summary", "description", "status", "issuetype"])
     }
   }
 }`;
@@ -145,48 +169,62 @@ const chunk = (items, size) => {
 };
 
 /**
+ * Run a GraphQL query against Xray Cloud, renewing the JWT when it expired
+ * halfway through.
+ *
+ * @param {Object} settings - Full Jira settings
+ * @param {Object} body - { query, variables }
+ * @param {Object} [options] - { timeout }
+ * @returns {Promise<Object>} The "data" of the answer
+ */
+const graphql = async (settings, body, { timeout = TIMEOUT } = {}) => {
+  const token = await authenticate(settings);
+
+  const request = (jwt) => axios.post(`${settings.cloud.xrayBaseUrl}/api/v2/graphql`, body, {
+    timeout,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` }
+  });
+
+  let response;
+  try {
+    response = await request(token);
+  }
+  catch (error) {
+    // The JWT lives for ~24h: when it expired mid-process, get a new one
+    if (error && error.response && error.response.status === 401) {
+      response = await request(await authenticate(settings, true))
+        .catch(retryError => { throw describeError(retryError, 'read tests from Xray Cloud'); });
+    }
+    else {
+      throw describeError(error, 'read tests from Xray Cloud');
+    }
+  }
+
+  const data = response.data || {};
+
+  if (data.errors && data.errors.length) {
+    throw new Error(`Xray Cloud: ${data.errors.map(error => error.message).join('; ')}`);
+  }
+
+  return data.data || {};
+};
+
+/**
  * Fetch tests from Xray Cloud, in as few GraphQL calls as possible.
  * @param {Object} settings - Full Jira settings
  * @param {Array<string>} keys - Jira issue keys
  * @returns {Promise<Object>} Tests, keyed by issue key
  */
 const fetchCloudTests = async (settings, keys) => {
-  const token = await authenticate(settings);
   const found = {};
 
   for (const batch of chunk(keys, MAX_KEYS_PER_QUERY)) {
-    const body = {
+    const data = await graphql(settings, {
       query: TESTS_QUERY,
       variables: { jql: `key in (${batch.join(', ')})`, limit: MAX_KEYS_PER_QUERY }
-    };
-
-    const request = (jwt) => axios.post(`${settings.cloud.xrayBaseUrl}/api/v2/graphql`, body, {
-      timeout: TIMEOUT,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` }
     });
 
-    let response;
-    try {
-      response = await request(token);
-    }
-    catch (error) {
-      // The JWT lives for ~24h: when it expired mid-process, get a new one
-      if (error && error.response && error.response.status === 401) {
-        response = await request(await authenticate(settings, true))
-          .catch(retryError => { throw describeError(retryError, 'read tests from Xray Cloud'); });
-      }
-      else {
-        throw describeError(error, 'read tests from Xray Cloud');
-      }
-    }
-
-    const data = response.data || {};
-
-    if (data.errors && data.errors.length) {
-      throw new Error(`Xray Cloud: ${data.errors.map(error => error.message).join('; ')}`);
-    }
-
-    const results = (data.data && data.data.getTests && data.data.getTests.results) || [];
+    const results = (data.getTests && data.getTests.results) || [];
 
     results.forEach(result => {
       const test = fromGraphql(result);
@@ -197,6 +235,50 @@ const fetchCloudTests = async (settings, keys) => {
   }
 
   return found;
+};
+
+/**
+ * Walk every Test of a JQL query in Xray Cloud, page by page, handing each
+ * page to the caller as soon as it arrives. Used by the pull, which writes
+ * files while the next page is still downloading.
+ *
+ * @param {Object} settings - Full Jira settings
+ * @param {Object} options
+ * @param {string} options.jql - Which tests to walk, e.g. 'project = "BOP"'
+ * @param {Function} options.onPage - async (tests, total) => void. Each test is
+ *   { key, summary, description, status, issueType, testType, issueId, folder }
+ * @param {Function} [options.stopped] - () => boolean, checked between pages
+ * @returns {Promise<number>} How many tests were handed over
+ */
+const walkCloudTests = async (settings, { jql, onPage, stopped }) => {
+  let start = 0;
+  let seen = 0;
+
+  for (;;) {
+    const data = await graphql(settings, {
+      query: ALL_TESTS_QUERY,
+      variables: { jql, limit: MAX_KEYS_PER_QUERY, start }
+    }, { timeout: PULL_TIMEOUT });
+
+    const page = (data.getTests && data.getTests.results) || [];
+    const total = (data.getTests && data.getTests.total) || 0;
+
+    if (!page.length) { return seen; }
+
+    await onPage(page.map(result => {
+      const jira = result.jira || {};
+      return {
+        ...(fromGraphql(result) || { key: jira.key }),
+        description: jira.description || null,
+        folder: (result.folder && result.folder.path) || null
+      };
+    }).filter(test => test.key), total);
+
+    seen += page.length;
+    start += page.length;
+
+    if (seen >= total || (stopped && stopped())) { return seen; }
+  }
 };
 
 /**
@@ -269,6 +351,256 @@ const fetchTests = (settings, keys) => (settings.kind === 'cloud'
   ? fetchCloudTests(settings, keys)
   : fetchJiraTests(settings, keys));
 
+/* ------------------------------- Searching ------------------------------- */
+
+/**
+ * Jira Cloud retired GET /rest/api/2/search in favour of the token-paginated
+ * /rest/api/2/search/jql; Jira Server/DC only ever had the former. Whichever
+ * one this instance answers is remembered per base URL, so the fallback is
+ * paid once.
+ */
+const searchStyles = new Map();
+
+/**
+ * One page of a JQL search, whichever endpoint this Jira understands.
+ * @param {Object} settings - Full Jira settings
+ * @param {Object} cursor - { jql, fields, nextPageToken, startAt }
+ * @returns {Promise<Object>} { issues, nextPageToken, startAt, total }
+ */
+const searchPage = async (settings, cursor) => {
+  const headers = jiraRestHeaders(settings);
+  const style = searchStyles.get(settings.jiraBaseUrl) || 'enhanced';
+
+  const common = {
+    jql: cursor.jql,
+    fields: (cursor.fields || []).join(','),
+    maxResults: SEARCH_PAGE_SIZE
+  };
+
+  if (style === 'enhanced') {
+    const params = { ...common };
+    if (cursor.nextPageToken) { params.nextPageToken = cursor.nextPageToken; }
+
+    try {
+      const response = await axios.get(`${settings.jiraBaseUrl}/rest/api/2/search/jql`, {
+        timeout: PULL_TIMEOUT, headers, params
+      });
+
+      searchStyles.set(settings.jiraBaseUrl, 'enhanced');
+
+      return {
+        issues: (response.data && response.data.issues) || [],
+        nextPageToken: (response.data && response.data.nextPageToken) || null,
+        total: (response.data && response.data.total) || null
+      };
+    }
+    catch (error) {
+      const status = error && error.response && error.response.status;
+
+      // Not there: this is a Jira that still has the classic endpoint
+      if (status !== 404 && status !== 405 && status !== 410) {
+        throw describeError(error, 'search issues in Jira');
+      }
+
+      searchStyles.set(settings.jiraBaseUrl, 'classic');
+    }
+  }
+
+  const response = await axios
+    .get(`${settings.jiraBaseUrl}/rest/api/2/search`, {
+      timeout: PULL_TIMEOUT,
+      headers,
+      params: { ...common, startAt: cursor.startAt || 0 }
+    })
+    .catch(error => { throw describeError(error, 'search issues in Jira'); });
+
+  const data = response.data || {};
+  const issues = data.issues || [];
+
+  return {
+    issues,
+    startAt: (data.startAt || 0) + issues.length,
+    total: typeof data.total === 'number' ? data.total : null
+  };
+};
+
+/**
+ * Walk every issue of a JQL query, handing each page to the caller as soon as
+ * it arrives.
+ *
+ * @param {Object} settings - Full Jira settings
+ * @param {Object} options
+ * @param {string} options.jql
+ * @param {Array<string>} options.fields - Jira field names to ask for
+ * @param {Function} options.onPage - async (issues, total) => void
+ * @param {Function} [options.stopped] - () => boolean, checked between pages
+ * @returns {Promise<number>} How many issues were handed over
+ */
+const searchIssues = async (settings, { jql, fields, onPage, stopped }) => {
+  let cursor = { jql, fields };
+  let seen = 0;
+
+  for (;;) {
+    const page = await searchPage(settings, cursor);
+
+    if (!page.issues.length) { return seen; }
+
+    await onPage(page.issues, page.total);
+    seen += page.issues.length;
+
+    if (stopped && stopped()) { return seen; }
+
+    // The enhanced endpoint stops by dropping the token, the classic one by
+    // answering with fewer issues than a full page
+    if (page.nextPageToken) {
+      cursor = { jql, fields, nextPageToken: page.nextPageToken };
+      continue;
+    }
+
+    if (page.startAt !== undefined && page.issues.length === SEARCH_PAGE_SIZE) {
+      cursor = { jql, fields, startAt: page.startAt };
+      continue;
+    }
+
+    return seen;
+  }
+};
+
+/**
+ * How many issues a JQL query matches, so a pull can show real progress.
+ * Returns null when Jira will not say, which only costs the progress bar its
+ * percentage.
+ *
+ * @param {Object} settings - Full Jira settings
+ * @param {string} jql
+ * @returns {Promise<number|null>}
+ */
+const countIssues = async (settings, jql) => {
+  const headers = jiraRestHeaders(settings);
+
+  const approximate = await axios
+    .post(`${settings.jiraBaseUrl}/rest/api/2/search/approximate-count`, { jql }, {
+      timeout: TIMEOUT,
+      headers: { ...headers, 'Content-Type': 'application/json' }
+    })
+    .then(response => (response.data && typeof response.data.count === 'number' ? response.data.count : null))
+    .catch(() => null);
+
+  if (approximate !== null) { return approximate; }
+
+  return axios
+    .get(`${settings.jiraBaseUrl}/rest/api/2/search`, {
+      timeout: TIMEOUT, headers, params: { jql, maxResults: 0 }
+    })
+    .then(response => (response.data && typeof response.data.total === 'number' ? response.data.total : null))
+    .catch(() => null);
+};
+
+/**
+ * Read a set of issues in as few searches as possible. Used to resolve the
+ * parents of a batch of tests without one request per issue.
+ *
+ * @param {Object} settings - Full Jira settings
+ * @param {Array<string>} keys - Jira issue keys
+ * @param {Array<string>} fields - Jira field names to ask for
+ * @returns {Promise<Object>} Raw Jira issues, keyed by uppercase issue key
+ */
+const fetchIssuesByKeys = async (settings, keys, fields) => {
+  const found = {};
+
+  for (const batch of chunk(keys, MAX_KEYS_PER_QUERY)) {
+    await searchIssues(settings, {
+      jql: `key in (${batch.join(', ')})`,
+      fields,
+      onPage: (issues) => {
+        issues.forEach(issue => {
+          if (issue && issue.key) { found[issue.key.toUpperCase()] = issue; }
+        });
+      }
+    });
+  }
+
+  return found;
+};
+
+/**
+ * The id of a Jira field, by name — "Epic Link" is a custom field, and its id
+ * differs from one instance to the next.
+ *
+ * @param {Object} settings - Full Jira settings
+ * @param {string} name - The field name as Jira displays it
+ * @returns {Promise<string|null>}
+ */
+const fieldId = async (settings, name) => axios
+  .get(`${settings.jiraBaseUrl}/rest/api/2/field`, {
+    timeout: TIMEOUT, headers: jiraRestHeaders(settings)
+  })
+  .then(response => {
+    const fields = Array.isArray(response.data) ? response.data : [];
+    const match = fields.find(field => String(field.name || '').toLowerCase() === name.toLowerCase());
+    return (match && match.id) || null;
+  })
+  // A user without admin rights may not list the fields: the pull carries on
+  // with whatever the issues themselves say
+  .catch(() => null);
+
+/* -------------------------- Xray Server/DC folders ------------------------ */
+
+/**
+ * The Test Repository of a project on Xray for Server/DC: which folder every
+ * test sits in.
+ *
+ * Xray Cloud answers this as part of the GraphQL query, Server/DC only
+ * through its own REST API, and only to users who can see the project. When
+ * it cannot be read the pull falls back to a flat folder, so this never
+ * throws.
+ *
+ * @param {Object} settings - Full Jira settings
+ * @param {string} projectKey
+ * @returns {Promise<Object>} Folder path ("/A/B"), keyed by uppercase test key
+ */
+const fetchServerRepository = async (settings, projectKey) => {
+  const headers = jiraRestHeaders(settings);
+  const base = `${settings.jiraBaseUrl}/rest/raven/1.0/api/testrepository/${encodeURIComponent(projectKey)}/folders`;
+
+  const root = await axios
+    .get(base, { timeout: PULL_TIMEOUT, headers })
+    .then(response => response.data)
+    .catch(() => null);
+
+  if (!root) { return {}; }
+
+  const paths = {};
+
+  // Depth first, so a folder is asked for its tests right after its name is
+  // known — the tree is small, the test lists are not
+  const walk = async (folder, prefix) => {
+    const path = folder.id === -1 || !folder.name ? prefix : `${prefix}/${folder.name}`;
+
+    if (folder.id !== undefined && folder.id !== -1) {
+      const tests = await axios
+        .get(`${base}/${encodeURIComponent(folder.id)}/tests`, { timeout: PULL_TIMEOUT, headers })
+        .then(response => {
+          const data = response.data;
+          return (data && Array.isArray(data.tests) ? data.tests : (Array.isArray(data) ? data : []));
+        })
+        .catch(() => []);
+
+      tests.forEach(test => {
+        if (test && test.key) { paths[String(test.key).toUpperCase()] = path || '/'; }
+      });
+    }
+
+    for (const child of (folder.folders || [])) {
+      await walk(child, path);
+    }
+  };
+
+  await walk(root, '');
+
+  return paths;
+};
+
 /**
  * Validate the stored credentials by actually using them.
  * @param {Object} settings - Full Jira settings
@@ -297,5 +629,12 @@ module.exports = {
   fetchTests,
   verify,
   resetToken,
-  TIMEOUT
+  walkCloudTests,
+  searchIssues,
+  countIssues,
+  fetchIssuesByKeys,
+  fetchServerRepository,
+  fieldId,
+  TIMEOUT,
+  PULL_TIMEOUT
 };
