@@ -1,0 +1,37 @@
+---
+import Icon from './Icon.astro';
+import { groupedTopics, withBase } from '../lib/help.js';
+
+const { activeId = null } = Astro.props;
+---
+
+<nav class="space-y-6">
+  {
+    groupedTopics.map((category) => (
+      <div>
+        <p class="mb-2 px-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          {category.label}
+        </p>
+        <ul class="space-y-0.5">
+          {category.topics.map((topic) => (
+            <li>
+              <a
+                href={withBase(`/docs/${topic.id}/`)}
+                aria-current={topic.id === activeId ? 'page' : undefined}
+                class:list={[
+                  'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                  topic.id === activeId
+                    ? 'bg-accent font-medium text-accent-foreground'
+                    : 'text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground',
+                ]}
+              >
+                <Icon name={topic.icon} class="size-3.5 opacity-70" />
+                {topic.title}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ))
+  }
+</nav>

@@ -2,6 +2,8 @@
 
 Heavily opinionated tool to help you test E2E flows and behaviours.
 
+📖 **Documentation website:** [flows.lab34.es](https://flows.lab34.es/) — generated from the app's built-in Help section (source in [`website/`](website/)).
+
 > Trigger, understand and test E2E flows and behaviours.
 > Ask an AI to generate a flow for you.
 > Run on any environment (staging, production, etc).
