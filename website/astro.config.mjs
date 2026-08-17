@@ -3,10 +3,10 @@ import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
 import tailwindcss from '@tailwindcss/vite';
 
-// Deployed to GitHub Pages at https://lab34-es.github.io/lab34-flows/
+// Deployed to GitHub Pages at the custom domain https://flows.lab34.es/
+// (public/CNAME + the Pages custom-domain setting in the repository).
 export default defineConfig({
-  site: 'https://lab34-es.github.io',
-  base: '/lab34-flows',
+  site: 'https://flows.lab34.es',
   trailingSlash: 'always',
   integrations: [sitemap()],
   vite: {

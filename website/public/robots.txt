@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://lab34-es.github.io/lab34-flows/sitemap-index.xml
+Sitemap: https://flows.lab34.es/sitemap-index.xml
