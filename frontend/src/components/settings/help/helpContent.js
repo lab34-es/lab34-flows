@@ -96,19 +96,66 @@ are executed. Everything else is documentation, and is rendered as such.
     keywords: ['sidebar', 'notebook', 'source', 'document', 'tour', 'interface', 'environment'],
     body: `
 - **Sidebar › Flows** — your flows tree, with a live status dot per flow
-  (*standby*, *running*, *ok*, *error*). Create folders and flows, upload files
-  and delete them from the \`+\` menu and each row's actions.
-- **Sidebar › Applications** — every application in your context directory.
-  Click one to read its README and browse its methods: input parameters,
-  output, memory usage and examples, plus its environment files.
+  (*standby*, *running*, *ok*, *error*). The \`+\` menu creates flows and
+  folders, uploads files and refreshes the tree; each row's \`…\` menu renames
+  and deletes.
+- **Sidebar › Applications** — every application in your context directory,
+  with the number of methods it exports. Click one to read its README and
+  browse its methods: input parameters, output, memory usage and examples,
+  plus its environment files. Its \`…\` menu renames the application.
 - **Sidebar footer › Environment** — the environment used for every run.
 - **Notebook view** — a flow rendered as a document, with each step block as a
   cell. Press *Run* and the details stream in below each block.
 - **Document / Source toggle** — *Source* opens the raw Markdown in an editor
-  and saves it back to disk. Applications have the same toggle for their
-  \`README.md\`, \`index.js\` and \`env/*.env\` files.
+  and saves it back to disk. Applications have the same toggle, and theirs
+  opens a file explorer over the whole application folder (see *Managing files
+  and folders*).
 - **Magic wand** — next to the toggle: describe a change and the model rewrites
   the document (see *Writing flows with AI*).
+`,
+  },
+
+  {
+    id: 'managing-files',
+    category: 'basics',
+    icon: 'folder',
+    title: 'Managing files and folders',
+    summary: 'Create, rename and delete flows, folders and application files.',
+    keywords: [
+      'create', 'rename', 'delete', 'move', 'upload', 'folder', 'file', 'explorer',
+      'new flow', 'new file', 'source',
+    ],
+    body: `
+Everything you can do to a file on disk, you can do from the UI — and it *is*
+the file on disk that changes.
+
+### Flows
+
+- The \`+\` next to **Flows** creates a flow or a folder at the root, uploads an
+  existing file, or refreshes the tree after you changed something by hand.
+- Every folder row has the same menu, scoped to that folder.
+- Every row's \`…\` menu **renames** and **deletes**. Renaming a folder moves
+  everything inside it with it.
+
+A new flow gets a \`.md\` extension when you do not type one, and renaming keeps
+the extension the file already had. Deleting asks first, and is permanent —
+there is no bin to recover from.
+
+### Application files
+
+Open an application and switch to **Source**. The left pane is a file explorer
+over the whole application folder — \`index.js\`, \`README.md\`, \`env/*.env\` and
+anything else you put there — and the right pane is the editor.
+
+- The **new file** button at the top of the explorer creates a file at the root
+  of the application; a folder's \`…\` menu creates one inside it. Type a path
+  like \`helpers/http.js\` and the folders are created for you.
+- Each row's \`…\` menu renames and deletes.
+- A dot next to a file name means it has **unsaved** changes.
+
+Renaming the application itself is in the sidebar, on the application's own
+\`…\` menu: it renames the folder, so every flow that calls it by name has to be
+updated too.
 `,
   },
 
@@ -131,8 +178,19 @@ The content of a \`step\` block is YAML:
 | \`parameters\` | What the method receives — usually \`body\`, \`params\`, \`query\`, \`headers\`. |
 | \`test\` | The assertions for this step. See *Assertions and tests*. |
 | \`mimic\` | Fake the response of a dependency for this step. |
-| \`retry\` | \`{ times, delay }\` — retry the step when it fails, waiting \`delay\` ms. |
+| \`retry\` | \`{ times, delay }\` — retry when the application answers **nothing** at all. |
 | \`testKey\` | The Xray Test key this step maps to (informative). |
+
+There are two different retries, and they cover different failures:
+
+- \`retry\` **on the step** only fires when the call comes back empty — no
+  headers, no status, no body. It is for a dependency that is not there yet.
+- \`retry\` **inside \`test\`** fires when the assertions do not pass, which is what
+  you want for something that becomes true a moment later. \`delay\` defaults to
+  1000 ms there.
+
+In both cases the random values generated for the step are **frozen** on the
+first attempt, so a retry sends exactly what the first attempt sent.
 
     ---
     title: Create and read back
@@ -415,9 +473,10 @@ default (override it with \`--context <path>\`):
 | Path | What it holds |
 |-|-|
 | \`flows/\` | Your flows — the tree you see in the sidebar. |
-| \`applications/\` | One folder per application: \`index.js\`, \`README.md\`, \`envs/*.env\`. |
+| \`applications/\` | One folder per application: \`index.js\`, \`README.md\`, \`env/*.env\`. |
 | \`config/ai.json\` | AI provider, model and API keys. |
 | \`config/jira.json\` | Jira / Xray credentials. |
+| \`.examples-seeded\` | Marker written the first time the examples are copied. |
 
 Credentials never leave your machine except to reach the provider or Jira, and
 they are never sent back to the browser: the UI is only told whether a secret
@@ -525,13 +584,30 @@ Web applications are tested through [Playwright](https://playwright.dev).
 Playwright automations have their **own YAML files**, and an application
 integrates with them by calling \`playwright.run\` with the path to one.
 
-The application's \`envs/*.env\` decide the browser configuration: which browser,
-launch options (headless, slowMo…) and context options (viewport, locale,
-credentials…).
+That YAML file carries both the browser configuration and the steps:
 
-This part is **experimental**: the set of available methods lives with the
-Playwright helper, and the seeded \`playful_website\` example application shows a
-complete YAML automation end to end.
+    browserType: chromium        # chromium (default), firefox, webkit
+    device: Desktop Chrome       # any playwright device; iPhone 11 Pro by default
+    keepOpen: false              # leave the browser open — debugging only
+    launchOptions:
+      headless: false
+      timeout: 30000
+    contextOptions:
+      locale: en-US
+      timezoneId: Europe/Brussels
+    steps:
+      - method: goto
+        parameters:
+          url: "https://example.com"
+
+The methods a step can use are \`goto\`, \`click\`, \`type\`, \`fill\`, \`press\`,
+\`hover\`, \`dragAndDrop\`, \`selectOption\`, \`check\`, \`uncheck\`, \`evaluate\`,
+\`keyboard\`, \`mouse\`, \`waitForTimeout\`, \`waitForSelector\`, \`screenshot\`,
+\`waitForInput\` and \`scrape\`. Whatever \`scrape\` collects is returned to the flow
+as the step's response body.
+
+This part is **experimental**, and no example application is seeded for it: the
+README covers every method with a full example.
 `,
   },
   {
@@ -545,11 +621,17 @@ complete YAML automation end to end.
 Credentials are never stored in the flows. Each application keeps one env file
 per environment, in its own folder:
 
-    applications/<app>/envs/<environment>.env
+    applications/<app>/env/<environment>.env
+
+The name of the file *is* the name of the environment: \`env/staging.env\` is what
+the sidebar offers as **staging**. The list you can pick from is the union of
+the env files of every application.
 
 The environment selected in the sidebar footer is the one every run uses, and
 the *Applications* page lets you edit those files — variable by variable, or as
-raw text — without leaving the UI.
+raw text — without leaving the UI. Variables named \`secret\`, \`token\`,
+\`credential\`, \`password\`, \`authorization\` or \`x-api-key\` are masked in that
+list, with only their last four characters visible.
 
 ### PostgreSQL
 
@@ -587,9 +669,10 @@ values already resolved), the response, the assertions and the timings.
 
 - The dot next to the flow in the sidebar reflects the run: *standby*,
   *running*, *ok*, *error*.
-- A failed step can be retried automatically with \`retry: { times, delay }\`.
-  Random values are kept stable across the retries of a step, so a retry does
-  not silently test something else.
+- A step can be retried automatically: \`retry: { times, delay }\` on the step
+  covers an empty response, and the same block inside \`test\` covers failing
+  assertions. Random values are kept stable across the retries of a step, so a
+  retry does not silently test something else.
 - The environment used is the one selected in the sidebar footer.
 
 Runs are streamed over a socket, so you can watch a long flow progress instead
@@ -613,12 +696,17 @@ of waiting for a final report.
 
 | Flag | What it does |
 |-|-|
-| \`--file\` | Path to the flow (\`.md\` or \`.yaml\`). Required unless \`--server\`. |
+| \`--file\` | Path to the flow (\`.md\`, \`.markdown\`, \`.yaml\` or \`.yml\`). Required unless \`--server\`. |
 | \`--env\` | Environment to run in. Required with \`--file\`. |
 | \`--server\` | Start the web UI on http://localhost:3001. |
-| \`--context\` | Use another context directory instead of \`~/lab34-flows\`. |
+| \`--capabilities\` | List every application and method available in the context. |
+| \`--context\` | Use another context directory instead of \`~/lab34-flows\`. It has to exist. |
 | \`--debug\` | Print environment variables and Node.js paths. |
 | \`--help\` | Show the help. |
+| \`-v\` | Print the version and exit. |
+
+\`--file\` is resolved *inside* the context directory, so
+\`--file flows/my-flow.md\` means \`~/lab34-flows/flows/my-flow.md\`.
 
 Applications are plain Node.js modules, so extend \`NODE_PATH\` to npm's root for
 them to resolve the library:
@@ -704,8 +792,9 @@ told whether a secret is stored.
   [github.com/lab34-es/lab34-flows/issues](https://github.com/lab34-es/lab34-flows/issues)
 - **The examples** are documentation too: the seeded \`01 · Welcome\`,
   \`02 · HTTP basics\` and \`03 · Posts and memory\` flows are meant to be read as
-  much as run. They are only copied when missing, so you can edit them freely —
-  or delete them and get them back on the next start.
+  much as run. They are copied **once**, on first start, and never again — so
+  editing or deleting them is safe. To get them back, delete the
+  \`.examples-seeded\` file in your context folder and restart.
 `,
   },
 ];

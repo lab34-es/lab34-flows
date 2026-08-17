@@ -1,101 +1,75 @@
-# Lab34 Flows Frontend
+# Lab34 Flows — frontend
 
-React frontend for the Lab34 Flows CLI tool, built with Vite and MUI Joy components.
+The web UI of [lab34-flows](../README.md): the flow tree, the notebook view that
+runs a flow and shows each step's execution below its code block, the application
+pages, and the settings.
 
-## Features
+It is served by the tool itself (`lab34-flows --server`) from `frontend/dist`, so
+in normal use there is nothing to run here.
 
-- **Dashboard**: Overview of system status, flows, and applications
-- **Flow Management**: Browse and execute flow definitions
-- **Applications**: View and configure available applications
-- **AI Integration**: Generate flows using natural language prompts
-- **Real-time Updates**: Socket.IO integration for live flow execution monitoring
+## Stack
 
-## Technology Stack
-
-- **Vite** - Fast build tool and development server
-- **React 18** - Modern React with hooks
-- **MUI Joy** - Material-UI Joy design system
-- **React Router** - Client-side routing
-- **Socket.IO Client** - Real-time communication
-- **Axios** - HTTP client with interceptors
-
-## Environment Variables
-
-The application uses Vite's environment variable system:
-
-- `VITE_API_URL` - Backend API URL (default: http://localhost:5678)
-
-Create a `.env` file in the frontend directory to customize:
-
-```env
-VITE_API_URL=http://localhost:5678
-```
+- **React 19** + **React Router 7**
+- **Vite 7** as the build tool and dev server
+- **Tailwind CSS 4** with [shadcn/ui](https://ui.shadcn.com) components (Radix
+  primitives, `lucide-react` icons)
+- **Monaco** (`@monaco-editor/react`) for the Source editors
+- **react-markdown** + `remark-gfm` for the document view
+- **Socket.IO client** for live execution updates
+- **Axios** for the REST calls
 
 ## Development
 
-The frontend runs on port 3000 and proxies API requests to the backend on port 3001.
-
-### Available Scripts
-
-- `npm run dev` - Start Vite development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm test` - Run tests
-
-### Running with Backend
-
-From the root directory:
+From the repository root:
 
 ```bash
-# Install frontend dependencies
-npm run install:frontend
-
-# Run both API and frontend together
-npm run dev:full
-
-# Or run separately:
-npm run dev        # API only (port 3001)
-npm run frontend   # Frontend only (port 3000)
+npm run install:frontend   # install these dependencies
+npm run dev:full           # API on :3001 and this dev server on :3000
 ```
 
-## Project Structure
+Or separately:
 
+```bash
+npm run dev                # API only, port 3001
+npm run frontend           # this dev server only, port 3000
 ```
+
+The dev server proxies `/api` and `/socket.io` to `http://localhost:3001`
+(see `vite.config.js`), so there is no API URL to configure: every request is
+same-origin in development and in production alike.
+
+### Scripts
+
+| Script | What it does |
+|-|-|
+| `npm run dev` | Start the Vite dev server on port 3000 |
+| `npm run build` | Build into `dist/`, which the API serves |
+| `npm run preview` | Preview the production build |
+| `npm run lint` | ESLint |
+
+## Structure
+
+```text
 src/
 ├── components/
-│   ├── Layout/           # Main layout with sidebar navigation
-│   ├── Dashboard/        # Dashboard with system overview
-│   ├── FlowList/         # Flow definitions browser
-│   └── ApplicationsList/ # Applications management
-├── services/
-│   └── api.js           # Axios configuration and API methods
-├── hooks/               # Custom React hooks
-└── utils/               # Utility functions
+│   ├── app-sidebar/     # Flow tree, application list, and their dialogs
+│   ├── application/     # Application page: docs and the Source file explorer
+│   ├── flow/            # Notebook cells, execution output, AI edit, Xray chips
+│   ├── settings/        # AI, Xray, UI and Help sections
+│   ├── shared/          # Markdown, code blocks, status dots
+│   └── ui/              # shadcn/ui primitives
+├── context/             # App state, execution state, theme
+├── hooks/
+├── lib/                 # Flow parsing, Monaco setup, templates, helpers
+├── pages/               # Home, Flow, Application, Settings
+└── services/            # REST client and socket client
 ```
 
-## API Integration
+The `@` alias points at `src/`.
 
-The frontend communicates with the Lab34 Flows API through:
+## Theme
 
-- **REST endpoints** for data fetching (`/flows`, `/applications`)
-- **Environment-based configuration** using `VITE_API_URL`
-- **Proxy configuration** in Vite for seamless development
-- **Request/Response interceptors** for logging and error handling
-
-## Styling
-
-Uses MUI Joy's design system with:
-
-- **CSS-in-JS styling** with `sx` prop
-- **Responsive design** with Grid system
-- **Dark/light theme support** via CssVarsProvider
-- **Consistent spacing and typography**
-- **Modern component variants** (outlined, soft, solid)
-
-## Development Features
-
-- **Hot Module Replacement (HMR)** for instant updates
-- **Fast refresh** preserving component state
-- **TypeScript support** (can be enabled)
-- **ESLint integration** for code quality
-- **Optimized builds** with tree shaking and code splitting
+Light, dark and auto (follows the operating system) are handled by
+`context/ThemeContext.jsx` and chosen under **Settings › UI**. The choice is kept
+in the browser's local storage, not in the context folder, and the default is
+dark.

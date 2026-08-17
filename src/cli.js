@@ -72,9 +72,10 @@ Options:
   --capabilities  List all available capabilities from the contents of ~/flows
   --server        Start the web server with built frontend and API
   --env           Environment to run the flow in (required for --file)
-  --context       Context directory for server mode (optional)
+  --context       Context directory to use instead of ~/lab34-flows (must exist)
   --debug         Print debug information including environment variables
   --help          Show this help message
+  -v              Print the version and exit
 
 Generating flows with AI is done from the web UI (--server): the provider,
 model and API keys are configured there, under Settings.
