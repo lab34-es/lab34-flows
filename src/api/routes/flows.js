@@ -81,6 +81,16 @@ router.post('/file', (req, res) => {
     .catch(error => sendError(res, error));
 });
 
+// Rewrite the frontmatter of a markdown flow. { path, properties }
+router.put('/properties', (req, res) => {
+  flows.saveProperties({
+    relativePath: req.body.path,
+    properties: req.body.properties
+  })
+    .then(result => res.send({ success: true, ...result }))
+    .catch(error => sendError(res, error));
+});
+
 // Rename or move a flow file or folder. { from, to }
 router.post('/rename', (req, res) => {
   flows.rename(req.body.from, req.body.to)

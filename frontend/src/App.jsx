@@ -6,6 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import AppSidebar from '@/components/app-sidebar/AppSidebar';
 import HomePage from '@/pages/HomePage';
 import FlowPage from '@/pages/FlowPage';
+import FolderPage from '@/pages/FolderPage';
 import ApplicationPage from '@/pages/ApplicationPage';
 import SettingsPage from '@/pages/SettingsPage';
 import AiSettings from '@/components/settings/AiSettings';
@@ -30,6 +31,7 @@ function Shell() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/flows/view" element={<FlowPage />} />
+            <Route path="/flows/folder" element={<FolderPage />} />
             <Route path="/applications/:slug" element={<ApplicationPage />} />
             <Route path="/settings" element={<SettingsPage />}>
               <Route index element={<Navigate to="/settings/ai" replace />} />

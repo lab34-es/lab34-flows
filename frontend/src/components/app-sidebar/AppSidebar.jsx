@@ -51,6 +51,7 @@ import FlowDialogs from '@/components/app-sidebar/FlowDialogs';
 import ApplicationDialogs from '@/components/app-sidebar/ApplicationDialogs';
 import { useAppState } from '@/context/AppStateContext';
 import { flowsApi } from '@/services/api';
+import { folderUrl } from '@/lib/flows';
 
 export function AppSidebar() {
   const navigate = useNavigate();
@@ -120,7 +121,16 @@ export function AppSidebar() {
       <SidebarContent>
         {/* ------------------------------ Flows ------------------------------ */}
         <SidebarGroup>
-          <SidebarGroupLabel>Flows</SidebarGroupLabel>
+          {/* The label opens the whole flows directory as a table, the same
+              way a folder row opens its own subtree */}
+          <SidebarGroupLabel
+            asChild
+            className="hover:text-sidebar-accent-foreground cursor-pointer"
+          >
+            <button type="button" onClick={() => navigate(folderUrl(''))} title="Open all flows as a table">
+              Flows
+            </button>
+          </SidebarGroupLabel>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <SidebarGroupAction title="Add flow, folder or upload">

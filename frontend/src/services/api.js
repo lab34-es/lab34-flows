@@ -31,6 +31,18 @@ export const flowsApi = {
     api.post('/api/flows/file', { path, content, overwrite }),
   remove: (path) => api.delete('/api/flows/file', { data: { path } }),
   rename: (from, to) => api.post('/api/flows/rename', { from, to }),
+  // Rewrite a markdown flow's frontmatter, leaving its body untouched
+  saveProperties: (path, properties) =>
+    api.put('/api/flows/properties', { path, properties }),
+};
+
+// The saved views a folder of flows is rendered with: one views.yaml for the
+// whole context, in the shape Obsidian Bases uses.
+export const viewsApi = {
+  get: () => api.get('/api/views'),
+  save: (document) => api.put('/api/views', document),
+  query: (folder, view) =>
+    api.get('/api/views/query', { params: { folder: folder || '', view: view || undefined } }),
 };
 
 export const applicationsApi = {

@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Markdown from '@/components/shared/Markdown';
 import AiEditDialog from '@/components/flow/AiEditDialog';
+import FlowProperties from '@/components/flow/FlowProperties';
 import StepCell from '@/components/flow/StepCell';
 import XrayChip from '@/components/flow/XrayChip';
 import { flowsApi, jiraApi } from '@/services/api';
@@ -38,6 +39,7 @@ export function FlowPage() {
   const [loadError, setLoadError] = useState(null);
   const [tab, setTab] = useState('document');
   const [saving, setSaving] = useState(false);
+  const [savingProperties, setSavingProperties] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [aiOpen, setAiOpen] = useState(false);
   // configured: null while unknown (loading / unreachable), then a boolean
@@ -142,6 +144,31 @@ export function FlowPage() {
       setSaveError(ex.response?.data?.error || ex.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  /**
+   * Write the frontmatter back to the file. Only the property block is
+   * rewritten — the body of the document is never touched — and the flow is
+   * read back afterwards so the notebook, the title and the tree agree with
+   * what is on disk.
+   *
+   * @param {Object} properties - The whole new frontmatter
+   */
+  const handlePropertiesChange = async (properties) => {
+    if (!flowData?.relativePath) { return; }
+    setSavingProperties(true);
+    setSaveError(null);
+    try {
+      await flowsApi.saveProperties(flowData.relativePath, properties);
+      const response = await flowsApi.getUserFlow(flowPath);
+      setFlowData(response.data);
+      setDraft(response.data.plainText || '');
+      refreshTree();
+    } catch (ex) {
+      setSaveError(ex.response?.data?.error || ex.message);
+    } finally {
+      setSavingProperties(false);
     }
   };
 
@@ -327,6 +354,20 @@ export function FlowPage() {
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-4xl space-y-1 px-6 py-6">
+            {/* The frontmatter, as a property list. "title" and
+                "description" are ordinary properties, but they read as the
+                document's heading, so they are rendered above the list */}
+            <FlowProperties
+              properties={flowData.properties}
+              fallbackTitle={flowData.title}
+              readOnly={flowData.format !== 'markdown' || dirty}
+              readOnlyReason={flowData.format !== 'markdown'
+                ? 'YAML flows keep their metadata in the document itself — edit it in Source.'
+                : 'Save your changes in Source before editing properties.'}
+              saving={savingProperties}
+              onChange={handlePropertiesChange}
+            />
+
             {/* The Xray Test this flow maps to (frontmatter "xray.testKey"):
                 a live chip when Jira answered, a gray notice otherwise */}
             {flowData.xray?.testKey && (

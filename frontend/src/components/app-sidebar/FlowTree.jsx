@@ -9,6 +9,7 @@ import {
   MoreHorizontal,
   FilePlus2,
   Pencil,
+  Table2,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -34,19 +35,42 @@ import {
 } from '@/components/ui/dropdown-menu';
 import StatusDot from '@/components/shared/StatusDot';
 import { useExecutions } from '@/context/ExecutionContext';
-import { flowUrl } from '@/lib/flows';
+import { flowUrl, folderUrl } from '@/lib/flows';
+import { cn } from '@/lib/utils';
 
 function FolderNode({ node, onAction, children }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [open, setOpen] = React.useState(true);
+
+  const isActive = location.pathname === '/flows/folder' &&
+    new URLSearchParams(location.search).get('path') === node.relativePath;
+
   return (
     <SidebarMenuItem>
-      <Collapsible defaultOpen className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90">
-        <CollapsibleTrigger asChild>
-          <SidebarMenuButton>
-            <ChevronRight className="transition-transform" />
+      <Collapsible open={open} onOpenChange={setOpen}>
+        {/* The chevron expands the folder in place; the name opens it as a
+            table. Two separate buttons, so neither steals the other's click */}
+        <div className="flex items-center">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="hover:bg-sidebar-accent flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm"
+              aria-label={`${open ? 'Collapse' : 'Expand'} folder ${node.name}`}
+            >
+              <ChevronRight className={cn('size-3.5 transition-transform', open && 'rotate-90')} />
+            </button>
+          </CollapsibleTrigger>
+
+          <SidebarMenuButton
+            isActive={isActive}
+            onClick={() => navigate(folderUrl(node.relativePath))}
+            title={`Open ${node.relativePath} as a table`}
+          >
             <Folder className="text-muted-foreground" />
             <span>{node.name}</span>
           </SidebarMenuButton>
-        </CollapsibleTrigger>
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -55,6 +79,10 @@ function FolderNode({ node, onAction, children }) {
             </SidebarMenuAction>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="right" align="start">
+            <DropdownMenuItem onClick={() => navigate(folderUrl(node.relativePath))}>
+              <Table2 /> Open as table
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onAction({ type: 'new-flow', parentPath: node.relativePath })}>
               <FilePlus2 /> New flow
             </DropdownMenuItem>

@@ -176,3 +176,92 @@ describe('flows.rename', () => {
       .toThrow(/inside itself/);
   });
 });
+
+describe('flows.saveProperties', () => {
+  const flowPath = path.join(flowsDir, 'team', 'checkout.md');
+
+  const BODY = [
+    '# Checkout',
+    '',
+    'Some prose.',
+    '',
+    '```step',
+    'application: calculator',
+    'method: add',
+    '```',
+    ''
+  ].join('\n');
+
+  beforeEach(() => {
+    write(flowPath, `---\ntitle: Checkout\nowner: ana\n---\n\n${BODY}`);
+  });
+
+  it('rewrites the frontmatter and leaves the body untouched', async () => {
+    await flows.saveProperties({
+      relativePath: 'team/checkout.md',
+      properties: { title: 'Checkout', owner: 'bruno', priority: 5 }
+    });
+
+    const parsed = flows.parseValue(fs.readFileSync(flowPath, 'utf8'), 'markdown');
+    expect(parsed.properties).toEqual({ title: 'Checkout', owner: 'bruno', priority: 5 });
+    expect(parsed.steps).toHaveLength(1);
+    expect(fs.readFileSync(flowPath, 'utf8')).toContain(BODY);
+  });
+
+  it('writes title and description first, whatever order they arrive in', async () => {
+    await flows.saveProperties({
+      relativePath: 'team/checkout.md',
+      properties: { owner: 'ana', description: 'What it does', title: 'Checkout' }
+    });
+
+    const lines = fs.readFileSync(flowPath, 'utf8').split('\n');
+    expect(lines.slice(1, 4)).toEqual(['title: Checkout', 'description: What it does', 'owner: ana']);
+  });
+
+  it('writes an empty value as a bare key rather than an empty string', async () => {
+    await flows.saveProperties({
+      relativePath: 'team/checkout.md',
+      properties: { title: 'Checkout', epic: '' }
+    });
+
+    expect(fs.readFileSync(flowPath, 'utf8')).toContain('\nepic: null\n');
+    expect(flows.parseValue(fs.readFileSync(flowPath, 'utf8'), 'markdown').properties.epic).toBeNull();
+  });
+
+  it('removes a property that is no longer sent', async () => {
+    await flows.saveProperties({
+      relativePath: 'team/checkout.md',
+      properties: { title: 'Checkout' }
+    });
+
+    expect(flows.parseValue(fs.readFileSync(flowPath, 'utf8'), 'markdown').properties)
+      .toEqual({ title: 'Checkout' });
+  });
+
+  it('refuses YAML flows, which keep their metadata in the document itself', async () => {
+    write(path.join(flowsDir, 'team', 'legacy.yaml'), 'title: Legacy\nsteps: []\n');
+    await expect(flows.saveProperties({
+      relativePath: 'team/legacy.yaml',
+      properties: { owner: 'ana' }
+    })).rejects.toThrow(/only be edited on Markdown flows/);
+  });
+
+  it('refuses to escape the flows directory', async () => {
+    await expect(flows.saveProperties({
+      relativePath: '../../escape.md',
+      properties: {}
+    })).rejects.toThrow(/outside of the flows directory/);
+  });
+
+  it('refuses a missing flow, and a non-object payload', async () => {
+    await expect(flows.saveProperties({
+      relativePath: 'team/nope.md',
+      properties: {}
+    })).rejects.toThrow(/Flow not found/);
+
+    await expect(flows.saveProperties({
+      relativePath: 'team/checkout.md',
+      properties: 'nope'
+    })).rejects.toThrow(/must be an object/);
+  });
+});

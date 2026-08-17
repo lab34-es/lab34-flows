@@ -34,6 +34,7 @@ Features:
   - [Usage](#usage)
     - [Writing flows with AI](#writing-flows-with-ai)
   - [Web UI](#web-ui)
+  - [Properties and folder views](#properties-and-folder-views)
   - [Jira / Xray integration](#jira--xray-integration)
   - [Default examples](#default-examples)
   - [Application docs (JSDoc)](#application-docs-jsdoc)
@@ -91,9 +92,13 @@ the document. In the web UI, the execution details of each step (request,
 response, assertions, timings) are displayed right below its code block —
 like a notebook.
 
-Flow-level metadata goes in an optional YAML frontmatter at the top
-(`title`, `description`, `version`, `latentApplications`...). When there is
-no frontmatter title, the first `# heading` is used.
+Flow-level metadata goes in an optional YAML frontmatter at the top. A few
+keys mean something to the tool (`title`, `description`, `version`,
+`latentApplications`, `xray`), and **any other property you write is yours** —
+`owner`, `priority`, `tags`, `due`, whatever your team needs. They are
+editable from the **Document** view and are what folder views filter and sort
+on: see [Properties and folder views](#properties-and-folder-views). When
+there is no frontmatter title, the first `# heading` is used.
 
 Additionally:
 1. You can mimic the behaviour of dependant applications, by adding a *mimic* section to each step's definition.
@@ -364,6 +369,124 @@ and open http://localhost:3001.
   - **Help** — every guide and reference the tool ships with, searchable:
     writing flows, assertions, replacers, integrations, the CLI and
     troubleshooting.
+
+## Properties and folder views
+
+### Properties
+
+Every key in a flow's frontmatter is a **property**. Some are understood by
+the tool (`title`, `description`, `version`, `latentApplications`, `xray`);
+the rest are yours to invent.
+
+```markdown
+---
+title: Fraud detection
+description: A payment above the limit is held for review
+owner: ana
+priority: 8
+reviewed: true
+tags:
+  - smoke
+  - payments
+due: 2026-03-01
+---
+```
+
+In the web UI, the **Document** view of a flow renders that frontmatter as a
+property list, and it is editable in place: click a value to change it, click
+a name to rename it, and use **Add property** for a new one. `title` and
+`description` are ordinary properties, but they are rendered above the list —
+as the document's heading and standfirst — rather than as two more rows.
+
+Nothing declares a property's type: it is whatever its value is. A number
+sorts numerically, a `true` / `false` renders as a checkbox, a list renders as
+chips, and an ISO date sorts chronologically. Adding a property asks which
+kind of value to start with, and from then on the value itself is the type.
+
+> Properties are edited on Markdown flows. Legacy YAML flows keep their
+> metadata in the document itself, so they are edited in the **Source** tab.
+
+### Folder views
+
+Click a folder in the sidebar and its flows — **including those in
+subfolders** — are listed as a table: one row per flow, one column per
+property. From the toolbar you can search, choose which properties are shown
+and in which order, sort by any of them, and filter.
+
+Those settings are **views**, and they live in a single `views.yaml` at the
+root of your context directory, in the same shape [Obsidian
+Bases](https://help.obsidian.md/bases) uses:
+
+```yaml
+formulas:
+  coverage: 'if(flow.steps > 3, "deep", "shallow")'
+properties:
+  note.owner:
+    displayName: Responsable
+views:
+  - type: table
+    name: All flows
+    order: [file.name, note.owner, note.priority, formula.coverage]
+  - type: table
+    name: Critical
+    filters:
+      and:
+        - priority > 5
+        - file.hasTag("smoke") || owner == "ana"
+    order: [file.name, note.owner, note.priority]
+    sort:
+      - property: note.priority
+        direction: DESC
+  - type: list
+    name: Reading list
+```
+
+A view is **not tied to a folder**: every view shows up as a tab on every
+folder, and is applied to whatever folder is open. Which view a given folder
+was last opened with is remembered in your browser, so `views.yaml` stays free
+of folder references.
+
+- `views` — the saved views, each a `table` or a `list`. `order` is the
+  columns, `sort` the ordering, `filters` which flows are kept and
+  `columnSize` the widths.
+- `properties` — a `displayName` per column, for when `zona_usda_min` should
+  read as *USDA min*.
+- `formulas` — columns worked out from the others, available everywhere as
+  `formula.<name>`.
+- `filters` at the top level — applied to every view, on top of its own.
+
+### The expression language
+
+Filters and formulas are expressions. A bare name is a frontmatter property,
+so `priority` and `note.priority` are the same thing. Four namespaces are
+available:
+
+| Namespace | What it holds |
+| --- | --- |
+| `note.<property>` | A frontmatter property of the flow |
+| `file.<property>` | `name`, `basename`, `path`, `folder`, `ext`, `size`, `ctime`, `mtime`, `tags` |
+| `flow.<property>` | `title`, `description`, `format`, `steps`, `hasErrors` |
+| `formula.<name>` | Another formula |
+
+```yaml
+filters:
+  and:
+    - priority > 5                       # comparisons: > >= < <= == !=
+    - owner.contains("an")               # methods on the value
+    - file.hasTag("smoke")               # file helpers
+    - file.inFolder("payments")          # the folder and everything below it
+    - flow.steps > 3 && !flow.hasErrors  # && || !
+```
+
+Filter groups are `and`, `or` and `not`, and they nest. Functions include
+`if(condition, then, else)`, `min()`, `max()`, `round()`, `number()`,
+`date()`, `now()` and `default(value, fallback)`; values carry methods such as
+`contains()`, `startsWith()`, `isEmpty()`, `lower()`, `join()` and `format()`.
+
+A property a flow does not have evaluates to `null` rather than failing, and
+`null` never satisfies a comparison — so a filter is never broken by a flow
+that simply has not been annotated yet. A filter that *is* broken (an unknown
+function, a typo) is reported in the UI instead of taking the view down.
 
 ## Jira / Xray integration
 

@@ -116,6 +116,9 @@ const parseValue = (value, format = null) => {
       description: parsed.description,
       version: parsed.version,
       xray: flowXray(parsed.xray),
+      // The frontmatter as written, so the UI can render it as a property
+      // list and the folder views can filter and sort on it
+      properties: parsed.meta,
       segments: parsed.segments,
       steps: parsed.steps,
       errors: parsed.errors
@@ -133,6 +136,7 @@ const parseValue = (value, format = null) => {
       format: 'yaml',
       title: null,
       description: null,
+      properties: {},
       segments: [],
       steps: [],
       errors: [{ message: `Invalid YAML: ${ex.message}` }]
@@ -144,6 +148,7 @@ const parseValue = (value, format = null) => {
       format: 'yaml',
       title: null,
       description: null,
+      properties: {},
       segments: [],
       steps: [],
       errors: [{ message: 'Flow file must contain a YAML object' }]
@@ -165,12 +170,18 @@ const parseValue = (value, format = null) => {
     });
   });
 
+  // A YAML flow has no frontmatter: everything but the step list plays that
+  // role, so folder views treat both formats alike
+  const properties = { ...contents };
+  delete properties.steps;
+
   return {
     format: 'yaml',
     title: contents.title || null,
     description: contents.description || null,
     version: contents.version,
     xray: flowXray(contents.xray),
+    properties,
     segments,
     steps: steps.map((step, index) => {
       if (step && typeof step === 'object' && !Array.isArray(step)) {
@@ -439,6 +450,64 @@ module.exports.saveFile = async ({ relativePath, content, overwrite = false }) =
   fs.writeFileSync(absolute, content ?? '', 'utf8');
 
   return { relativePath: relative, path: absolute };
+};
+
+/**
+ * Rewrite the frontmatter of a markdown flow, leaving its body untouched.
+ *
+ * "title" and "description" are written first, because the document view
+ * renders them above the property list and reading the file should match what
+ * the UI shows.
+ *
+ * Legacy YAML flows have no frontmatter — their whole document is metadata —
+ * so they are rejected rather than reformatted behind the user's back.
+ *
+ * @param {Object} options
+ * @param {string} options.relativePath - Flow path relative to the flows dir
+ * @param {Object} options.properties - The frontmatter to write
+ * @returns {Promise<Object>} { relativePath, path, properties }
+ */
+module.exports.saveProperties = async ({ relativePath, properties }) => {
+  if (!relativePath || !relativePath.trim()) {
+    throw new Error('File path is required');
+  }
+
+  if (!properties || typeof properties !== 'object' || Array.isArray(properties)) {
+    throw new Error('"properties" must be an object');
+  }
+
+  const { absolute, relative } = await resolveWithinFlows(relativePath);
+
+  if (!fs.existsSync(absolute) || fs.statSync(absolute).isDirectory()) {
+    throw new Error('Flow not found');
+  }
+
+  if (!isMarkdownPath(absolute)) {
+    throw new Error('Properties can only be edited on Markdown flows. Use the Source tab for YAML flows.');
+  }
+
+  // An empty text property is written as a bare "key:" rather than 'key: ""',
+  // so a property that exists but has no value yet reads as one
+  const normalize = (value) => (value === '' ? null : value);
+
+  const ordered = {};
+  ['title', 'description'].forEach(key => {
+    if (Object.prototype.hasOwnProperty.call(properties, key)) {
+      ordered[key] = normalize(properties[key]);
+    }
+  });
+  Object.entries(properties).forEach(([key, value]) => {
+    if (!Object.prototype.hasOwnProperty.call(ordered, key)) {
+      ordered[key] = normalize(value);
+    }
+  });
+
+  const raw = fs.readFileSync(absolute, 'utf8');
+  const next = markdownFlows.withFrontmatter(raw, ordered);
+
+  fs.writeFileSync(absolute, next, 'utf8');
+
+  return { relativePath: relative, path: absolute, properties: ordered, plainText: next };
 };
 
 /**

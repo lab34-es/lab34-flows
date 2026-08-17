@@ -40,6 +40,57 @@ Closing remarks.
 `;
 
 describe('markdownFlows', () => {
+  describe('withFrontmatter', () => {
+    it('replaces the frontmatter and leaves the body alone', () => {
+      const next = markdownFlows.withFrontmatter(SAMPLE, {
+        title: 'Sample flow',
+        description: 'A markdown flow used in tests',
+        owner: 'ana',
+        priority: 8
+      });
+
+      const { meta, body } = markdownFlows.parseFrontmatter(next);
+      expect(meta).toEqual({
+        title: 'Sample flow',
+        description: 'A markdown flow used in tests',
+        owner: 'ana',
+        priority: 8
+      });
+      expect(body).toBe(markdownFlows.parseFrontmatter(SAMPLE).body);
+      expect(markdownFlows.parse(next).steps).toHaveLength(2);
+    });
+
+    it('keeps the given key order', () => {
+      const next = markdownFlows.withFrontmatter(SAMPLE, { title: 'T', zeta: 1, alpha: 2 });
+      const keys = next.split('\n').slice(1, 4).map(line => line.split(':')[0]);
+      expect(keys).toEqual(['title', 'zeta', 'alpha']);
+    });
+
+    it('adds a frontmatter block to a document that had none', () => {
+      const next = markdownFlows.withFrontmatter('# Title\n\nBody\n', { owner: 'ana' });
+      expect(next).toBe('---\nowner: ana\n---\n\n# Title\n\nBody\n');
+    });
+
+    it('removes the block when no property is left', () => {
+      const next = markdownFlows.withFrontmatter(SAMPLE, {});
+      expect(next.startsWith('# Sample flow')).toBe(true);
+      expect(markdownFlows.parseFrontmatter(next).meta).toEqual({});
+    });
+
+    it('round-trips values YAML has to quote', () => {
+      const meta = {
+        title: 'A: colon, and a #hash',
+        tags: ['smoke', 'slow'],
+        reviewed: false,
+        due: '2026-01-15'
+      };
+      const parsed = markdownFlows.parseFrontmatter(
+        markdownFlows.withFrontmatter(SAMPLE, meta)
+      ).meta;
+      expect(parsed).toEqual(meta);
+    });
+  });
+
   describe('parseFrontmatter', () => {
     it('extracts YAML frontmatter', () => {
       const { meta, body } = markdownFlows.parseFrontmatter(SAMPLE);

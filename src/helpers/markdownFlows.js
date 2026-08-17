@@ -84,6 +84,42 @@ const parseFrontmatter = (content) => {
 };
 
 /**
+ * Replace the YAML frontmatter of a markdown document, leaving the body
+ * exactly as it was — the document view edits properties, not prose.
+ *
+ * An empty meta object removes the frontmatter block altogether, and a
+ * document that had none gets one prepended.
+ *
+ * @param {string} content - Full markdown document
+ * @param {Object} meta - The frontmatter to write. Key order is kept, so the
+ *                        caller decides how the block reads.
+ * @returns {string} The document with the new frontmatter
+ */
+const withFrontmatter = (content, meta) => {
+  const { body } = parseFrontmatter(content || '');
+
+  const entries = Object.entries(meta || {}).filter(([key]) => String(key).trim() !== '');
+
+  if (!entries.length) {
+    // Nothing left to write: drop the block, and the blank line it left behind
+    return body.replace(/^\n+/, '');
+  }
+
+  const yaml = YAML.stringify(Object.fromEntries(entries));
+
+  // YAML.stringify always ends with a newline, so the closing marker sits on
+  // its own line
+  const frontmatter = `---\n${yaml}---\n`;
+
+  if (body.trim() === '') {
+    return frontmatter;
+  }
+
+  // Keep the body's own leading blank line when it had one, add one otherwise
+  return body.startsWith('\n') ? `${frontmatter}${body}` : `${frontmatter}\n${body}`;
+};
+
+/**
  * Check whether a fence info string marks a step block.
  * @param {string} info - The text after the opening fence (e.g. "yaml step")
  * @returns {boolean}
@@ -329,6 +365,7 @@ const toFlow = (content) => {
 module.exports = {
   parse,
   parseFrontmatter,
+  withFrontmatter,
   splitSegments,
   isMarkdownFlow,
   isStepInfo,

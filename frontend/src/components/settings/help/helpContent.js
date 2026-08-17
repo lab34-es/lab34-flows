@@ -77,7 +77,8 @@ fenced code block tagged as \`step\`.
     \`\`\`
 
 **Frontmatter** (the optional YAML block at the top) carries the flow-level
-metadata: \`title\`, \`description\`, \`version\`, \`latentApplications\`, \`xray\`.
+metadata: \`title\`, \`description\`, \`version\`, \`latentApplications\`, \`xray\` —
+plus any other property you want to keep on the flow. See *Properties*.
 When there is no frontmatter title, the first \`#\` heading is used.
 
 Regular code blocks (\`\`\`js\`, \`\`\`bash\`…) are **not** steps: only \`step\` blocks
@@ -109,6 +110,132 @@ are executed. Everything else is documentation, and is rendered as such.
   \`README.md\`, \`index.js\` and \`env/*.env\` files.
 - **Magic wand** — next to the toggle: describe a change and the model rewrites
   the document (see *Writing flows with AI*).
+- **Click a folder** and its flows — subfolders included — are listed as a
+  table you can search, sort and filter (see *Properties* and *Folder views*).
+`,
+  },
+  {
+    id: 'properties',
+    category: 'basics',
+    icon: 'file',
+    title: 'Properties',
+    summary: 'Any frontmatter property you like, editable from the document.',
+    keywords: ['properties', 'frontmatter', 'metadata', 'owner', 'tags', 'priority', 'title', 'description'],
+    body: `
+Every key in a flow's frontmatter is a **property**. A handful mean something
+to the tool — \`title\`, \`description\`, \`version\`, \`latentApplications\`,
+\`xray\` — and everything else is yours to invent.
+
+    ---
+    title: Fraud detection
+    description: A payment above the limit is held for review
+    owner: ana
+    priority: 8
+    reviewed: true
+    tags:
+      - smoke
+      - payments
+    due: 2026-03-01
+    ---
+
+The **Document** view renders them as a list you can edit in place: click a
+value to change it, click a name to rename it, and use **Add property** for a
+new one. \`title\` and \`description\` are ordinary properties, but they are
+shown above the list — as the document's heading and standfirst — rather than
+as two more rows.
+
+Nothing declares a property's type: it is whatever its value is. A number
+sorts numerically, \`true\` / \`false\` renders as a checkbox, a list renders as
+chips, and an ISO date sorts chronologically. Adding a property asks which kind
+of value to start from, and from then on the value itself is the type.
+
+Properties are what folder views filter and sort on — see *Folder views*.
+
+> Legacy YAML flows keep their metadata in the document itself, so they are
+> edited in the **Source** tab rather than here.
+`,
+  },
+  {
+    id: 'folder-views',
+    category: 'basics',
+    icon: 'folder',
+    title: 'Folder views',
+    summary: 'A folder of flows as a table you can sort, filter and search.',
+    keywords: ['views', 'table', 'folder', 'filter', 'sort', 'columns', 'search', 'base', 'obsidian', 'views.yaml', 'formula'],
+    body: `
+Click a folder in the sidebar and every flow below it — **subfolders
+included** — is listed as a table: one row per flow, one column per property.
+The toolbar searches, picks which properties are shown and in which order,
+sorts, and filters.
+
+Those settings are **views**, saved in a single \`views.yaml\` at the root of
+your context directory, in the shape [Obsidian
+Bases](https://help.obsidian.md/bases) uses:
+
+    formulas:
+      coverage: 'if(flow.steps > 3, "deep", "shallow")'
+    properties:
+      note.owner:
+        displayName: Responsable
+    views:
+      - type: table
+        name: Critical
+        filters:
+          and:
+            - priority > 5
+        order: [file.name, note.owner, note.priority, formula.coverage]
+        sort:
+          - property: note.priority
+            direction: DESC
+
+A view is **not tied to a folder**: every view is a tab on every folder, and
+applies to whichever folder is open. Which one a folder was last opened with
+is remembered in your browser, so \`views.yaml\` holds no folder references.
+
+- **Properties** — the columns, and their order. Renaming one here writes a
+  \`displayName\`, which every view then follows.
+- **Sort** — stack several: the first that separates two flows wins.
+- **Filter** — see *Filters and formulas*.
+- **⋯ › Formulas** — columns worked out from the others.
+`,
+  },
+  {
+    id: 'view-expressions',
+    category: 'reference',
+    icon: 'code',
+    title: 'Filters and formulas',
+    summary: 'The little expression language behind views.',
+    keywords: ['filter', 'formula', 'expression', 'and', 'or', 'not', 'hasTag', 'inFolder', 'if', 'contains'],
+    body: `
+What a view keeps, and what a formula computes, are **expressions**. A bare
+name is a frontmatter property, so \`priority\` and \`note.priority\` mean the
+same thing. Four namespaces are available:
+
+| Namespace | What it holds |
+|-|-|
+| \`note.<property>\` | A frontmatter property of the flow |
+| \`file.<property>\` | \`name\`, \`basename\`, \`path\`, \`folder\`, \`ext\`, \`size\`, \`ctime\`, \`mtime\`, \`tags\` |
+| \`flow.<property>\` | \`title\`, \`description\`, \`format\`, \`steps\`, \`hasErrors\` |
+| \`formula.<name>\` | Another formula |
+
+    filters:
+      and:
+        - priority > 5                       # > >= < <= == !=
+        - owner.contains("an")               # methods on the value
+        - file.hasTag("smoke")               # file helpers
+        - file.inFolder("payments")          # the folder and everything below
+        - flow.steps > 3 && !flow.hasErrors  # && || !
+
+Groups are \`and\`, \`or\` and \`not\`, and they nest. Functions include
+\`if(condition, then, else)\`, \`min()\`, \`max()\`, \`round()\`, \`number()\`,
+\`date()\`, \`now()\` and \`default(value, fallback)\`; values carry methods such
+as \`contains()\`, \`startsWith()\`, \`isEmpty()\`, \`lower()\`, \`join()\` and
+\`format()\`.
+
+A property a flow does not have is \`null\`, and \`null\` never satisfies a
+comparison — so a filter is never broken by a flow nobody has annotated yet.
+A filter that really is broken (an unknown function, a typo) is reported above
+the table instead of taking the view down.
 `,
   },
 
