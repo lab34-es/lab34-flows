@@ -1,6 +1,15 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import ThemedShot from '../components/ThemedShot.astro';
 import { withBase } from '../lib/help.js';
+import flowDark from '../assets/screenshots/flow-dark.png';
+import flowLight from '../assets/screenshots/flow-light.png';
+import folderDark from '../assets/screenshots/folder-dark.png';
+import folderLight from '../assets/screenshots/folder-light.png';
+import aiCreateDark from '../assets/screenshots/ai-create-dark.png';
+import aiCreateLight from '../assets/screenshots/ai-create-light.png';
+import aiEditDark from '../assets/screenshots/ai-edit-dark.png';
+import aiEditLight from '../assets/screenshots/ai-edit-light.png';
 
 const repoUrl = 'https://github.com/lab34-es/lab34-flows';
 
@@ -924,6 +933,84 @@ const jsonLd = [
     </div>
   </section>
 
+  <!-- 10b · the tool itself -->
+  <section class="fl-wrap-wide">
+    <div class="fl-section">
+      <p class="fl-kicker">The tool</p>
+      <h2 class="fl-h2" style="max-width:24ch">What it looks like on your screen</h2>
+      <p class="fl-p" style="margin-bottom:40px;max-width:62ch">
+        The document, the folder it lives in, and the two ways AI writes one for
+        you — all local, all yours.
+      </p>
+      <div class="fl-shots">
+        <figure class="fl-shot-fig">
+          <ThemedShot
+            light={flowLight}
+            dark={flowDark}
+            alt="A flow after a run: below the step block, the execution details show a Passed badge, the HTTP 200 response body and the assertion results."
+            widths={[440, 880]}
+            sizes="(min-width: 1101px) 320px, (min-width: 621px) 46vw, 92vw"
+          />
+          <figcaption class="fl-shot-cap">
+            <span class="fl-shot-cap-label">a flow</span> — run like a notebook, with
+            the evidence under each step.
+          </figcaption>
+        </figure>
+        <figure class="fl-shot-fig">
+          <ThemedShot
+            light={folderLight}
+            dark={folderDark}
+            alt="A folder view listing last-mile delivery flows as a table, with one column per frontmatter property: owner, priority, tags, reviewed, due date, a computed coverage column and the step count."
+            widths={[440, 880]}
+            sizes="(min-width: 1101px) 320px, (min-width: 621px) 46vw, 92vw"
+          />
+          <figcaption class="fl-shot-cap">
+            <span class="fl-shot-cap-label">a folder</span> — every property a column,
+            sortable and saved as a view.
+          </figcaption>
+        </figure>
+        <figure class="fl-shot-fig">
+          <ThemedShot
+            light={aiCreateLight}
+            dark={aiCreateDark}
+            alt="The 'What should this flow test?' dialog after creating a flow with AI: a plain-words prompt describes a lost-parcel claim scenario, with a Generate flow button."
+            widths={[440, 880]}
+            sizes="(min-width: 1101px) 320px, (min-width: 621px) 46vw, 92vw"
+          />
+          <figcaption class="fl-shot-cap">
+            <span class="fl-shot-cap-label">written by AI</span> — describe the
+            scenario, get a flow built from your applications.
+          </figcaption>
+        </figure>
+        <figure class="fl-shot-fig">
+          <ThemedShot
+            light={aiEditLight}
+            dark={aiEditDark}
+            alt="The 'Edit with AI' dialog over an open flow: an instruction asks to also cover the full-locker case, with a Rewrite flow button and suggested example instructions."
+            widths={[440, 880]}
+            sizes="(min-width: 1101px) 320px, (min-width: 621px) 46vw, 92vw"
+          />
+          <figcaption class="fl-shot-cap">
+            <span class="fl-shot-cap-label">rewritten by AI</span> — the result stays
+            unsaved until you have read it.
+          </figcaption>
+        </figure>
+      </div>
+
+      <dialog id="shot-lightbox" class="fl-lightbox" aria-label="Screenshot">
+        <div class="fl-lightbox-panel">
+          <div class="fl-lightbox-head">
+            <p class="fl-lightbox-cap" data-lightbox-cap></p>
+            <button type="button" class="fl-lightbox-close" data-lightbox-close>close ✕</button>
+          </div>
+          <div class="fl-lightbox-body">
+            <img class="fl-lightbox-img" alt="" data-lightbox-img />
+          </div>
+        </div>
+      </dialog>
+    </div>
+  </section>
+
   <!-- 11 · who builds it -->
   <section class="fl-wrap">
     <div class="fl-section">
@@ -1099,6 +1186,35 @@ const jsonLd = [
     });
 
     render();
+  }
+
+  /* Screenshots open full size in a modal dialog, in the capture that matches
+   * the theme currently on screen. */
+  const lightbox = document.getElementById('shot-lightbox');
+
+  if (lightbox) {
+    const full = lightbox.querySelector('[data-lightbox-img]');
+    const caption = lightbox.querySelector('[data-lightbox-cap]');
+
+    document.querySelectorAll('.fl-shot-open').forEach((shot) => {
+      shot.addEventListener('click', () => {
+        const dark = document.documentElement.classList.contains('dark');
+        full.src = dark ? shot.dataset.fullDark : shot.dataset.fullLight;
+        full.alt = shot.dataset.alt ?? '';
+        const figcaption = shot.closest('figure')?.querySelector('figcaption');
+        caption.innerHTML = figcaption ? figcaption.innerHTML : '';
+        lightbox.showModal();
+      });
+    });
+
+    // A click on the backdrop lands on the dialog itself.
+    lightbox.addEventListener('click', (event) => {
+      if (event.target === lightbox) lightbox.close();
+    });
+    lightbox
+      .querySelector('[data-lightbox-close]')
+      ?.addEventListener('click', () => lightbox.close());
+    lightbox.addEventListener('close', () => full.removeAttribute('src'));
   }
 
   // The hero's install command.
