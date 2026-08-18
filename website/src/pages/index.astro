@@ -72,20 +72,22 @@ const jsonLd = [
 ];
 
 const exampleFlow = `---
-title: Create and read back
+title: Order to door
 ---
 
-# Create and read back
+# Order to door
 
-Create a post signed by a random author, then check it exists.
+Create an order for a customer, then confirm its payment.
 
 \`\`\`step
-application: jsonplaceholder
-method: createPost
+application: acme-orders
+method: createOrder
 parameters:
   body:
-    title: "{{ randomString }}"
-    userId: 1
+    customerId: CUST-2041
+    items:
+      - sku: SKU-BOX-020
+        qty: 10
 test:
   status: 201
 \`\`\``;
@@ -233,7 +235,7 @@ test:
           class="flex items-center gap-2 border-b border-border bg-muted/50 px-4 py-2.5 text-xs font-medium text-muted-foreground"
         >
           <Icon name="file" class="size-3.5" />
-          flows/create-and-read-back.md
+          flows/order-to-door.md
         </div>
         <pre
           class="overflow-x-auto p-4 font-mono text-[13px] leading-relaxed">{exampleFlow}</pre>
@@ -269,7 +271,7 @@ test:
         <ThemedShot
           light={folderLight}
           dark={folderDark}
-          alt="A folder view listing nine payment flows as a table, with one column per frontmatter property: owner, priority, tags, reviewed, due date, a computed coverage column and the step count."
+          alt="A folder view listing nine last-mile delivery flows as a table, with one column per frontmatter property: owner, priority, tags, reviewed, due date, a computed coverage column and the step count."
           widths={[720, 1200, 2200]}
           sizes="(min-width: 1152px) 1104px, 100vw"
         />
@@ -297,7 +299,7 @@ test:
             <ThemedShot
               light={aiCreateLight}
               dark={aiCreateDark}
-              alt="The 'What should this flow test?' dialog after creating a flow with AI: a plain-words prompt describes a chargeback scenario, with a Generate flow button."
+              alt="The 'What should this flow test?' dialog after creating a flow with AI: a plain-words prompt describes a lost-parcel claim scenario, with a Generate flow button."
               widths={[560, 1100]}
               sizes="(min-width: 1024px) 540px, 100vw"
             />
@@ -311,7 +313,7 @@ test:
             <ThemedShot
               light={aiEditLight}
               dark={aiEditDark}
-              alt="The 'Edit with AI' dialog over an open flow: an instruction asks to also cover the dispute case, with a Rewrite flow button and suggested example instructions."
+              alt="The 'Edit with AI' dialog over an open flow: an instruction asks to also cover the full-locker case, with a Rewrite flow button and suggested example instructions."
               widths={[560, 1100]}
               sizes="(min-width: 1024px) 540px, 100vw"
             />
