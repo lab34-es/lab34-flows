@@ -575,7 +575,7 @@ shows what it is doing in a modal while it runs. The pull happens on the
 server, so closing the modal does not stop it.
 
 Each document is a normal Markdown flow with **no `step` blocks yet**: Jira
-owns the title and the description, you write the steps.
+owns the title, the description and the Xray test details, you write the steps.
 
 ````markdown
 ---
@@ -584,6 +584,7 @@ xray:
   testKey: BOP-123
   status: To Do
   issueType: Test
+  testType: Manual
   feature: BOP-10
   userStory: BOP-42
   url: https://acme.atlassian.net/browse/BOP-123
@@ -594,7 +595,34 @@ xray:
 <!-- xray:description -->
 The description, as written in Jira.
 <!-- /xray:description -->
+
+<!-- xray:details -->
+## Test details
+
+**Test type:** Manual
+
+### Step 1
+
+Pay with a card that expired yesterday
+
+**Data**
+
+4111 1111 1111 1111
+
+**Expected result**
+
+The payment is refused
+<!-- /xray:details -->
 ````
+
+The **test details** block is the Test Details panel of Xray, as Markdown: the
+steps of a Manual test, the scenario of a Cucumber one (in a `gherkin` code
+block), the definition of a Generic one. Where they come from depends on the
+integration — Xray Cloud answers them with the tests themselves, Xray for
+Server/DC answers the steps through its own API and keeps the rest in Jira
+custom fields, and a plain **Jira Cloud API token** reaches only whatever Xray
+exposes as a Jira field. When a pull cannot read the details, it says so in the
+log and leaves the block a previous pull wrote untouched.
 
 How the folders are laid out depends on what the integration can see:
 
@@ -621,13 +649,25 @@ How the folders are laid out depends on what the integration can see:
 
 Pulling again is safe, and is the point:
 
-- Only the frontmatter and the block between the `xray:description` markers
-  are rewritten. Every step you added, and every property of your own, is kept.
+- Only the frontmatter and the blocks between the `xray:description` and
+  `xray:details` markers are rewritten. Every step you added, and every
+  property of your own, is kept.
 - A test that moved in Jira is **moved** on disk, not written twice, and the
   folders it left behind are removed.
 - A pull that finds nothing new leaves every file byte for byte as it was, so
   `git diff` after a pull shows what Jira changed and nothing else.
 - Tests deleted in Jira are never deleted here.
+
+**Overwrite tests already pulled** decides what a second pull does with the
+tests that are already there:
+
+- **On** (the default) — a flow whose `xray.testKey` is already in the `xray`
+  folder is rewritten with what Jira says now, as described above.
+- **Off** — that flow is left exactly as it is: not moved, not rewritten, not
+  even read, and nothing is downloaded for it. Only tests that were never
+  pulled are written, and the modal counts the rest as **skipped**. Turn it off
+  when the files in `xray` have become yours and Jira should no longer touch
+  them.
 
 ## Default examples
 

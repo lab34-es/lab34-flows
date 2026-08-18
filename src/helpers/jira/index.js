@@ -19,7 +19,8 @@
  *     "cloud":  { "xrayBaseUrl": "https://xray.cloud.getxray.app",
  *                 "clientId": "...", "clientSecret": "..." },
  *     "basic":  { "email": "me@acme.com", "apiToken": "..." },
- *     "server": { "personalAccessToken": "..." }
+ *     "server": { "personalAccessToken": "..." },
+ *     "pull":   { "overwrite": true }
  *   }
  *
  * Secrets never leave the machine through this module: everything the UI
@@ -66,13 +67,14 @@ const cleanUrl = (value) => String(value || '').trim().replace(/\/+$/, '');
 /**
  * Normalize a raw config file into the current shape.
  * @param {Object} raw - Contents of config/jira.json
- * @returns {Object} { kind, jiraBaseUrl, projectKey, cloud, server }
+ * @returns {Object} { kind, jiraBaseUrl, projectKey, cloud, server, pull }
  */
 const normalize = (raw) => {
   const source = (raw && typeof raw === 'object') ? raw : {};
   const cloud = (source.cloud && typeof source.cloud === 'object') ? source.cloud : {};
   const basic = (source.basic && typeof source.basic === 'object') ? source.basic : {};
   const server = (source.server && typeof source.server === 'object') ? source.server : {};
+  const pull = (source.pull && typeof source.pull === 'object') ? source.pull : {};
 
   return {
     kind: KIND_IDS.includes(source.kind) ? source.kind : KIND_IDS[0],
@@ -89,6 +91,11 @@ const normalize = (raw) => {
     },
     server: {
       personalAccessToken: server.personalAccessToken || undefined
+    },
+    pull: {
+      // A pull has always rewritten what Jira owns: it stays that way unless
+      // the user turned it off
+      overwrite: pull.overwrite !== false
     }
   };
 };
@@ -141,6 +148,9 @@ const getSettings = async () => {
     server: {
       hasToken: Boolean(settings.server.personalAccessToken)
     },
+    pull: {
+      overwrite: settings.pull.overwrite
+    },
     available: KINDS,
     defaultXrayBaseUrl: DEFAULT_XRAY_BASE_URL,
     configured: isConfigured(settings)
@@ -166,7 +176,8 @@ const nextSecret = (incoming, stored) => {
  * @param {Object} body - { kind, jiraBaseUrl, projectKey,
  *                          cloud: { xrayBaseUrl, clientId, clientSecret },
  *                          basic: { email, apiToken },
- *                          server: { personalAccessToken } }
+ *                          server: { personalAccessToken },
+ *                          pull: { overwrite } }
  * @returns {Promise<Object>} The public settings, as returned by getSettings
  */
 const saveSettings = async (body) => {
@@ -180,6 +191,7 @@ const saveSettings = async (body) => {
   const inputCloud = (input.cloud && typeof input.cloud === 'object') ? input.cloud : {};
   const inputBasic = (input.basic && typeof input.basic === 'object') ? input.basic : {};
   const inputServer = (input.server && typeof input.server === 'object') ? input.server : {};
+  const inputPull = (input.pull && typeof input.pull === 'object') ? input.pull : {};
 
   const next = {
     kind: input.kind || current.kind,
@@ -204,6 +216,11 @@ const saveSettings = async (body) => {
     },
     server: {
       personalAccessToken: nextSecret(inputServer.personalAccessToken, current.server.personalAccessToken)
+    },
+    pull: {
+      overwrite: inputPull.overwrite === undefined
+        ? current.pull.overwrite
+        : Boolean(inputPull.overwrite)
     }
   };
 

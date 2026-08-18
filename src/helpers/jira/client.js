@@ -48,6 +48,27 @@ const ALL_TESTS_QUERY = `query allTests($jql: String!, $limit: Int!, $start: Int
   }
 }`;
 
+// ...and the same again with the Test Details: the steps of a Manual test,
+// the scenario of a Cucumber one, the definition of a Generic one. Xray only
+// answers the fields its version knows, so this query is tried first and the
+// one above is the fallback — see walkCloudTests.
+const ALL_TESTS_DETAILS_QUERY = `query allTestsWithDetails($jql: String!, $limit: Int!, $start: Int!) {
+  getTests(jql: $jql, limit: $limit, start: $start) {
+    total
+    start
+    limit
+    results {
+      issueId
+      testType { name kind }
+      folder { path }
+      steps { id action data result }
+      gherkin
+      unstructured
+      jira(fields: ["key", "summary", "description", "status", "issuetype"])
+    }
+  }
+}`;
+
 // The JWT of the last authenticated Xray Cloud account, kept for the life of
 // the process. The credentials are part of the entry so that changing them in
 // Settings cannot reuse the previous token.
@@ -203,7 +224,10 @@ const graphql = async (settings, body, { timeout = TIMEOUT } = {}) => {
   const data = response.data || {};
 
   if (data.errors && data.errors.length) {
-    throw new Error(`Xray Cloud: ${data.errors.map(error => error.message).join('; ')}`);
+    const error = new Error(`Xray Cloud: ${data.errors.map(item => item.message).join('; ')}`);
+    // The query itself was refused: the caller may know a simpler one to ask
+    error.graphql = true;
+    throw error;
   }
 
   return data.data || {};
@@ -238,27 +262,67 @@ const fetchCloudTests = async (settings, keys) => {
 };
 
 /**
+ * The Test Details of an Xray Cloud result: whichever of the three shapes a
+ * Test can have, plus the steps of a Manual one.
+ * @param {Object} result - One entry of getTests().results
+ * @returns {Object} { testType, steps, gherkin, unstructured }
+ */
+const cloudDetails = (result) => ({
+  testType: (result.testType && result.testType.name) || null,
+  steps: (result.steps || []).map(step => ({
+    action: step.action || null,
+    data: step.data || null,
+    result: step.result || null
+  })),
+  gherkin: result.gherkin || null,
+  unstructured: result.unstructured || null
+});
+
+/**
  * Walk every Test of a JQL query in Xray Cloud, page by page, handing each
  * page to the caller as soon as it arrives. Used by the pull, which writes
  * files while the next page is still downloading.
+ *
+ * The Test Details are asked for along with the tests themselves; an Xray
+ * that will not answer them is not an error, the walk just carries on
+ * without them and says so through onNotice.
  *
  * @param {Object} settings - Full Jira settings
  * @param {Object} options
  * @param {string} options.jql - Which tests to walk, e.g. 'project = "BOP"'
  * @param {Function} options.onPage - async (tests, total) => void. Each test is
- *   { key, summary, description, status, issueType, testType, issueId, folder }
+ *   { key, summary, description, status, issueType, testType, issueId, folder,
+ *     details }
  * @param {Function} [options.stopped] - () => boolean, checked between pages
+ * @param {Function} [options.onNotice] - (message) => void, for what the user
+ *   should know without the pull failing
  * @returns {Promise<number>} How many tests were handed over
  */
-const walkCloudTests = async (settings, { jql, onPage, stopped }) => {
+const walkCloudTests = async (settings, { jql, onPage, stopped, onNotice }) => {
   let start = 0;
   let seen = 0;
+  let details = true;
 
   for (;;) {
+    const variables = { jql, limit: MAX_KEYS_PER_QUERY, start };
+
     const data = await graphql(settings, {
-      query: ALL_TESTS_QUERY,
-      variables: { jql, limit: MAX_KEYS_PER_QUERY, start }
-    }, { timeout: PULL_TIMEOUT });
+      query: details ? ALL_TESTS_DETAILS_QUERY : ALL_TESTS_QUERY,
+      variables
+    }, { timeout: PULL_TIMEOUT })
+      .catch(error => {
+        // Only the query was refused — ask again for the tests alone, and
+        // never ask for the details again in this walk
+        if (!details || !error || !error.graphql) { throw error; }
+
+        details = false;
+
+        if (onNotice) {
+          onNotice(`Xray did not answer the test details (${error.message}): the tests are pulled without them.`);
+        }
+
+        return graphql(settings, { query: ALL_TESTS_QUERY, variables }, { timeout: PULL_TIMEOUT });
+      });
 
     const page = (data.getTests && data.getTests.results) || [];
     const total = (data.getTests && data.getTests.total) || 0;
@@ -270,7 +334,8 @@ const walkCloudTests = async (settings, { jql, onPage, stopped }) => {
       return {
         ...(fromGraphql(result) || { key: jira.key }),
         description: jira.description || null,
-        folder: (result.folder && result.folder.path) || null
+        folder: (result.folder && result.folder.path) || null,
+        details: details ? cloudDetails(result) : null
       };
     }).filter(test => test.key), total);
 
@@ -601,6 +666,63 @@ const fetchServerRepository = async (settings, projectKey) => {
   return paths;
 };
 
+/* --------------------------- Xray Server/DC steps ------------------------- */
+
+/**
+ * Read one of the {raw, rendered} pairs Xray Server answers with, or the
+ * plain string an older version sends instead.
+ * @param {*} value
+ * @returns {string|null}
+ */
+const stepText = (value) => {
+  if (value === null || value === undefined) { return null; }
+
+  const text = typeof value === 'object'
+    ? (value.raw !== undefined ? value.raw : value.rendered)
+    : value;
+
+  return String(text || '').trim() || null;
+};
+
+/**
+ * The steps of a Manual test on Xray for Server/DC.
+ *
+ * Xray answers this through its own REST API, and only to users who can see
+ * the test. A test that has no steps — or an Xray that will not answer —
+ * gives an empty list, so this never throws: a pull must not fail over a
+ * detail it could not read.
+ *
+ * @param {Object} settings - Full Jira settings
+ * @param {string} key - Test issue key
+ * @returns {Promise<Array<Object>>} { action, data, result }
+ */
+const fetchServerSteps = async (settings, key) => {
+  const headers = jiraRestHeaders(settings);
+  const base = `${settings.jiraBaseUrl}/rest/raven/1.0/api/test/${encodeURIComponent(key)}`;
+
+  const read = (url) => axios
+    .get(url, { timeout: PULL_TIMEOUT, headers })
+    .then(response => response.data);
+
+  // Xray named the resource "step"; some versions only answer "steps"
+  const data = await read(`${base}/step`)
+    .catch(() => read(`${base}/steps`))
+    .catch(() => null);
+
+  // Xray never answered: "unknown", which is not the same as "no steps"
+  if (data === null || data === undefined) { return null; }
+
+  const steps = Array.isArray(data)
+    ? data
+    : (Array.isArray(data.steps) ? data.steps : []);
+
+  return steps.map(step => ({
+    action: stepText(step.step !== undefined ? step.step : step.action),
+    data: stepText(step.data),
+    result: stepText(step.result !== undefined ? step.result : step.expectedResult)
+  }));
+};
+
 /**
  * Validate the stored credentials by actually using them.
  * @param {Object} settings - Full Jira settings
@@ -634,6 +756,7 @@ module.exports = {
   countIssues,
   fetchIssuesByKeys,
   fetchServerRepository,
+  fetchServerSteps,
   fieldId,
   TIMEOUT,
   PULL_TIMEOUT

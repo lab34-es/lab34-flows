@@ -32,6 +32,11 @@ const markdownFlows = require('../markdownFlows');
 const DESCRIPTION_START = '<!-- xray:description -->';
 const DESCRIPTION_END = '<!-- /xray:description -->';
 
+// ...and so is the Test Details panel of Xray: the steps of a Manual test,
+// the scenario of a Cucumber one, the definition of a Generic one
+const DETAILS_START = '<!-- xray:details -->';
+const DETAILS_END = '<!-- /xray:details -->';
+
 // Long summaries make for unusable paths: enough to recognise the test, no more
 const MAX_SLUG_LENGTH = 60;
 
@@ -132,6 +137,125 @@ const withDescriptionBlock = (body, description, title) => {
 };
 
 /**
+ * Trim a piece of text coming from Jira/Xray, or say there is none.
+ * @param {*} value
+ * @returns {string|null}
+ */
+const trimmed = (value) => String(value === null || value === undefined ? '' : value).trim() || null;
+
+/**
+ * A code fence long enough to hold text that has fences of its own.
+ * @param {string} text
+ * @returns {string}
+ */
+const fenceFor = (text) => {
+  const longest = String(text || '').match(/`{3,}/g) || [];
+  const length = longest.reduce((max, run) => Math.max(max, run.length), 2);
+  return '`'.repeat(length + 1);
+};
+
+/**
+ * One Manual step, as Xray shows it: what to do, what to do it with, and
+ * what should happen.
+ * @param {Object} step - { action, data, result }
+ * @param {number} index - Zero based
+ * @returns {string} Markdown
+ */
+const stepSection = (step, index) => {
+  const lines = [`### Step ${index + 1}`, '', trimmed(step && step.action) || '_No action._'];
+
+  const data = trimmed(step && step.data);
+  if (data) { lines.push('', '**Data**', '', data); }
+
+  const result = trimmed(step && step.result);
+  if (result) { lines.push('', '**Expected result**', '', result); }
+
+  return lines.join('\n');
+};
+
+/**
+ * The Test Details of a test, as Markdown.
+ *
+ * What a Test holds depends on what it is: a Manual test has steps, a
+ * Cucumber test a Gherkin scenario, a Generic test a definition. Whatever
+ * Xray answered is written, and a test with nothing in it says so rather
+ * than leaving a block that looks half written.
+ *
+ * @param {Object} details - { testType, steps, gherkin, unstructured }
+ * @returns {string} Markdown, without the markers
+ */
+const detailsMarkdown = (details) => {
+  const sections = ['## Test details'];
+
+  const testType = trimmed(details && details.testType);
+  if (testType) { sections.push(`**Test type:** ${testType}`); }
+
+  const steps = (details && details.steps) || [];
+  const gherkin = trimmed(details && details.gherkin);
+  const unstructured = trimmed(details && details.unstructured);
+
+  steps.forEach((step, index) => sections.push(stepSection(step, index)));
+
+  if (gherkin) {
+    const fence = fenceFor(gherkin);
+    sections.push(`${fence}gherkin\n${gherkin}\n${fence}`);
+  }
+
+  if (unstructured) {
+    const fence = fenceFor(unstructured);
+    sections.push(`${fence}\n${unstructured}\n${fence}`);
+  }
+
+  if (!steps.length && !gherkin && !unstructured) {
+    sections.push('_This test has no details in Xray._');
+  }
+
+  return sections.join('\n\n');
+};
+
+/**
+ * Replace the Test Details block of a document body, add one when the
+ * document has none yet, or leave the body exactly as it is when this pull
+ * could not read the details at all.
+ *
+ * A brand new block goes right under the description, so the file reads the
+ * way Xray does: what the test is, then what it says to do — and whatever
+ * the user wrote below stays below.
+ *
+ * @param {string} body - The body of the document (no frontmatter)
+ * @param {Object|null} details - See detailsMarkdown, or null when unknown
+ * @returns {string} The new body
+ */
+const withDetailsBlock = (body, details) => {
+  const current = String(body || '').replace(/\r\n?/g, '\n');
+
+  // "Xray was not asked" is not "Xray has nothing": a pull that could not
+  // read the details must not wipe the ones a previous pull wrote
+  if (!details) { return current; }
+
+  const block = `${DETAILS_START}\n${detailsMarkdown(details)}\n${DETAILS_END}`;
+
+  const start = current.indexOf(DETAILS_START);
+  const end = current.indexOf(DETAILS_END);
+
+  if (start !== -1 && end > start) {
+    return `${current.slice(0, start)}${block}${current.slice(end + DETAILS_END.length)}`;
+  }
+
+  const afterDescription = current.indexOf(DESCRIPTION_END);
+
+  if (afterDescription !== -1) {
+    const cut = afterDescription + DESCRIPTION_END.length;
+    const rest = current.slice(cut).replace(/^\n+/, '');
+    return `${current.slice(0, cut)}\n\n${block}\n${rest ? `\n${rest}` : ''}`;
+  }
+
+  const rest = current.trim();
+
+  return rest ? `${rest}\n\n${block}\n` : `${block}\n`;
+};
+
+/**
  * The frontmatter of a pulled test: what Jira owns comes first and is always
  * rewritten, anything the user added to the file is kept as it was.
  *
@@ -181,8 +305,10 @@ const frontmatter = (current, test) => {
 const build = (existing, test) => {
   const { meta, body } = markdownFlows.parseFrontmatter(existing || '');
 
+  const described = withDescriptionBlock(body, test.description, test.summary || test.key);
+
   return markdownFlows.withFrontmatter(
-    withDescriptionBlock(body, test.description, test.summary || test.key),
+    withDetailsBlock(described, test.details),
     frontmatter(meta, test)
   );
 };
@@ -191,9 +317,13 @@ module.exports = {
   build,
   frontmatter,
   withDescriptionBlock,
+  withDetailsBlock,
+  detailsMarkdown,
   keyedName,
   sanitizeSegment,
   slug,
   DESCRIPTION_START,
-  DESCRIPTION_END
+  DESCRIPTION_END,
+  DETAILS_START,
+  DETAILS_END
 };

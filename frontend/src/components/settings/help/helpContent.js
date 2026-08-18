@@ -638,18 +638,31 @@ until a flow that mentions a test key is rendered, and every key is downloaded
 at most once per run of the tool.
 
 **Pull tests** downloads every Test of the project into an \`xray\` folder in
-your flows — one Markdown document per test, with the Jira description as its
-content and no step blocks yet. With an Xray API key (Cloud) or on Server/DC
-the folders mirror the **Test Repository**; with a Jira API token there is no
-Test Repository to read, so they are rebuilt from Jira's hierarchy:
+your flows — one Markdown document per test, with the Jira description and the
+Xray **test details** as its content, and no step blocks yet. The details block
+is the Test Details panel as Markdown: the steps of a Manual test, the scenario
+of a Cucumber one, the definition of a Generic one. Xray Cloud answers them
+with the tests themselves; on Server/DC the steps come from Xray's own API;
+with a Jira API token only what Xray exposes as a Jira field can be read.
+
+With an Xray API key (Cloud) or on Server/DC the folders mirror the **Test
+Repository**; with a Jira API token there is no Test Repository to read, so
+they are rebuilt from Jira's hierarchy:
 
     xray/<FEATURE>_<slug>/<STORY>_<slug>/<TEST>_<slug>.md
 
 A test that is a child of nothing gets its feature and story from its
 **related work** — the issue links — and whatever cannot be resolved lands in
-\`_no-feature\` / \`_no-user-story\`. Pulling again rewrites only the frontmatter
-and the description block: the steps you wrote stay, a test that moved in Jira
-is moved rather than duplicated, and nothing is ever deleted.
+\`_no-feature\` / \`_no-user-story\`. Pulling again rewrites only the frontmatter,
+the description block and the details block: the steps you wrote stay, a test
+that moved in Jira is moved rather than duplicated, and nothing is ever deleted.
+
+**Overwrite tests already pulled** decides what that second pull does with the
+tests that are already on disk. On (the default), a flow whose \`xray.testKey\`
+is already in \`xray\` is updated with what Jira says now. Off, it is left
+exactly as it is — not moved, not rewritten, nothing downloaded for it — and
+only tests that were never pulled are written; the modal counts the rest as
+**skipped**.
 
 > Uploading executions back to Xray is **not supported yet**: nothing this
 > integration does ever writes to Jira.

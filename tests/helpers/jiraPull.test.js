@@ -306,6 +306,42 @@ describe('the Jira hierarchy layout (Jira Cloud with an API token)', () => {
     expect(status.created).toBe(0);
     expect(status.updated).toBe(0);
   });
+
+  test('leaves a test that is already in "xray" alone when overwrite is off', async () => {
+    mockJira({ tests: [issue('BOP-125', 'Orphan test', 'Test', { summary: 'Orphan test' })] });
+
+    await runPull();
+
+    const file = `${pull.NO_FEATURE}/${pull.NO_STORY}/BOP-125_orphan-test.md`;
+    const before = read(file);
+
+    configHelper.__set({ ...BASIC_SETTINGS, pull: { overwrite: false } });
+
+    // Jira renamed the test: with overwrite off, the file must not notice
+    mockJira({ tests: [issue('BOP-125', 'Renamed in Jira', 'Test')] });
+
+    const status = await runPull();
+
+    expect(status.overwrite).toBe(false);
+    expect(status.skipped).toBe(1);
+    expect(status.updated).toBe(0);
+    expect(status.created).toBe(0);
+    expect(status.moved).toBe(0);
+    expect(written()).toEqual([file]);
+    expect(read(file)).toBe(before);
+  });
+
+  test('still writes a test that was never pulled when overwrite is off', async () => {
+    configHelper.__set({ ...BASIC_SETTINGS, pull: { overwrite: false } });
+
+    mockJira({ tests: [issue('BOP-125', 'Orphan test', 'Test')] });
+
+    const status = await runPull();
+
+    expect(status.created).toBe(1);
+    expect(status.skipped).toBe(0);
+    expect(written()).toEqual([`${pull.NO_FEATURE}/${pull.NO_STORY}/BOP-125_orphan-test.md`]);
+  });
 });
 
 describe('the Xray Test Repository layout (Xray Cloud)', () => {
@@ -353,6 +389,158 @@ describe('the Xray Test Repository layout (Xray Cloud)', () => {
     });
   });
 
+  test('writes the test details Xray answers, steps and all', async () => {
+    axios.post.mockImplementation((url, body) => {
+      if (url.endsWith('/api/v2/authenticate')) {
+        return Promise.resolve({ data: '"jwt-token"' });
+      }
+
+      if (url.endsWith('/api/v2/graphql')) {
+        if (body.variables.start > 0) {
+          return Promise.resolve({ data: { data: { getTests: { total: 1, results: [] } } } });
+        }
+
+        return Promise.resolve({
+          data: {
+            data: {
+              getTests: {
+                total: 1,
+                results: [{
+                  issueId: '10001',
+                  testType: { name: 'Manual' },
+                  folder: { path: '/Authentication/Login' },
+                  steps: [
+                    { id: '1', action: 'Open the login page', data: null, result: 'The form shows' },
+                    { id: '2', action: 'Sign in', data: 'jane@acme.com', result: 'The dashboard shows' }
+                  ],
+                  gherkin: null,
+                  unstructured: null,
+                  jira: {
+                    key: 'BOP-200',
+                    summary: 'Login with valid credentials',
+                    status: { name: 'To Do' },
+                    issuetype: { name: 'Test' },
+                    description: null
+                  }
+                }]
+              }
+            }
+          }
+        });
+      }
+
+      return Promise.reject(new Error(`Unexpected POST ${url}`));
+    });
+
+    await runPull();
+
+    const document = read('Authentication/Login/BOP-200_login-with-valid-credentials.md');
+
+    expect(document).toContain('## Test details');
+    expect(document).toContain('**Test type:** Manual');
+    expect(document).toContain('### Step 1');
+    expect(document).toContain('Open the login page');
+    expect(document).toContain('**Expected result**');
+    expect(document).toContain('### Step 2');
+    expect(document).toContain('jane@acme.com');
+  });
+
+  test('writes the scenario of a Cucumber test', async () => {
+    axios.post.mockImplementation((url, body) => {
+      if (url.endsWith('/api/v2/authenticate')) {
+        return Promise.resolve({ data: '"jwt-token"' });
+      }
+
+      if (body.variables.start > 0) {
+        return Promise.resolve({ data: { data: { getTests: { total: 1, results: [] } } } });
+      }
+
+      return Promise.resolve({
+        data: {
+          data: {
+            getTests: {
+              total: 1,
+              results: [{
+                issueId: '10002',
+                testType: { name: 'Cucumber' },
+                folder: { path: '/' },
+                steps: [],
+                gherkin: 'Given a registered user\nWhen they sign in\nThen the dashboard shows',
+                unstructured: null,
+                jira: {
+                  key: 'BOP-201',
+                  summary: 'Sign in',
+                  status: { name: 'To Do' },
+                  issuetype: { name: 'Test' },
+                  description: null
+                }
+              }]
+            }
+          }
+        }
+      });
+    });
+
+    await runPull();
+
+    const document = read('BOP-201_sign-in.md');
+
+    expect(document).toContain('```gherkin');
+    expect(document).toContain('Given a registered user');
+  });
+
+  test('pulls the tests anyway when Xray will not answer the details', async () => {
+    axios.post.mockImplementation((url, body) => {
+      if (url.endsWith('/api/v2/authenticate')) {
+        return Promise.resolve({ data: '"jwt-token"' });
+      }
+
+      // The Xray that does not know the detail fields refuses that query
+      if (/steps/.test(body.query)) {
+        return Promise.resolve({
+          data: { errors: [{ message: 'Cannot query field "steps" on type "Test"' }] }
+        });
+      }
+
+      if (body.variables.start > 0) {
+        return Promise.resolve({ data: { data: { getTests: { total: 1, results: [] } } } });
+      }
+
+      return Promise.resolve({
+        data: {
+          data: {
+            getTests: {
+              total: 1,
+              results: [{
+                issueId: '10003',
+                testType: { name: 'Manual' },
+                folder: { path: '/' },
+                jira: {
+                  key: 'BOP-202',
+                  summary: 'No details here',
+                  status: { name: 'To Do' },
+                  issuetype: { name: 'Test' },
+                  description: null
+                }
+              }]
+            }
+          }
+        }
+      });
+    });
+
+    const status = await runPull();
+
+    expect(status.phase).toBe('done');
+    expect(status.created).toBe(1);
+    expect(status.log.some(line => line.level === 'warn' && /test details/i.test(line.message))).toBe(true);
+
+    const document = read('BOP-202_no-details-here.md');
+
+    expect(document).toContain('testKey: BOP-202');
+    expect(document).not.toContain('## Test details');
+  });
+
   test('mirrors the folders of the Test Repository', async () => {
     const status = await runPull();
 
@@ -366,6 +554,101 @@ describe('the Xray Test Repository layout (Xray Cloud)', () => {
     expect(document).toContain('folder: /Authentication/Login');
     expect(document).toContain('testType: Manual');
     expect(document).toContain('Sign in and land on the dashboard.');
+  });
+});
+
+describe('the Xray Test Repository layout (Xray Server/DC)', () => {
+  const SERVER_SETTINGS = {
+    kind: 'server',
+    jiraBaseUrl: 'https://jira.acme.com',
+    projectKey: 'BOP',
+    server: { personalAccessToken: 'personal-access-token' }
+  };
+
+  beforeEach(() => {
+    configHelper.__set(SERVER_SETTINGS);
+
+    axios.get.mockImplementation((url) => {
+      if (url.endsWith('/rest/raven/1.0/api/testrepository/BOP/folders')) {
+        return Promise.resolve({
+          data: { id: -1, name: '', folders: [{ id: 1, name: 'Login', folders: [] }] }
+        });
+      }
+
+      if (url.endsWith('/rest/raven/1.0/api/testrepository/BOP/folders/1/tests')) {
+        return Promise.resolve({ data: { tests: [{ key: 'BOP-300' }] } });
+      }
+
+      if (url.endsWith('/rest/raven/1.0/api/test/BOP-300/step')) {
+        return Promise.resolve({
+          data: [{
+            id: 1,
+            index: 1,
+            step: { raw: 'Open the app', rendered: '<p>Open the app</p>' },
+            data: { raw: '' },
+            result: { raw: 'It opens' }
+          }]
+        });
+      }
+
+      if (url.endsWith('/rest/api/2/field')) {
+        return Promise.resolve({
+          data: [
+            { id: 'customfield_20001', name: 'Test Type' },
+            { id: 'customfield_20002', name: 'Cucumber Scenario' }
+          ]
+        });
+      }
+
+      if (url.endsWith('/rest/api/2/search/jql')) {
+        return Promise.resolve({
+          data: {
+            issues: [issue('BOP-300', 'Sign in', 'Test', {
+              customfield_20001: { value: 'Manual' }
+            })],
+            nextPageToken: null
+          }
+        });
+      }
+
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    axios.post.mockImplementation((url) => {
+      if (url.endsWith('/rest/api/2/search/approximate-count')) {
+        return Promise.resolve({ data: { count: 1 } });
+      }
+
+      return Promise.reject(new Error(`Unexpected POST ${url}`));
+    });
+  });
+
+  test('writes the steps Xray for Server/DC answers, in the folder of the repository', async () => {
+    const status = await runPull();
+
+    expect(status.phase).toBe('done');
+    expect(written()).toEqual(['Login/BOP-300_sign-in.md']);
+
+    const document = read('Login/BOP-300_sign-in.md');
+
+    expect(document).toContain('folder: /Login');
+    expect(document).toContain('testType: Manual');
+    expect(document).toContain('## Test details');
+    expect(document).toContain('### Step 1');
+    expect(document).toContain('Open the app');
+    expect(document).toContain('It opens');
+  });
+
+  test('asks nothing about a test it is going to skip', async () => {
+    await runPull();
+
+    configHelper.__set({ ...SERVER_SETTINGS, pull: { overwrite: false } });
+    axios.get.mockClear();
+
+    const status = await runPull();
+
+    expect(status.skipped).toBe(1);
+    expect(axios.get.mock.calls.some(([url]) => url.includes('/api/test/BOP-300/step'))).toBe(false);
   });
 });
 
@@ -403,6 +686,58 @@ describe('testDoc', () => {
     const second = testDoc.build(edited, { key: 'BOP-1', summary: 'Login', description: 'Text' });
 
     expect(second).toContain('owner: jane');
+  });
+
+  test('rewrites the test details on a second pull, keeping the steps written by hand', () => {
+    const first = testDoc.build(null, {
+      key: 'BOP-1',
+      summary: 'Login',
+      description: 'Sign in.',
+      details: { testType: 'Manual', steps: [{ action: 'Open the app', result: 'It opens' }] }
+    });
+
+    expect(first).toContain('## Test details');
+    expect(first).toContain('Open the app');
+
+    const edited = `${first}\n\`\`\`step\napplication: calculator\n\`\`\`\n`;
+
+    const second = testDoc.build(edited, {
+      key: 'BOP-1',
+      summary: 'Login',
+      description: 'Sign in.',
+      details: { testType: 'Manual', steps: [{ action: 'Open the app twice', result: 'It opens' }] }
+    });
+
+    expect(second).toContain('Open the app twice');
+    expect(second).not.toContain('Open the app\n');
+    expect(second).toContain('```step');
+    // The block is written once, not once per pull
+    expect(second.match(/## Test details/g)).toHaveLength(1);
+  });
+
+  test('leaves the details alone when the pull could not read them', () => {
+    const first = testDoc.build(null, {
+      key: 'BOP-1',
+      summary: 'Login',
+      description: 'Sign in.',
+      details: { testType: 'Manual', steps: [{ action: 'Open the app' }] }
+    });
+
+    const second = testDoc.build(first, { key: 'BOP-1', summary: 'Login', description: 'Sign in.' });
+
+    expect(second).toContain('Open the app');
+    expect(second).toBe(first);
+  });
+
+  test('says so when a test has no details in Xray', () => {
+    const document = testDoc.build(null, {
+      key: 'BOP-1',
+      summary: 'Login',
+      description: 'Sign in.',
+      details: { testType: 'Manual', steps: [] }
+    });
+
+    expect(document).toContain('_This test has no details in Xray._');
   });
 
   test('says so when Jira has no description', () => {
