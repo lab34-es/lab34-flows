@@ -18,8 +18,11 @@
  *     "_no-user-story" rather than being dropped.
  *
  * A pull is repeatable: a test that moved is moved on disk instead of being
- * duplicated, and only the frontmatter and the description block of a file
- * are rewritten — see ./testDoc.
+ * duplicated, and only the frontmatter, the description block and the test
+ * details block of a file are rewritten — see ./testDoc. Whether a test that
+ * is already on disk is rewritten at all is the user's call: with "overwrite"
+ * off, a flow whose frontmatter already carries that xray.testKey is left
+ * exactly as it is and counted as skipped.
  *
  * One pull runs at a time, and its progress is both readable (status()) and
  * pushed over the socket, because the UI shows it in a modal.
@@ -50,6 +53,19 @@ const LOG_LIMIT = 200;
 
 // The Jira fields a pulled test is built from
 const TEST_FIELDS = ['summary', 'description', 'status', 'issuetype', 'parent', 'issuelinks'];
+
+// Where Xray for Server/DC keeps the Test Details that are not steps. They
+// are ordinary Jira custom fields, so they are read with the issue itself —
+// a Jira that does not have them simply resolves to nothing.
+const DETAIL_FIELDS = [
+  { name: 'Test Type', as: 'testType' },
+  { name: 'Cucumber Scenario', as: 'gherkin' },
+  { name: 'Generic Test Definition', as: 'unstructured' }
+];
+
+// How many tests are asked for their steps at once on Server/DC: enough to
+// keep the pull moving, few enough not to hammer Jira
+const STEP_CONCURRENCY = 5;
 
 // ...and the ones needed to walk up from a story to its feature
 const PARENT_FIELDS = ['summary', 'issuetype', 'parent', 'issuelinks'];
@@ -87,12 +103,14 @@ const idle = () => ({
   strategy: null,
   folder: ROOT,
   projectKey: null,
+  overwrite: true,
   total: null,
   processed: 0,
   created: 0,
   updated: 0,
   moved: 0,
   unchanged: 0,
+  skipped: 0,
   failed: 0,
   startedAt: null,
   finishedAt: null,
@@ -335,15 +353,33 @@ const indexExisting = (rootDir) => {
 /* -------------------------------- Writing -------------------------------- */
 
 /**
+ * Whether a test is already on disk and the user asked for those to be left
+ * alone. Checked before the test is written — and before anything is
+ * downloaded for it — so a pull that skips costs nothing.
+ *
+ * @param {Object} ctx - The running pull
+ * @param {string} key - Test issue key
+ * @returns {boolean}
+ */
+const skipping = (ctx, key) => !ctx.overwrite && Boolean(ctx.existing[String(key).trim().toUpperCase()]);
+
+/**
  * Write one test to disk, moving it first when it no longer belongs where it
  * was.
  *
  * @param {Object} ctx - The running pull
  * @param {Object} test - { key, summary, description, status, issueType,
- *                          testType, folder, feature, userStory }
+ *                          testType, folder, feature, userStory, details }
  * @param {Array<string>} segments - Folder names under "xray"
  */
 const writeTest = (ctx, test, segments) => {
+  // A flow with this xray.testKey is already there and must stay as it is:
+  // not moved, not rewritten, not even read
+  if (skipping(ctx, test.key)) {
+    state.skipped += 1;
+    return;
+  }
+
   const fileName = `${testDoc.keyedName(test.key, test.summary)}.md`;
   const absolute = path.join(ctx.rootDir, ...segments, fileName);
   const key = test.key.toUpperCase();
@@ -369,6 +405,7 @@ const writeTest = (ctx, test, segments) => {
     folder: test.folder,
     feature: test.feature,
     userStory: test.userStory,
+    details: test.details || null,
     url: ctx.jiraBaseUrl ? `${ctx.jiraBaseUrl}/browse/${test.key}` : null
   });
 
@@ -397,6 +434,94 @@ const failed = (key, error) => {
   log(`${key}: ${(error && error.message) || error}`, 'error');
 };
 
+/* --------------------------------- Details -------------------------------- */
+
+/**
+ * Run a worker over a list, a few items at a time, keeping the answers in
+ * the order the items came in.
+ *
+ * @param {Array} items
+ * @param {number} limit - How many run at once
+ * @param {Function} worker - async (item, index) => any
+ * @returns {Promise<Array>}
+ */
+const mapWithLimit = async (items, limit, worker) => {
+  const results = new Array(items.length);
+  let next = 0;
+
+  const runner = async () => {
+    for (;;) {
+      const index = next;
+      next += 1;
+
+      if (index >= items.length) { return; }
+
+      results[index] = await worker(items[index], index);
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runner));
+
+  return results;
+};
+
+/**
+ * The ids of the Jira custom fields Xray keeps the non-step details in.
+ * A field this Jira does not have — or that this user may not list — is
+ * simply absent, and the pull carries on without it.
+ *
+ * @param {Object} settings - Full Jira settings
+ * @returns {Promise<Object>} Field id, keyed by "testType" | "gherkin" | "unstructured"
+ */
+const detailFieldIds = async (settings) => {
+  const found = {};
+
+  for (const field of DETAIL_FIELDS) {
+    const id = await client.fieldId(settings, field.name);
+    if (id) { found[field.as] = id; }
+  }
+
+  return found;
+};
+
+/**
+ * Read the detail custom fields off an issue.
+ * @param {Object} fields - issue.fields
+ * @param {Object} ids - As returned by detailFieldIds
+ * @returns {Object} { testType, gherkin, unstructured }
+ */
+const fieldDetails = (fields, ids) => {
+  const read = (id) => {
+    const raw = id ? (fields || {})[id] : null;
+
+    if (raw === null || raw === undefined) { return null; }
+    // An option field ("Test Type") arrives as an object, a text one as text
+    if (typeof raw === 'object') { return raw.value || raw.name || null; }
+
+    return String(raw).trim() || null;
+  };
+
+  return {
+    testType: read(ids.testType),
+    gherkin: read(ids.gherkin),
+    unstructured: read(ids.unstructured)
+  };
+};
+
+/**
+ * The details to write for a test, or null when this pull learned nothing
+ * about them — which must leave whatever a previous pull wrote alone.
+ *
+ * @param {Object} parts - { testType, gherkin, unstructured }
+ * @param {Array<Object>|null} steps - null when Xray would not answer
+ * @returns {Object|null}
+ */
+const detailsOf = (parts, steps) => {
+  const known = steps !== null || parts.testType || parts.gherkin || parts.unstructured;
+
+  return known ? { ...parts, steps: steps || [] } : null;
+};
+
 /* ------------------------------- Strategies ------------------------------- */
 
 /**
@@ -422,6 +547,7 @@ const pullXrayCloud = async (settings, ctx) => {
   await client.walkCloudTests(settings, {
     jql: `project = "${ctx.projectKey}"`,
     stopped,
+    onNotice: (message) => log(message, 'warn'),
     onPage: (tests, total) => {
       if (state.total === null) { state.total = total; }
 
@@ -436,7 +562,8 @@ const pullXrayCloud = async (settings, ctx) => {
             status: test.status,
             issueType: test.issueType,
             testType: test.testType,
-            folder: test.folder || '/'
+            folder: test.folder || '/',
+            details: test.details || null
           }, folderSegments(test.folder));
         }
         catch (error) {
@@ -469,6 +596,9 @@ const pullXrayServer = async (settings, ctx) => {
     : 'The Test Repository could not be read: the tests will land directly in "xray".',
   known ? 'info' : 'warn');
 
+  phase('fields', 'Looking up the Jira fields…');
+  const detailIds = await detailFieldIds(settings);
+
   const jql = `project = "${ctx.projectKey}" AND issuetype = Test ORDER BY key ASC`;
 
   phase('downloading', `Reading the tests of ${ctx.projectKey} from Jira…`);
@@ -476,16 +606,45 @@ const pullXrayServer = async (settings, ctx) => {
 
   await client.searchIssues(settings, {
     jql,
-    fields: ['summary', 'description', 'status', 'issuetype'],
+    fields: ['summary', 'description', 'status', 'issuetype', ...Object.values(detailIds)],
     stopped,
-    onPage: (issues, total) => {
+    onPage: async (issues, total) => {
       if (state.total === null && typeof total === 'number') { state.total = total; }
+
+      // A test that is skipped is not asked for its steps: the point of
+      // skipping is that nothing is downloaded for it either
+      const wanted = issues.filter(issue => !stopped() && !skipping(ctx, issue.key));
+
+      if (wanted.length) {
+        state.phase = 'details';
+        state.message = `Reading the details of ${wanted.length} test(s)…`;
+        emit(true);
+      }
+
+      const steps = new Map();
+
+      await mapWithLimit(wanted, STEP_CONCURRENCY, async (issue) => {
+        if (stopped()) { return; }
+
+        try {
+          steps.set(issue.key, await client.fetchServerSteps(settings, issue.key));
+        }
+        catch {
+          // The steps are a detail: a test that would not answer is still
+          // written, just without them
+          steps.set(issue.key, null);
+        }
+      });
+
+      state.phase = 'writing';
 
       issues.forEach(issue => {
         if (stopped()) { return; }
 
         const fields = issue.fields || {};
         const folder = folders[String(issue.key).toUpperCase()] || '/';
+        const parts = fieldDetails(fields, detailIds);
+        const details = detailsOf(parts, steps.has(issue.key) ? steps.get(issue.key) : null);
 
         try {
           writeTest(ctx, {
@@ -494,7 +653,9 @@ const pullXrayServer = async (settings, ctx) => {
             description: adf.toMarkdown(fields.description),
             status: (fields.status && fields.status.name) || null,
             issueType: (fields.issuetype && fields.issuetype.name) || null,
-            folder
+            testType: parts.testType,
+            folder,
+            details
           }, folderSegments(folder));
         }
         catch (error) {
@@ -520,7 +681,21 @@ const pullJiraHierarchy = async (settings, ctx) => {
 
   const epicLinkField = await client.fieldId(settings, 'Epic Link');
   const parentFields = epicLinkField ? [...PARENT_FIELDS, epicLinkField] : PARENT_FIELDS;
-  const testFields = epicLinkField ? [...TEST_FIELDS, epicLinkField] : TEST_FIELDS;
+
+  // Whatever of the Test Details this Jira exposes as a custom field: without
+  // an Xray API key there is no other way to reach them, and the steps of a
+  // Manual test are out of reach altogether
+  const detailIds = await detailFieldIds(settings);
+
+  if (!Object.keys(detailIds).length) {
+    log('Jira does not expose the Xray test details as fields: the tests are pulled without them.', 'warn');
+  }
+
+  const testFields = [
+    ...TEST_FIELDS,
+    ...(epicLinkField ? [epicLinkField] : []),
+    ...Object.values(detailIds)
+  ];
 
   // Every parent read so far, so a story shared by fifty tests is downloaded
   // once
@@ -596,6 +771,8 @@ const pullJiraHierarchy = async (settings, ctx) => {
           story ? testDoc.keyedName(story.key, story.summary) : NO_STORY
         ];
 
+        const parts = fieldDetails(fields, detailIds);
+
         try {
           writeTest(ctx, {
             key: issue.key,
@@ -603,8 +780,10 @@ const pullJiraHierarchy = async (settings, ctx) => {
             description: adf.toMarkdown(fields.description),
             status: (fields.status && fields.status.name) || null,
             issueType: (fields.issuetype && fields.issuetype.name) || null,
+            testType: parts.testType,
             feature: feature ? feature.key : null,
-            userStory: story ? story.key : null
+            userStory: story ? story.key : null,
+            details: detailsOf(parts, null)
           }, segments);
         }
         catch (error) {
@@ -631,7 +810,13 @@ const run = async (settings, ctx) => {
     phase('starting', `Pulling the tests of ${ctx.projectKey} into "${ROOT}"…`);
 
     ctx.existing = indexExisting(ctx.rootDir);
-    log(`${Object.keys(ctx.existing).length} test(s) already pulled.`);
+
+    const already = Object.keys(ctx.existing).length;
+
+    log(`${already} test(s) already pulled.`);
+    log(ctx.overwrite
+      ? 'Tests already pulled are updated with what Jira says now.'
+      : 'Tests already pulled are left as they are: only tests that are not in "xray" yet are written.');
 
     if (settings.kind === 'cloud') { await pullXrayCloud(settings, ctx); }
     else if (settings.kind === 'basic') { await pullJiraHierarchy(settings, ctx); }
@@ -648,7 +833,8 @@ const run = async (settings, ctx) => {
       phase('cancelled', `Stopped after ${state.processed} test(s).`);
     }
     else {
-      phase('done', `${state.processed} test(s) pulled into "${ROOT}".`);
+      const skipped = state.skipped ? `, ${state.skipped} left as they were` : '';
+      phase('done', `${state.processed} test(s) pulled into "${ROOT}"${skipped}.`);
     }
   }
   catch (error) {
@@ -667,7 +853,8 @@ const run = async (settings, ctx) => {
  * Start a pull. Answers as soon as it has started: the progress travels over
  * the socket, and can be read back with status().
  *
- * @param {Object} settings - Full Jira settings, secrets included
+ * @param {Object} settings - Full Jira settings, secrets included, the pull
+ *   options among them
  * @param {Object} [options] - { io } - the socket.io server, when there is one
  * @returns {Promise<Object>} The progress, as it stands at the first tick
  */
@@ -692,6 +879,8 @@ const start = async (settings, options = {}) => {
   emitter = options.io || null;
   lastEmit = 0;
 
+  const overwrite = !(settings.pull && settings.pull.overwrite === false);
+
   state = {
     ...idle(),
     running: true,
@@ -699,6 +888,7 @@ const start = async (settings, options = {}) => {
     message: 'Starting…',
     strategy: settings.kind === 'basic' ? 'jira-hierarchy' : 'xray-repository',
     projectKey,
+    overwrite,
     startedAt: new Date().toISOString()
   };
 
@@ -707,6 +897,7 @@ const start = async (settings, options = {}) => {
     flowsDir,
     rootDir: absolute,
     jiraBaseUrl: settings.jiraBaseUrl || '',
+    overwrite,
     existing: {}
   };
 
@@ -741,5 +932,7 @@ module.exports = {
   // Exported for the tests
   bestRelatives,
   folderSegments,
-  indexExisting
+  indexExisting,
+  detailsOf,
+  fieldDetails
 };

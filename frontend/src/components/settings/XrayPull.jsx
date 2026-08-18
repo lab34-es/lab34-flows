@@ -20,7 +20,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { useAppState } from '@/context/AppStateContext';
 import { settingsApi } from '@/services/api';
 import { socket } from '@/services/socket';
@@ -55,6 +57,7 @@ const PHASE_LABELS = {
   folders: 'Reading the Test Repository',
   downloading: 'Downloading',
   resolving: 'Resolving the hierarchy',
+  details: 'Reading the test details',
   writing: 'Writing files',
   done: 'Finished',
   cancelled: 'Stopped',
@@ -66,6 +69,7 @@ const COUNTERS = [
   { key: 'updated', label: 'updated' },
   { key: 'moved', label: 'moved' },
   { key: 'unchanged', label: 'unchanged' },
+  { key: 'skipped', label: 'skipped' },
   { key: 'failed', label: 'failed' },
 ];
 
@@ -96,6 +100,12 @@ export function XrayPull() {
   const [error, setError] = useState(null);
   const [starting, setStarting] = useState(false);
 
+  // Whether a test already in "xray" is rewritten by the next pull. Saved as
+  // soon as it is switched: it is one setting, not a form.
+  const [overwrite, setOverwrite] = useState(true);
+  const [savingOverwrite, setSavingOverwrite] = useState(false);
+  const [overwriteError, setOverwriteError] = useState(null);
+
   // The tree is refreshed once, when the pull that wrote the files ends
   const finished = useRef(false);
   const logRef = useRef(null);
@@ -104,7 +114,11 @@ export function XrayPull() {
     let cancelled = false;
 
     settingsApi.getJira()
-      .then((response) => { if (!cancelled) { setSettings(response.data); } })
+      .then((response) => {
+        if (cancelled) { return; }
+        setSettings(response.data);
+        setOverwrite(response.data?.pull?.overwrite !== false);
+      })
       .catch(() => { if (!cancelled) { setSettings(null); } })
       .finally(() => { if (!cancelled) { setLoading(false); } });
 
@@ -172,6 +186,25 @@ export function XrayPull() {
     }
   };
 
+  const handleOverwrite = async (next) => {
+    // The switch moves now and is put back if the save fails: waiting for a
+    // round trip to see a toggle move reads as broken
+    setOverwrite(next);
+    setSavingOverwrite(true);
+    setOverwriteError(null);
+
+    try {
+      const response = await settingsApi.saveJira({ pull: { overwrite: next } });
+      setSettings(response.data);
+      setOverwrite(response.data?.pull?.overwrite !== false);
+    } catch (ex) {
+      setOverwrite(!next);
+      setOverwriteError(ex.response?.data?.error || ex.message);
+    } finally {
+      setSavingOverwrite(false);
+    }
+  };
+
   const handleStop = async () => {
     try {
       const response = await settingsApi.cancelJiraPull();
@@ -201,8 +234,9 @@ export function XrayPull() {
           </CardTitle>
           <CardDescription>
             Download every Xray test of the project into the <span className="font-mono">xray</span>{' '}
-            folder of your flows, one Markdown file per test, with the Jira description as its
-            content. Pulling again updates what Jira owns and keeps the steps you wrote.
+            folder of your flows, one Markdown file per test, with the Jira description and the
+            Xray test details as its content. Pulling again updates what Jira owns and keeps the
+            steps you wrote.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
@@ -217,6 +251,29 @@ export function XrayPull() {
             </div>
             <p className="text-muted-foreground text-xs">{layout.detail}</p>
             <p className="text-muted-foreground font-mono text-xs break-all">{layout.example}</p>
+          </div>
+
+          <div className="flex items-start justify-between gap-4 rounded-md border p-3">
+            <div className="grid gap-1">
+              <Label htmlFor="xray-pull-overwrite" className="text-sm font-medium">
+                Overwrite tests already pulled
+              </Label>
+              <p className="text-muted-foreground text-xs">
+                {overwrite
+                  ? 'A test that is already in the xray folder is rewritten with what Jira says '
+                    + 'now: its properties, its description and its test details. The steps you '
+                    + 'wrote in the file are kept.'
+                  : 'A flow whose xray.testKey is already in the xray folder is left exactly as '
+                    + 'it is: only tests that were never pulled are written.'}
+              </p>
+              {overwriteError && <p className="text-destructive text-xs">{overwriteError}</p>}
+            </div>
+            <Switch
+              id="xray-pull-overwrite"
+              checked={overwrite}
+              disabled={savingOverwrite || running}
+              onCheckedChange={handleOverwrite}
+            />
           </div>
 
           {!settings?.configured && (
