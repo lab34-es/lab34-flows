@@ -13,11 +13,25 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const SIDEBAR_COOKIE_NAME = 'sidebar_state';
+const SIDEBAR_WIDTH_COOKIE_NAME = 'sidebar_width';
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-const SIDEBAR_WIDTH = '18rem';
+const SIDEBAR_WIDTH = 288;
+const SIDEBAR_MIN_WIDTH = 180;
+const SIDEBAR_MAX_WIDTH = 560;
 const SIDEBAR_WIDTH_MOBILE = '18rem';
 const SIDEBAR_WIDTH_ICON = '3rem';
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
+
+function clampSidebarWidth(value) {
+  if (!Number.isFinite(value)) return SIDEBAR_WIDTH;
+  return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(value)));
+}
+
+function readStoredSidebarWidth() {
+  if (typeof document === 'undefined') return SIDEBAR_WIDTH;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${SIDEBAR_WIDTH_COOKIE_NAME}=(\\d+)`));
+  return match ? clampSidebarWidth(Number(match[1])) : SIDEBAR_WIDTH;
+}
 
 const SidebarContext = React.createContext(null);
 
@@ -60,6 +74,27 @@ function SidebarProvider({
     return isMobile ? setOpenMobile((o) => !o) : setOpen((o) => !o);
   }, [isMobile, setOpen, setOpenMobile]);
 
+  const [width, _setWidth] = React.useState(readStoredSidebarWidth);
+  const [isResizing, setIsResizing] = React.useState(false);
+
+  const setWidth = React.useCallback((value) => {
+    const next = clampSidebarWidth(value);
+    _setWidth(next);
+    document.cookie = `${SIDEBAR_WIDTH_COOKIE_NAME}=${next}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+  }, []);
+
+  // Keep the resize cursor while dragging, even when the pointer leaves the rail.
+  React.useEffect(() => {
+    if (!isResizing) return undefined;
+    const { cursor, userSelect } = document.body.style;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    return () => {
+      document.body.style.cursor = cursor;
+      document.body.style.userSelect = userSelect;
+    };
+  }, [isResizing]);
+
   React.useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === SIDEBAR_KEYBOARD_SHORTCUT && (event.metaKey || event.ctrlKey)) {
@@ -74,8 +109,20 @@ function SidebarProvider({
   const state = open ? 'expanded' : 'collapsed';
 
   const contextValue = React.useMemo(
-    () => ({ state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    () => ({
+      state,
+      open,
+      setOpen,
+      isMobile,
+      openMobile,
+      setOpenMobile,
+      toggleSidebar,
+      width,
+      setWidth,
+      isResizing,
+      setIsResizing,
+    }),
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, width, setWidth, isResizing]
   );
 
   return (
@@ -83,8 +130,9 @@ function SidebarProvider({
       <TooltipProvider delayDuration={0}>
         <div
           data-slot="sidebar-wrapper"
+          data-resizing={isResizing ? 'true' : undefined}
           style={{
-            '--sidebar-width': SIDEBAR_WIDTH,
+            '--sidebar-width': `${width}px`,
             '--sidebar-width-icon': SIDEBAR_WIDTH_ICON,
             ...style,
           }}
@@ -151,6 +199,7 @@ function Sidebar({ side = 'left', variant = 'sidebar', collapsible = 'offcanvas'
         data-slot="sidebar-gap"
         className={cn(
           'relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear',
+          'in-data-[resizing=true]:transition-none',
           'group-data-[collapsible=offcanvas]:w-0',
           'group-data-[side=right]:rotate-180',
           variant === 'floating' || variant === 'inset'
@@ -162,6 +211,7 @@ function Sidebar({ side = 'left', variant = 'sidebar', collapsible = 'offcanvas'
         data-slot="sidebar-container"
         className={cn(
           'fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex',
+          'in-data-[resizing=true]:transition-none',
           side === 'left'
             ? 'left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]'
             : 'right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]',
@@ -206,8 +256,53 @@ function SidebarTrigger({ className, onClick, ...props }) {
   );
 }
 
-function SidebarRail({ className, ...props }) {
-  const { toggleSidebar } = useSidebar();
+function SidebarRail({ className, onClick, ...props }) {
+  const { toggleSidebar, setWidth, setIsResizing, state } = useSidebar();
+  const dragRef = React.useRef(null);
+  const draggedRef = React.useRef(false);
+
+  const handlePointerDown = (event) => {
+    draggedRef.current = false;
+    if (event.button !== 0 || state !== 'expanded') return;
+    const sidebar = event.currentTarget.closest('[data-slot="sidebar"]');
+    const container = sidebar?.querySelector('[data-slot="sidebar-container"]');
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth: container ? container.getBoundingClientRect().width : SIDEBAR_WIDTH,
+      side: sidebar?.dataset.side === 'right' ? 'right' : 'left',
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsResizing(true);
+  };
+
+  const handlePointerMove = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const delta = drag.side === 'right' ? drag.startX - event.clientX : event.clientX - drag.startX;
+    if (Math.abs(delta) > 3) draggedRef.current = true;
+    setWidth(drag.startWidth + delta);
+  };
+
+  const handlePointerUp = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setIsResizing(false);
+  };
+
+  const handleClick = (event) => {
+    onClick?.(event);
+    // A drag ends with a click event too; only a genuine click toggles the sidebar.
+    if (draggedRef.current) {
+      draggedRef.current = false;
+      return;
+    }
+    toggleSidebar();
+  };
 
   return (
     <button
@@ -215,10 +310,15 @@ function SidebarRail({ className, ...props }) {
       data-slot="sidebar-rail"
       aria-label="Toggle Sidebar"
       tabIndex={-1}
-      onClick={toggleSidebar}
-      title="Toggle Sidebar"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onClick={handleClick}
+      title="Drag to resize, click to toggle"
       className={cn(
         'hover:after:bg-sidebar-border absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] sm:flex',
+        'in-data-[resizing=true]:transition-none in-data-[resizing=true]:after:bg-sidebar-border',
         'in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize',
         '[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize',
         'hover:group-data-[collapsible=offcanvas]:bg-sidebar group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full',

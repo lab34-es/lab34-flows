@@ -37,6 +37,7 @@
     "https-proxy-agent": "7.0.6",
     "is-wsl": "2.2.0",
     "mqtt": "5.14.1",
+    "nodemon": "^3.1.14",
     "ollama": "0.5.18",
     "pg": "8.16.3",
     "playwright": "1.55.0",
