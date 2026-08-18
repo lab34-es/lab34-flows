@@ -1,6 +1,5 @@
 ---
 import DocsLayout from '../../layouts/DocsLayout.astro';
-import Icon from '../../components/Icon.astro';
 import { orderedTopics, withBase } from '../../lib/help.js';
 import { renderMarkdown } from '../../lib/markdown.js';
 
@@ -31,7 +30,7 @@ const jsonLd = [
     keywords: topic.keywords.join(', '),
     isPartOf: {
       '@type': 'WebSite',
-      name: 'lab34-flows',
+      name: 'lab34/flows',
       url: new URL(withBase('/'), Astro.site).href,
     },
     author: { '@type': 'Person', name: 'Jose Constela' },
@@ -43,7 +42,7 @@ const jsonLd = [
       {
         '@type': 'ListItem',
         position: 1,
-        name: 'lab34-flows',
+        name: 'lab34/flows',
         item: new URL(withBase('/'), Astro.site).href,
       },
       {
@@ -59,38 +58,28 @@ const jsonLd = [
 ---
 
 <DocsLayout
-  title={`${topic.title} — lab34-flows docs`}
+  title={`${topic.title} — lab34/flows docs`}
   description={topic.summary}
   activeId={topic.id}
   ogType="article"
   jsonLd={jsonLd}
 >
   <article>
-    <header class="mb-8">
-      <p class="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-        {topic.categoryLabel}
-      </p>
-      <h1 class="text-3xl font-semibold tracking-tight">{topic.title}</h1>
-      <p class="mt-3 text-lg text-muted-foreground">{topic.summary}</p>
+    <header class="fl-article-head">
+      <p class="fl-article-kicker">{topic.categoryLabel}</p>
+      <h1 class="fl-docs-h1">{topic.title}</h1>
+      <p class="fl-article-summary">{topic.summary}</p>
     </header>
 
-    <div class="prose-docs" set:html={html} />
+    <div class="fl-prose" set:html={html} />
   </article>
 
-  <nav class="mt-12 grid gap-3 border-t border-border pt-6 sm:grid-cols-2">
+  <nav class="fl-pager" aria-label="Article navigation">
     {
       prev ? (
-        <a
-          href={withBase(`/docs/${prev.id}/`)}
-          class="group rounded-xl border border-border bg-card p-4 shadow-xs transition-colors hover:bg-accent/40"
-        >
-          <span class="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Icon name="arrow-left" class="size-3.5" />
-            Previous
-          </span>
-          <span class="mt-1 block font-medium group-hover:underline group-hover:underline-offset-4">
-            {prev.title}
-          </span>
+        <a href={withBase(`/docs/${prev.id}/`)} class="fl-pager-link">
+          <p class="fl-pager-label">← previous</p>
+          <p class="fl-pager-title">{prev.title}</p>
         </a>
       ) : (
         <span />
@@ -98,17 +87,9 @@ const jsonLd = [
     }
     {
       next && (
-        <a
-          href={withBase(`/docs/${next.id}/`)}
-          class="group rounded-xl border border-border bg-card p-4 text-right shadow-xs transition-colors hover:bg-accent/40"
-        >
-          <span class="flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
-            Next
-            <Icon name="arrow-right" class="size-3.5" />
-          </span>
-          <span class="mt-1 block font-medium group-hover:underline group-hover:underline-offset-4">
-            {next.title}
-          </span>
+        <a href={withBase(`/docs/${next.id}/`)} class="fl-pager-link fl-pager-next">
+          <p class="fl-pager-label">next →</p>
+          <p class="fl-pager-title">{next.title}</p>
         </a>
       )
     }

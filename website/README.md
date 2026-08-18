@@ -1,11 +1,17 @@
-# lab34-flows website
+# lab34/flows website
 
 The documentation website for [lab34-flows](https://github.com/lab34-es/lab34-flows),
 published at **https://flows.lab34.es/**.
 
-- Built with [Astro](https://astro.build) and Tailwind CSS, styled with the
-  [shadcn/ui](https://ui.shadcn.com) design system (its tokens, theme and
-  component recipes).
+- Built with [Astro](https://astro.build). The look is the editorial
+  lab34/flows theme: a bone ground (`#F3F2F2`) with ink type, a single brass
+  accent (`#B68235`) applied as stroke — borders, rules and underlines, never
+  as a fill — IBM Plex Sans for prose and IBM Plex Mono for anything that is
+  machinery (kickers, paths, code, metadata). Every color, size and rule comes
+  from the tokens at the top of `src/styles/global.css`; both themes are
+  defined there (`:root` and `.dark`).
+- The home page carries the example flow document: pressing **Run** replays a
+  pre-recorded execution, including the MQTT retry, straight in the page.
 - The **Docs** section is generated at build time from the app's own Help
   section (`frontend/src/components/settings/help/helpContent.js`). Edit the
   in-app help and the website follows — there is no second copy.

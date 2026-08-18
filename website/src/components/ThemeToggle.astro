@@ -1,15 +1,6 @@
----
-import Icon from './Icon.astro';
----
-
-<button
-  id="theme-toggle"
-  type="button"
-  aria-label="Toggle theme"
-  class="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
->
-  <span class="dark:hidden"><Icon name="sun" /></span>
-  <span class="hidden dark:inline"><Icon name="moon" /></span>
+<button id="theme-toggle" type="button" aria-label="Switch color theme" class="fl-btn-ghost">
+  <span class="fl-theme-to-dark">● dark</span>
+  <span class="fl-theme-to-light">○ light</span>
 </button>
 
 <script>

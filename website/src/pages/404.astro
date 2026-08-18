@@ -1,35 +1,22 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import Icon from '../components/Icon.astro';
 import { withBase } from '../lib/help.js';
 ---
 
 <BaseLayout
-  title="Page not found — lab34-flows"
-  description="This page does not exist. Head back to the lab34-flows documentation."
+  title="Page not found — lab34/flows"
+  description="This page does not exist. Head back to the lab34/flows documentation."
 >
-  <div class="mx-auto flex w-full max-w-6xl flex-col items-start gap-6 px-4 py-24 sm:px-6">
-    <p class="text-sm font-semibold tracking-wide text-muted-foreground uppercase">404</p>
-    <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">Page not found</h1>
-    <p class="max-w-xl text-muted-foreground">
+  <div class="fl-notfound">
+    <p class="fl-kicker">404</p>
+    <h2 class="fl-h2" style="max-width:20ch">Page not found</h2>
+    <p class="fl-p" style="max-width:52ch">
       The page you are looking for does not exist — it may have moved when the
       documentation was reorganised.
     </p>
-    <div class="flex flex-wrap gap-3">
-      <a
-        href={withBase('/')}
-        class="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90"
-      >
-        <Icon name="arrow-left" />
-        Back home
-      </a>
-      <a
-        href={withBase('/docs/')}
-        class="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-background px-5 text-sm font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground"
-      >
-        <Icon name="book-open" />
-        Browse the docs
-      </a>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:32px">
+      <a href={withBase('/')} class="fl-cta">← Back home</a>
+      <a href={withBase('/docs/')} class="fl-cta fl-cta-plain">Browse the docs</a>
     </div>
   </div>
 </BaseLayout>
