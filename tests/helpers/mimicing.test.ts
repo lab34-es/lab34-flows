@@ -20,7 +20,7 @@ describe('mimicing.validate', () => {
   test('true when every mimic file is present', async () => {
     const exists = jest.spyOn(fs, 'existsSync').mockReturnValue(true);
     await expect(mimicing.validate([step('calculator')])).resolves.toBe(true);
-    expect(paths.contextDir).toHaveBeenCalledWith(['applications', 'calculator', 'mimic.js']);
+    expect(paths.contextDir).toHaveBeenCalledWith(['applications', 'calculator']);
     exists.mockRestore();
   });
 
@@ -39,7 +39,7 @@ describe('mimicing.validate', () => {
   test('false, with a message, when a mimic file is missing', async () => {
     const exists = jest.spyOn(fs, 'existsSync').mockReturnValue(false);
     await expect(mimicing.validate([step('calculator')])).resolves.toBe(false);
-    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('does not exist'));
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('has no mimic file'));
     exists.mockRestore();
   });
 
@@ -58,7 +58,7 @@ describe('mimicing.load', () => {
   test('exits when a mimic file is missing', async () => {
     const exists = jest.spyOn(fs, 'existsSync').mockReturnValue(false);
     await mimicing.load([step('calculator')]);
-    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('does not exist'));
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('has no mimic file'));
     expect(process.exit).toHaveBeenCalledWith(1);
     exists.mockRestore();
   });

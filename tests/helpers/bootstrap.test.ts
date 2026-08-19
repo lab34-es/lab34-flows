@@ -30,7 +30,7 @@ describe('bootstrap.ensureDefaults', () => {
   test('seeds the bundled example applications and flows', async () => {
     await bootstrap.ensureDefaults();
 
-    expect(fs.existsSync(path.join(ctx, 'applications', 'calculator', 'index.js'))).toBe(true);
+    expect(fs.existsSync(path.join(ctx, 'applications', 'calculator', 'index.ts'))).toBe(true);
     expect(fs.existsSync(path.join(ctx, 'applications', 'httpbin'))).toBe(true);
     expect(fs.existsSync(path.join(ctx, 'applications', 'jsonplaceholder'))).toBe(true);
     expect(fs.existsSync(path.join(ctx, 'flows', 'examples', '01-welcome.md'))).toBe(true);
@@ -78,6 +78,62 @@ describe('bootstrap.ensureDefaults', () => {
     await expect(bootstrap.ensureDefaults()).resolves.toBeUndefined();
     expect(console.error).toHaveBeenCalledWith(
       'Could not seed default examples:', 'no context'
+    );
+  });
+});
+
+describe('bootstrap.ensureTypeScriptConfig', () => {
+  const read = () => fs.readFileSync(path.join(ctx, 'tsconfig.json'), 'utf8');
+
+  test('writes a tsconfig pointing at the types of this installation', async () => {
+    await bootstrap.ensureTypeScriptConfig();
+
+    const written = read();
+    const config = JSON.parse(written.slice(written.indexOf('{')));
+
+    expect(config.include).toEqual(['applications/**/*.ts']);
+    expect(config.compilerOptions.paths['@lab34/flows'][0]).toMatch(/lab34-flows\/(dist|src)\//);
+    expect(config.compilerOptions.paths['lab34-flows']).toEqual(
+      config.compilerOptions.paths['@lab34/flows']
+    );
+  });
+
+  test('is created by ensureDefaults too', async () => {
+    await bootstrap.ensureDefaults();
+    expect(fs.existsSync(path.join(ctx, 'tsconfig.json'))).toBe(true);
+  });
+
+  test('refreshes a stale generated file, so the paths follow the install', async () => {
+    await bootstrap.ensureTypeScriptConfig();
+    const generated = read();
+
+    fs.writeFileSync(path.join(ctx, 'tsconfig.json'), generated.replace(/"paths".*/, '"paths": {},'));
+    await bootstrap.ensureTypeScriptConfig();
+
+    expect(read()).toBe(generated);
+  });
+
+  test('a file the user took over is never rewritten', async () => {
+    fs.writeFileSync(path.join(ctx, 'tsconfig.json'), '{ "mine": true }');
+    await bootstrap.ensureTypeScriptConfig();
+    expect(read()).toBe('{ "mine": true }');
+  });
+
+  test('leaves an up-to-date file alone', async () => {
+    await bootstrap.ensureTypeScriptConfig();
+    const before = fs.statSync(path.join(ctx, 'tsconfig.json')).mtimeMs;
+
+    await bootstrap.ensureTypeScriptConfig();
+
+    expect(fs.statSync(path.join(ctx, 'tsconfig.json')).mtimeMs).toBe(before);
+  });
+
+  test('a failure is reported, never thrown', async () => {
+    (paths.contextDir as jest.Mock).mockRejectedValue(new Error('no context'));
+
+    await expect(bootstrap.ensureTypeScriptConfig()).resolves.toBeUndefined();
+    expect(console.error).toHaveBeenCalledWith(
+      'Could not write tsconfig.json for the applications:', 'no context'
     );
   });
 });

@@ -25,7 +25,7 @@ against a real HTTP API.
 | `status` | `GET /status/{code}`, answers with that status code |
 | `delay` | `GET /delay/{seconds}`, waits before responding |
 
-See the **Methods** section in the UI (or the JSDoc blocks of `index.js`) for
+See the **Methods** section in the UI (or the JSDoc blocks of `index.ts`) for
 the full input / output / memory reference of each method.
 
 ## Environment

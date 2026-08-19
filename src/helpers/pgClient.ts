@@ -26,10 +26,14 @@ const debug = createDebug('lab34:flows:helpers:pgClient');
  * @param {string} [ctx.env.PGSSL_KEY] - Path to client key file.
  * @param {string} query - The SQL query to be executed.
  * @param {Array} values - The values to be used in the SQL query.
- * @returns {Promise<Object>} - A promise that resolves to the result of the query.
+ * @returns {Promise<pg.QueryResult>} - A promise that resolves to the result
+ *   of the query, i.e. `rows` as objects keyed by column name.
  * @throws {Error} - Throws an error if the query execution fails.
  */
-export const query = (ctx, query, values) => {
+// The types matter here beyond this file: pg overloads `query`, and an untyped
+// SQL string picks the array-of-arrays overload, which would tell every
+// application that `res.rows[0]` is an array rather than a row.
+export const query = (ctx, query: string, values?: any[]): Promise<pg.QueryResult> => {
   // Build database configuration object
   const dbConfig: pg.ClientConfig = {};
 

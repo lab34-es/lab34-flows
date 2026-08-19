@@ -2,7 +2,8 @@
  * A free fake REST API (jsonplaceholder.typicode.com) with posts and users.
  * Demonstrates CRUD-style steps and passing data between steps via memory.
  */
-const { applications, httpClient } = require('lab34-flows');
+import { applications, httpClient } from '@lab34/flows';
+import type { Context, Parameters } from '@lab34/flows';
 
 /**
  * GET /posts — lists posts, optionally filtered by user.
@@ -22,8 +23,8 @@ const { applications, httpClient } = require('lab34-flows');
  *   status: 200
  *   body: "$expr: Array.isArray(value) && value.length === 10"
  */
-module.exports.listPosts = applications.handler([
-  async (ctx, parameters) => {
+export const listPosts = applications.handler([
+  async (ctx: Context, parameters: Parameters) => {
     const { query } = parameters || {};
     return httpClient.get(ctx, '/posts', { params: query || {} });
   }
@@ -49,8 +50,8 @@ module.exports.listPosts = applications.handler([
  *     id: 1
  *     userId: 1
  */
-module.exports.getPost = applications.handler([
-  async (ctx, parameters) => {
+export const getPost = applications.handler([
+  async (ctx: Context, parameters: Parameters) => {
     const params = (parameters || {}).params || {};
     return httpClient.get(ctx, `/posts/${params.id}`);
   }
@@ -80,8 +81,8 @@ module.exports.getPost = applications.handler([
  * test:
  *   status: 201
  */
-module.exports.createPost = applications.handler([
-  async (ctx, parameters) => {
+export const createPost = applications.handler([
+  async (ctx: Context, parameters: Parameters) => {
     const { body } = parameters || {};
     const [headers, status, responseBody] = await httpClient.post(ctx, '/posts', {
       body: body || {}
@@ -110,8 +111,8 @@ module.exports.createPost = applications.handler([
  *   body:
  *     id: 1
  */
-module.exports.getUser = applications.handler([
-  async (ctx, parameters) => {
+export const getUser = applications.handler([
+  async (ctx: Context, parameters: Parameters) => {
     const params = (parameters || {}).params || {};
     return httpClient.get(ctx, `/users/${params.id}`);
   }

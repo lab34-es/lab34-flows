@@ -19,6 +19,15 @@ module.exports = {
     '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.json' }]
   },
 
+  // An application imports the package that runs it. At run time that is
+  // resolved by helpers/appLoader, which patches Node's resolver -- machinery
+  // jest's own resolver does not go through, so the same alias is declared
+  // here. Tests therefore exercise src, not a possibly stale dist.
+  moduleNameMapper: {
+    '^@lab34/flows$': '<rootDir>/src/index.ts',
+    '^lab34-flows$': '<rootDir>/src/index.ts'
+  },
+
   testMatch: ['<rootDir>/tests/**/*.test.ts'],
 
   // Claude Code keeps scratch worktrees under .claude/worktrees; without this

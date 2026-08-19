@@ -20,8 +20,27 @@ const write = (relative: string, content = '') => {
   return file;
 };
 
-/** A minimal self-describing application, in the shape the loader expects. */
+/**
+ * A minimal self-describing application, in the shape the loader expects:
+ * TypeScript, with the ESM import and export style applications now use.
+ */
 const CALC_INDEX = `
+import { validate, applications } from '@lab34/flows';
+import type { Context, Parameters } from '@lab34/flows';
+
+/**
+ * Adds two numbers.
+ * @param {number} a - First
+ * @returns {200} The sum
+ */
+export const add = applications.handler([
+  validate.body({ type: 'object', properties: { a: { type: 'number' } } }),
+  (ctx: Context, parameters: Parameters) => ({ sum: 1 })
+], 'add');
+`;
+
+/** The same application as it was written before the TypeScript migration. */
+const CALC_INDEX_JS = `
 const { validate, applications } = require('lab34-flows');
 
 /**
@@ -107,7 +126,7 @@ describe('applications.parseApplications', () => {
   });
 
   test('loads an application, its methods and its JSDoc', async () => {
-    write('calculator/index.js', CALC_INDEX);
+    write('calculator/index.ts', CALC_INDEX);
 
     const [app] = await apps.parseApplications();
 
@@ -121,10 +140,53 @@ describe('applications.parseApplications', () => {
     expect(add.docs).toBeDefined();
   });
 
-  test('restores index.js after rewriting the lab34-flows import', async () => {
-    const file = write('calculator/index.js', CALC_INDEX);
+  test('never touches the source it loads', async () => {
+    const file = write('calculator/index.ts', CALC_INDEX);
     await apps.parseApplications();
     expect(fs.readFileSync(file, 'utf8')).toBe(CALC_INDEX);
+  });
+
+  test('loads an application still written in JavaScript', async () => {
+    write('calculator/index.js', CALC_INDEX_JS);
+
+    const [app] = await apps.parseApplications();
+
+    expect(app.errors).toEqual([]);
+    expect(app.methods.find(m => m.name === 'add')!.implemented).toBe(true);
+  });
+
+  test('index.ts wins over an index.js left behind by a migration', async () => {
+    write('calculator/index.ts', CALC_INDEX);
+    write('calculator/index.js', 'throw new Error("the old one");');
+
+    const [app] = await apps.parseApplications();
+
+    expect(app.errors).toEqual([]);
+  });
+
+  test('an export that is not a method is left out rather than failing', async () => {
+    write('calculator/index.ts', `${CALC_INDEX}\nexport const VERSION = '1';`);
+
+    const [app] = await apps.parseApplications();
+
+    expect(app.errors).toEqual([]);
+    expect(app.methods.map(m => m.name)).toEqual(['add']);
+  });
+
+  test('a type error does not stop an application from loading', async () => {
+    write('calculator/index.ts', CALC_INDEX.replace("'add');", "'add') as unknown as never;"));
+
+    const [app] = await apps.parseApplications();
+
+    expect(app.errors).toEqual([]);
+  });
+
+  test('a syntax error is reported against the application', async () => {
+    write('calculator/index.ts', 'export const broken = (');
+
+    const [app] = await apps.parseApplications();
+
+    expect(app.errors.length).toBeGreaterThan(0);
   });
 
   test('reports an application whose code throws, without failing the list', async () => {
@@ -151,7 +213,7 @@ describe('applications.parseApplications', () => {
   });
 
   test('warns that docs.json is no longer used', async () => {
-    write('calculator/index.js', CALC_INDEX);
+    write('calculator/index.ts', CALC_INDEX);
     write('calculator/docs.json', '{}');
 
     const [app] = await apps.parseApplications();
@@ -160,8 +222,8 @@ describe('applications.parseApplications', () => {
   });
 
   test('a documented but unimplemented method is listed as not implemented', async () => {
-    write('calculator/index.js', [
-      '/**', ' * Subtracts.', ' * @returns {200} diff', ' */', 'module.exports.subtract = 1;'
+    write('calculator/index.ts', [
+      '/**', ' * Subtracts.', ' * @returns {200} diff', ' */', 'export const subtract = 1;'
     ].join('\n'));
 
     const [app] = await apps.parseApplications();
@@ -196,7 +258,7 @@ describe('applications.parseApplications', () => {
   });
 
   test('an application with no env folder reports none', async () => {
-    write('calculator/index.js', CALC_INDEX);
+    write('calculator/index.ts', CALC_INDEX);
     const [app] = await apps.parseApplications();
     expect(app.envFiles).toEqual([]);
   });
@@ -219,7 +281,7 @@ describe('applications.allPossibleEnvironments', () => {
   });
 
   test('is empty when nothing declares an environment', async () => {
-    write('a/index.js', 'module.exports = {};');
+    write('a/index.ts', 'export const nothing = 1;');
     expect(await apps.allPossibleEnvironments()).toEqual([]);
   });
 });
@@ -247,20 +309,32 @@ describe('applications.updateEnvFile', () => {
 });
 
 describe('applications.loadAll', () => {
-  test('registers every application that has an index.js', async () => {
-    write('calculator/index.js', CALC_INDEX);
+  test('registers every application that has an entry point', async () => {
+    write('calculator/index.ts', CALC_INDEX);
+    write('legacy/index.js', CALC_INDEX_JS);
     write('noindex/README.md', '# x');
 
     await apps.loadAll();
 
-    expect(apps.applications.calculator).toBeDefined();
+    expect(apps.applications.calculator.add).toBeInstanceOf(Function);
+    expect(apps.applications.legacy.add).toBeInstanceOf(Function);
     expect(apps.applications.noindex).toBeUndefined();
+  });
+
+  test('picks up an edit made since the last load', async () => {
+    write('calculator/index.ts', CALC_INDEX);
+    await apps.loadAll();
+
+    write('calculator/index.ts', CALC_INDEX.replace(/add/g, 'subtract'));
+    await apps.loadAll();
+
+    expect(apps.applications.calculator.subtract).toBeInstanceOf(Function);
   });
 });
 
 describe('applications.summary', () => {
   test('prints each application and its methods', async () => {
-    write('calculator/index.js', CALC_INDEX);
+    write('calculator/index.ts', CALC_INDEX);
 
     await apps.summary();
 

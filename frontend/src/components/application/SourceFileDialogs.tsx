@@ -74,7 +74,7 @@ export function SourceFileDialogs({ action, onSubmit, onClose }) {
             <Label htmlFor="source-new-file">File name</Label>
             <Input
               id="source-new-file"
-              placeholder="helpers/http.js"
+              placeholder="helpers/http.ts"
               value={value}
               autoFocus
               disabled={busy}

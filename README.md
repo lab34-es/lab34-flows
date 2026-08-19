@@ -357,10 +357,10 @@ and open http://localhost:3001.
   - **Applications** — every application in your context directory. Click
     one to read its **README** and browse its **methods** (input parameters,
     output, memory usage and examples, from the JSDoc blocks of its
-    `index.js`), plus its environment files. Each row's actions rename the
+    `index.ts`), plus its environment files. Each row's actions rename the
     application, i.e. its folder. Like flows, applications have a
     **Document / Source** toggle: the Source view is a file explorer over the
-    application folder, where every file (`README.md`, `index.js`,
+    application folder, where every file (`README.md`, `index.ts`,
     `env/*.env` and anything else you add) can be edited, created, renamed
     and deleted.
 - **Notebook view** — a flow renders as a document; each ```` ```step ````
@@ -690,11 +690,38 @@ On first run, the tool seeds your context directory with example content:
 
 Examples are only copied when missing, so you can edit or delete them freely.
 
+## Applications are TypeScript
+
+An application is a TypeScript module: `applications/<name>/index.ts`, plus an
+optional `mimic.ts`. It imports the package that runs it, and the types it is
+written against come from there too:
+
+```ts
+import { applications, httpClient } from '@lab34/flows';
+import type { Context, Parameters, Flow } from '@lab34/flows';
+```
+
+Two things make that work outside any `node_modules` of this package:
+
+- **`tsconfig.json`**, written into your context directory and refreshed on
+  every start, points your editor at the type declarations of the installed
+  package. Delete the notice at the top of the file to take it over; it is then
+  never rewritten.
+- **The loader** (`helpers/appLoader`) transpiles the TypeScript in memory when
+  a flow runs, and resolves `@lab34/flows` to the running installation. There
+  is no build step, and applications are never type checked at run time — a
+  type error is for your editor to point out, not a reason a flow refuses to
+  start.
+
+Applications still written in JavaScript (`index.js`, `mimic.js`, `require()`,
+`module.exports`) keep working: the loader accepts either extension, and the
+documentation parser recognises both export styles.
+
 ## Application docs (JSDoc)
 
 Applications document themselves in their own code: there is no `docs.json`.
 The documentation is read from the JSDoc blocks of the application's
-`index.js`, and it is what the UI renders and what the model is given when it
+`index.ts`, and it is what the UI renders and what the model is given when it
 writes a flow for you — the better the JSDoc, the better the generated flows.
 
 - The block at the **top of the file** describes the application.
@@ -708,11 +735,12 @@ writes a flow for you — the better the JSDoc, the better the generated flows.
 | `@memory {write\|read} key - description` | Flow memory the method writes or reads |
 | `@example` | An example step, in YAML, ready to paste inside a ```` ```step ```` block |
 
-```js
+```ts
 /**
  * What this application is.
  */
-const { applications } = require('lab34-flows');
+import { applications } from '@lab34/flows';
+import type { Context, Parameters } from '@lab34/flows';
 
 /**
  * Adds two numbers (a + b).
@@ -732,8 +760,8 @@ const { applications } = require('lab34-flows');
  *     a: 2
  *     b: 40
  */
-module.exports.add = applications.handler([
-  async (ctx, parameters) => {
+export const add = applications.handler([
+  async (ctx: Context, parameters: Parameters) => {
     const { a, b } = parameters.body;
     return [{}, 200, { operation: 'add', result: a + b }, { lastResult: a + b }];
   }

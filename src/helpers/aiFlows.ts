@@ -26,7 +26,7 @@ const SYSTEM = [
  * Describe the applications the flow can drive.
  *
  * Applications document themselves through the JSDoc blocks of their
- * index.js: the description of the application and, per method, its
+ * index.ts: the description of the application and, per method, its
  * description, input parameters, output, memory usage and example step.
  *
  * @returns {Promise<Array<Object>>}

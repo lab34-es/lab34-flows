@@ -232,7 +232,7 @@ const parseBarcodePattern = (mask) => {
   return parts;
 };
 
-const barcode = (parts) => {
+const barcode = (parts?) => {
   if (!parts) {parts = [];}
 
   // If parts is a string, parse it as a barcode pattern

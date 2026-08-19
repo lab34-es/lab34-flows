@@ -1,6 +1,6 @@
 /**
  * Application documentation, extracted from the JSDoc blocks of an
- * application's `index.js`.
+ * application's `index.ts`.
  *
  * There is no `docs.json`: an application documents itself in its own code.
  *
@@ -26,14 +26,22 @@
  *    * application: calculator
  *    * method: add
  *    *\/
- *   module.exports.add = applications.handler([...], 'add');
+ *   export const add = applications.handler([...], 'add');
  */
 
 // Every JSDoc block (/** ... *\/) of a file
 const BLOCK_RE = /\/\*\*([\s\S]*?)\*\//g;
 
-// What follows a block when it documents an exported method
-const EXPORT_RE = /^\s*(?:module\.)?exports\.([A-Za-z0-9_$]+)\s*=/;
+// What follows a block when it documents an exported method. Applications are
+// TypeScript, so `export const add = ...` and `export function add() {}` are
+// the usual forms; the CommonJS ones are still recognised for applications
+// that have not been migrated yet.
+const EXPORT_RE = new RegExp(
+  '^\\s*(?:' +
+    'export\\s+(?:async\\s+)?(?:const|let|var|function)\\s+([A-Za-z0-9_$]+)' +
+    '|(?:module\\.)?exports\\.([A-Za-z0-9_$]+)\\s*=' +
+  ')'
+);
 
 // `{type} name - description`, where `[name]` and `[name=default]` mark an
 // optional value. Shared by @param and @memory.
@@ -261,8 +269,8 @@ const parseMethodBlock = (name, block) => {
 };
 
 /**
- * Parse the documentation of an application from the source of its index.js.
- * @param {string} source - Contents of the application's index.js
+ * Parse the documentation of an application from the source of its index.ts.
+ * @param {string} source - Contents of the application's index.ts
  * @returns {{description: string|null, methods: Object<string, Object>}}
  */
 const parse = (source) => {
@@ -282,7 +290,7 @@ const parse = (source) => {
     const exported = EXPORT_RE.exec(source.slice(blockEnd));
 
     if (exported) {
-      const name = exported[1];
+      const name = exported[1] || exported[2];
       result.methods[name] = parseMethodBlock(name, match[1]);
       continue;
     }

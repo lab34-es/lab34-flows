@@ -42,6 +42,7 @@ const argv = yargsParser(process.argv.slice(2));
 
 // Local dependencies
 import * as packageJson from '../package.json';
+import * as bootstrap from './helpers/bootstrap';
 import * as cli from './helpers/cli';
 import * as reporter from './helpers/reporter';
 import * as flows from './helpers/flows';
@@ -196,6 +197,9 @@ async function parseFlowFile(filePath) {
  */
 async function runFlow(flowConfig, options) {
   try {
+    // Keeps the applications' editor support pointing at this installation
+    await bootstrap.ensureTypeScriptConfig();
+
     await applications.loadAll();
 
     cli.logo(packageJson.version);

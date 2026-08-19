@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 
 import * as paths from './paths';
 import * as appDocs from './appDocs';
+import * as appLoader from './appLoader';
 
 const applications: Record<string, any> = {};
 
@@ -73,12 +74,11 @@ const loadAll = () => {
   return parseApplications()
     .then(apps => {
       return apps.reduce((acc, app) => {
-        const indexPath = path.join(app.path, 'index.js');
-        const hasIndex = fs.existsSync(indexPath);
-        if (!hasIndex) {
+        const indexPath = appLoader.resolveEntry(app.path);
+        if (!indexPath) {
           return acc;
         }
-        applications[app.name] = require(indexPath);
+        applications[app.name] = appLoader.load(indexPath);
         return acc;
       }, {});
     });
@@ -241,7 +241,7 @@ const parseApplications = async () => {
   const result = await Promise.all(apps.map(async applicationName => {
     const appPath = path.join(appsPath, applicationName);
 
-    const appIndex = path.join(appPath, 'index.js');
+    const appIndex = appLoader.resolveEntry(appPath);
 
     // List env files
     const envFiles = listEnvFiles(appPath);
@@ -262,35 +262,30 @@ const parseApplications = async () => {
     const errors: Record<string, any>[] = [];
     let indexSource: string | null = null;
 
-    if (fs.existsSync(appIndex)) {
-
-      // Replace in appIndex "lab34-flows" with $NODE_PATH/@lab34/flows/
-      // When NODE_PATH is not set (or the global install is missing), fall
-      // back to this repository itself so applications work in development
-      // and when the tool runs its own bundled examples.
-      const nodePath = process.env.NODE_PATH || '';
-      let flowsPath = nodePath ? path.join(nodePath, '@lab34', 'flows') : '';
-      if (!flowsPath || !fs.existsSync(flowsPath)) {
-        flowsPath = path.resolve(__dirname, '..', '..');
-      }
-      const appIndexContentOriginal = fs.readFileSync(appIndex, 'utf8');
-      indexSource = appIndexContentOriginal;
-      const appIndexContentModified = appIndexContentOriginal
-        .replace(/(['"`])lab34-flows(\/[^'"`]*)?\1/g, (match, quote, subpath) => {
-          return `${quote}${flowsPath}${subpath || ''}${quote}`;
-        });
-
-      // Write the modified content to a temporary file
-      fs.writeFileSync(appIndex, appIndexContentModified);
+    if (appIndex) {
+      indexSource = fs.readFileSync(appIndex, 'utf8');
 
       try {
-        // Bust the require cache so edits made from the UI (Source view)
-        // are picked up without restarting the server
-        delete require.cache[appIndex];
-        const lib = require(appPath);
-        methods = Object.keys(lib).map(method => {
-          return lib[method]('describe');
-        });
+        // appLoader transpiles TypeScript, resolves the application's import
+        // of this package, and reloads from disk so edits made in the UI
+        // (Source view) are picked up without restarting the server
+        const lib = appLoader.load(appIndex);
+
+        // Ask every exported method to describe itself. An application is
+        // free to export something that is not a method -- a constant, a
+        // helper -- so anything that does not answer is left out rather than
+        // failing the whole application.
+        methods = Object.keys(lib)
+          .filter(name => typeof lib[name] === 'function')
+          .map(name => {
+            try {
+              return lib[name]('describe');
+            }
+            catch {
+              return null;
+            }
+          })
+          .filter(method => method && method.name);
       }
       catch (ex) {
         console.error('Error loading application', applicationName, ex);
@@ -298,10 +293,6 @@ const parseApplications = async () => {
           message: ex.message,
           stack: ex.stack
         });
-      }
-      finally {
-        // Clean up the temporary file
-        fs.writeFileSync(appIndex, appIndexContentOriginal);
       }
     }
 
@@ -318,7 +309,7 @@ const parseApplications = async () => {
       }
     }
 
-    // Documentation lives in the JSDoc blocks of index.js: the block at the
+    // Documentation lives in the JSDoc blocks of index.ts: the block at the
     // top of the file describes the application, and the block above each
     // exported method documents its input, output, memory usage and an
     // example step.
@@ -329,11 +320,11 @@ const parseApplications = async () => {
     if (fs.existsSync(path.join(appPath, 'docs.json'))) {
       errors.push({
         message: 'docs.json is no longer used. Document the application and its ' +
-          'methods with JSDoc blocks in index.js, then delete docs.json.'
+          'methods with JSDoc blocks in index.ts, then delete docs.json.'
       });
     }
 
-    // Merge the self-described methods (from index.js) with their JSDoc.
+    // Merge the self-described methods (from index.ts) with their JSDoc.
     // The JSDoc description wins over the one a handler may still declare
     // inline. Documented methods that could not be loaded are included too,
     // flagged as not implemented.
@@ -376,7 +367,14 @@ export { parseApplications };
  * missing ones: the README, and the code that also carries the documentation
  * (as JSDoc).
  */
-const CANONICAL_APP_FILES = ['README.md', 'index.js'];
+const CANONICAL_APP_FILES = ['README.md', 'index.ts'];
+
+/**
+ * A canonical file is already there when a variant of it is: an application
+ * still written in JavaScript has an `index.js`, and the Source view must not
+ * offer to create an `index.ts` next to it.
+ */
+const CANONICAL_ALTERNATIVES = { 'index.ts': ['index.js'] };
 
 /**
  * Folders never shown nor written to from the Source view: they are either
@@ -457,7 +455,7 @@ const walkAppFiles = (dir, relativePath, collected) => {
 
 /**
  * List the files of an application. Every file on disk is listed, plus the
- * canonical ones (README.md, index.js) when they are missing, so the UI can
+ * canonical ones (README.md, index.ts) when they are missing, so the UI can
  * offer creating them.
  * @param {string} applicationName
  * @returns {Promise<Array<{path: string, exists: boolean}>>}
@@ -473,8 +471,10 @@ export const listAppFiles = async (applicationName) => {
     .sort((a, b) => a.path.localeCompare(b.path, undefined, { sensitivity: 'base' }));
 
   // Canonical files that do not exist yet, first, so they are easy to spot
+  const has = (name) => files.some(file => file.path.toLowerCase() === name.toLowerCase());
+
   const missing = CANONICAL_APP_FILES
-    .filter(name => !files.some(file => file.path.toLowerCase() === name.toLowerCase()))
+    .filter(name => !has(name) && !(CANONICAL_ALTERNATIVES[name] || []).some(has))
     .map(name => ({ path: name, exists: false }));
 
   return [...missing, ...files];
@@ -598,11 +598,9 @@ export const renameApplication = async (applicationName, newName) => {
 
   fs.renameSync(from, to);
 
-  // Applications are required by folder: drop the stale entries so the next
-  // parse loads the renamed one from its new location
-  Object.keys(require.cache)
-    .filter(key => key === from || key.startsWith(from + path.sep))
-    .forEach(key => delete require.cache[key]);
+  // Applications are cached by file: drop the stale entries so the next parse
+  // loads the renamed one from its new location
+  appLoader.purge(from);
 
   return { name: trimmed, slug: trimmed, previousName: applicationName };
 };

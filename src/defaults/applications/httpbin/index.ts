@@ -3,7 +3,8 @@
  * and headers, and can answer with any status code or delay. Great for
  * exploring HTTP testing without setting up a server.
  */
-const { applications, httpClient } = require('lab34-flows');
+import { applications, httpClient } from '@lab34/flows';
+import type { Context, Parameters } from '@lab34/flows';
 
 /**
  * GET /get — httpbin echoes the query parameters and headers of the request.
@@ -28,8 +29,8 @@ const { applications, httpClient } = require('lab34-flows');
  *     args:
  *       q: flows
  */
-module.exports.get = applications.handler([
-  async (ctx, parameters) => {
+export const get = applications.handler([
+  async (ctx: Context, parameters: Parameters) => {
     const { query, headers } = parameters || {};
     return httpClient.get(ctx, '/get', {
       params: query || {},
@@ -61,8 +62,8 @@ module.exports.get = applications.handler([
  *     json:
  *       email: "$expr: typeof value === 'string' && value.includes('@')"
  */
-module.exports.post = applications.handler([
-  async (ctx, parameters) => {
+export const post = applications.handler([
+  async (ctx: Context, parameters: Parameters) => {
     const { body, headers } = parameters || {};
     return httpClient.post(ctx, '/post', {
       body: body || {},
@@ -86,8 +87,8 @@ module.exports.post = applications.handler([
  * test:
  *   status: 404
  */
-module.exports.status = applications.handler([
-  async (ctx, parameters) => {
+export const status = applications.handler([
+  async (ctx: Context, parameters: Parameters) => {
     const params = (parameters || {}).params || {};
     const code = params.code || 200;
     return httpClient.get(ctx, `/status/${code}`);
@@ -112,8 +113,8 @@ module.exports.status = applications.handler([
  * test:
  *   status: 200
  */
-module.exports.delay = applications.handler([
-  async (ctx, parameters) => {
+export const delay = applications.handler([
+  async (ctx: Context, parameters: Parameters) => {
     const params = (parameters || {}).params || {};
     const seconds = params.seconds || 1;
     return httpClient.get(ctx, `/delay/${seconds}`);

@@ -13,6 +13,7 @@ import { useTheme } from '@/context/ThemeContext';
 const LANGUAGES = {
   md: 'markdown',
   markdown: 'markdown',
+  ts: 'typescript',
   js: 'javascript',
   json: 'json',
   yml: 'yaml',
@@ -26,12 +27,13 @@ const extensionOf = (filePath) => (filePath.split('.').pop() || '').toLowerCase(
 const templateFor = (filePath, slug) => {
   const ext = extensionOf(filePath);
 
-  if (ext === 'js') {
+  if (ext === 'ts' || ext === 'js') {
     return [
       '/**',
       ` * ${slug} — what this application is.`,
       ' */',
-      "const { applications } = require('lab34-flows');",
+      "import { applications } from '@lab34/flows';",
+      "import type { Context, Parameters } from '@lab34/flows';",
       '',
       '/**',
       ' * What this method does.',
@@ -49,8 +51,8 @@ const templateFor = (filePath, slug) => {
       ' *   body:',
       ' *     example: "hello"',
       ' */',
-      'module.exports.myMethod = applications.handler([',
-      '  async (ctx, parameters) => {',
+      'export const myMethod = applications.handler([',
+      '  async (ctx: Context, parameters: Parameters) => {',
       '    return [{}, 200, { ok: true }, {}];',
       '  }',
       "], 'myMethod');",
@@ -298,7 +300,7 @@ export function ApplicationSource({ slug, onSaved }) {
         </div>
 
         <p className="text-muted-foreground shrink-0 border-t px-3 py-2 text-xs">
-          The JSDoc blocks of <span className="font-mono">index.js</span> and{' '}
+          The JSDoc blocks of <span className="font-mono">index.ts</span> and{' '}
           <span className="font-mono">README.md</span> update the Document view on save;
           code changes are picked up on the next run.
         </p>

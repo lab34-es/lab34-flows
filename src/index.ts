@@ -17,6 +17,25 @@ import * as playwright from './helpers/playwright';
 import * as replacer from './helpers/replacer';
 import * as validate from './helpers/validate';
 
+/**
+ * The types an application is written against. They are types only: nothing
+ * of this is emitted, so importing them costs an application nothing at run
+ * time.
+ */
+export type {
+  Context,
+  Environment,
+  Flow,
+  Json,
+  Method,
+  MethodResult,
+  MethodStep,
+  MimicConfig,
+  Parameters,
+  Reporter,
+  Step
+} from './types/application';
+
 export {
   applications,
   express,

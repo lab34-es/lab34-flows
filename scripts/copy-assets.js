@@ -4,9 +4,10 @@
  *
  * src/defaults holds the example applications and flows that are seeded into
  * the user's context directory on first run. They are templates executed in
- * *that* directory -- where `require('lab34-flows')` resolves to the installed
- * package -- not modules of this package, so they stay plain JavaScript and are
- * excluded from the TypeScript program. helpers/bootstrap resolves them at
+ * *that* directory, not modules of this package: their TypeScript is
+ * transpiled at run time by helpers/appLoader, which is also what resolves
+ * their `@lab34/flows` import. They are therefore copied verbatim and stay out
+ * of the TypeScript program. helpers/bootstrap resolves them at
  * `__dirname/../defaults`, which is dist/defaults once compiled.
  */
 'use strict';

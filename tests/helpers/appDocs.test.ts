@@ -144,7 +144,7 @@ describe('appDocs', () => {
     it.each(apps)('%s documents itself with JSDoc, and has no docs.json', (app) => {
       expect(fs.existsSync(path.join(appsDir, app, 'docs.json'))).toBe(false);
 
-      const parsed = appDocs.parse(fs.readFileSync(path.join(appsDir, app, 'index.js'), 'utf8'));
+      const parsed = appDocs.parse(fs.readFileSync(path.join(appsDir, app, 'index.ts'), 'utf8'));
       const methods = Object.values(parsed.methods);
 
       expect(parsed.description).toBeTruthy();

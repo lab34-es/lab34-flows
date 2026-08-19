@@ -107,7 +107,7 @@ are executed. Everything else is documentation, and is rendered as such.
   cell. Press *Run* and the details stream in below each block.
 - **Document / Source toggle** — *Source* opens the raw Markdown in an editor
   and saves it back to disk. Applications have the same toggle for their
-  \`README.md\`, \`index.js\` and \`env/*.env\` files.
+  \`README.md\`, \`index.ts\` and \`env/*.env\` files.
 - **Magic wand** — next to the toggle: describe a change and the model rewrites
   the document (see *Writing flows with AI*).
 - **Click a folder** and its flows — subfolders included — are listed as a
@@ -291,15 +291,28 @@ click it in the sidebar to see them, with examples ready to paste.
     icon: 'app',
     title: 'Applications and methods',
     summary: 'Where the callable methods come from, and how they document themselves.',
-    keywords: ['application', 'method', 'jsdoc', 'docs', 'index.js', 'readme', 'http', 'mqtt', 'postgres'],
+    keywords: ['application', 'method', 'jsdoc', 'docs', 'index.ts', 'typescript', 'readme', 'http', 'mqtt', 'postgres'],
     body: `
 Applications live in the \`applications\` folder of your context directory. Each
-one is a Node.js module that exports methods, and each method is what a step
-can call. They can talk to HTTP APIs, MQTT, PostgreSQL databases, or drive a
-browser with Playwright.
+one is a **TypeScript** module that exports methods, and each method is what a
+step can call. They can talk to HTTP APIs, MQTT, PostgreSQL databases, or drive
+a browser with Playwright.
+
+    import { applications, httpClient } from '@lab34/flows';
+    import type { Context, Parameters } from '@lab34/flows';
+
+    export const search = applications.handler([
+      (ctx: Context, parameters: Parameters) =>
+        httpClient.get(ctx, \`/search/\${parameters.query?.barcode}\`)
+    ], 'search');
+
+Types are there to help you write the code: applications are transpiled when
+they run, never type checked, so a type error never stops a flow. A
+\`tsconfig.json\` is kept up to date in your context directory — that is what
+points your editor at the types of the installed package.
 
 Documentation is read straight from the **JSDoc blocks** of the application's
-\`index.js\` — there is no \`docs.json\`. That documentation is what the UI renders
+\`index.ts\` — there is no \`docs.json\`. That documentation is what the UI renders
 *and* what the model is given when it writes a flow for you, so the better the
 JSDoc, the better the generated flows.
 
@@ -542,7 +555,7 @@ default (override it with \`--context <path>\`):
 | Path | What it holds |
 |-|-|
 | \`flows/\` | Your flows — the tree you see in the sidebar. |
-| \`applications/\` | One folder per application: \`index.js\`, \`README.md\`, \`envs/*.env\`. |
+| \`applications/\` | One folder per application: \`index.ts\`, \`README.md\`, \`envs/*.env\`. |
 | \`config/ai.json\` | AI provider, model and API keys. |
 | \`config/jira.json\` | Jira / Xray credentials. |
 

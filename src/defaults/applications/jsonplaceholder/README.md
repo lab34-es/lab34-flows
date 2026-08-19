@@ -28,7 +28,7 @@ creation.
 | `createPost` | `POST /posts`, writes the new id to `memory.lastPostId` |
 | `getUser` | `GET /users/{id}`, a user profile |
 
-See the **Methods** section in the UI (or the JSDoc blocks of `index.js`) for
+See the **Methods** section in the UI (or the JSDoc blocks of `index.ts`) for
 the full input / output / memory reference of each method.
 
 ## Environment

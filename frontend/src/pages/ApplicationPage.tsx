@@ -176,7 +176,7 @@ function MethodCard({ method, appSlug, highlighted }) {
             {hasValidationSchema && (
               <Collapsible>
                 <CollapsibleTrigger className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-4 cursor-pointer">
-                  Show validation schema (from index.js)
+                  Show validation schema (from index.ts)
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <CodeBlock className="mt-2" code={JSON.stringify(method.parameters, null, 2)} language="json" />
@@ -297,7 +297,7 @@ export function ApplicationPage() {
       ) : (
       <div className="min-h-0 flex-1 overflow-auto">
       <div className="mx-auto w-full max-w-4xl space-y-6 px-6 py-6">
-      {/* Application description: the JSDoc block at the top of its index.js */}
+      {/* Application description: the JSDoc block at the top of its index.ts */}
       {app.description && <Markdown className="text-muted-foreground text-sm">{app.description}</Markdown>}
 
       {app.errors?.length > 0 && (
@@ -336,7 +336,7 @@ export function ApplicationPage() {
           )}
         </TabsContent>
 
-        {/* Methods, from the JSDoc blocks of the application's index.js */}
+        {/* Methods, from the JSDoc blocks of the application's index.ts */}
         <TabsContent value="methods" className="space-y-4 pt-4">
           {(app.methods || []).length === 0 && (
             <p className="text-muted-foreground text-sm">No methods found for this application.</p>
@@ -389,7 +389,7 @@ export function ApplicationPage() {
       <Separator />
       <p className="text-muted-foreground text-xs">
         Methods and their documentation come from the JSDoc blocks of the application's{' '}
-        <span className="font-mono">index.js</span>. Edit them in the <strong>Source</strong> view.
+        <span className="font-mono">index.ts</span>. Edit them in the <strong>Source</strong> view.
       </p>
       </div>
       </div>

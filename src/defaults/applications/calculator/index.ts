@@ -3,7 +3,8 @@
  * access, and to learn how flow memory works: every operation writes its
  * result to `memory.lastResult`, so later steps can reuse it.
  */
-const { applications } = require('lab34-flows');
+import { applications } from '@lab34/flows';
+import type { Context, Parameters } from '@lab34/flows';
 
 const toNumber = (value, name) => {
   const num = typeof value === 'number' ? value : parseFloat(value);
@@ -42,8 +43,8 @@ const round = (value, ctx) => {
  *   body:
  *     result: 42
  */
-module.exports.add = applications.handler([
-  async (ctx, parameters) => {
+export const add = applications.handler([
+  async (ctx: Context, parameters: Parameters) => {
     const body = (parameters || {}).body || {};
     const a = toNumber(body.a, 'a');
     const b = toNumber(body.b, 'b');
@@ -70,8 +71,8 @@ module.exports.add = applications.handler([
  *     a: "{{ memory.lastResult }}"
  *     b: 2
  */
-module.exports.multiply = applications.handler([
-  async (ctx, parameters) => {
+export const multiply = applications.handler([
+  async (ctx: Context, parameters: Parameters) => {
     const body = (parameters || {}).body || {};
     const a = toNumber(body.a, 'a');
     const b = toNumber(body.b, 'b');
@@ -105,8 +106,8 @@ module.exports.multiply = applications.handler([
  *     error:
  *       code: DIVISION_BY_ZERO
  */
-module.exports.divide = applications.handler([
-  async (ctx, parameters) => {
+export const divide = applications.handler([
+  async (ctx: Context, parameters: Parameters) => {
     const body = (parameters || {}).body || {};
     const a = toNumber(body.a, 'a');
     const b = toNumber(body.b, 'b');
