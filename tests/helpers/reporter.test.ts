@@ -4,6 +4,7 @@ import * as reporterHelper from '../../src/helpers/reporter';
 
 // The reporter colours its output; strip the escape codes so assertions can
 // match on the text itself.
+// eslint-disable-next-line no-control-regex -- matching ANSI escapes is the point
 const ANSI = /\u001b\[[0-9;]*m/g;
 
 /** Everything the reporter printed, decoloured, as one string. */

@@ -5,12 +5,12 @@ jest.mock('yargs-parser', () => () => ({}));
 const clients: any[] = [];
 
 const makeClient = (opts: any, subscribeImpl?: any, failWith?: Error) => {
-  const handlers: Record<string, Function[]> = {};
+  const handlers: Record<string, Array<(...args: any[]) => void>> = {};
   const client: any = {
     opts,
     on: jest.fn((event, fn) => { (handlers[event] ||= []).push(fn); return client; }),
     emit: (event: string, ...args: any[]) => (handlers[event] || []).forEach(fn => fn(...args)),
-    subscribe: jest.fn(subscribeImpl || ((topic: string, cb: Function) => cb(null))),
+    subscribe: jest.fn(subscribeImpl || ((topic: string, cb: (error: Error | null) => void) => cb(null))),
     end: jest.fn()
   };
   clients.push(client);
@@ -76,7 +76,7 @@ describe('mqtt.start', () => {
 
   test('a failing subscription rejects', async () => {
     (mqtt.connect as jest.Mock).mockImplementationOnce((opts) =>
-      makeClient(opts, (topic: string, cb: Function) => cb(new Error('denied'))));
+      makeClient(opts, (topic: string, cb: (error: Error | null) => void) => cb(new Error('denied'))));
 
     await expect(latentMqtt.start({}, {
       client: 'c6', connection: { host: 'b' }, subscribe: { topic: 'x' }
