@@ -12,6 +12,8 @@ import { highlight as highlight } from 'cli-highlight';
  */
 export interface Reporter {
   server: { emit: (...args: any[]) => void };
+  /** True when the run was started from the CLI, i.e. a person is at a terminal. */
+  cli: boolean;
   [method: string]: any;
 }
 
@@ -434,6 +436,43 @@ const playwrigthStep = (ctx, method, parameters) => {
 
 const stepTestError = (_ctx, _message) => {};
 
+/**
+ * A step is waiting for the person running the flow to type something.
+ *
+ * On the CLI `helpers/inputs` never gets this far -- it reads stdin itself.
+ * From the UI the request travels over the socket, and the answer comes back
+ * through the API. The terminal still gets a line saying what the run is
+ * stopped on, because the server's log is where someone looks when a run
+ * seems stuck.
+ *
+ * @param {import('./inputs').InputRequest} request
+ */
+const inputRequest = function (this: Reporter, request) {
+  console.log([
+    '   ⏸',
+    '  WAITING FOR INPUT '.yellow.bold,
+    request.label
+  ].join(''));
+
+  this.server.emit('flowexecution:update', {
+    id: _flow.execution.id,
+    topic: 'input',
+    data: { ...request, status: 'pending' }
+  });
+};
+
+/**
+ * The request was answered or cancelled: the UI can take the field away.
+ * @param {import('./inputs').InputRequest} request
+ */
+const inputResolved = function (this: Reporter, request) {
+  this.server.emit('flowexecution:update', {
+    id: _flow.execution.id,
+    topic: 'input',
+    data: { id: request.id, stepId: request.stepId, status: 'resolved' }
+  });
+};
+
 const execution = function (this: Reporter) {
   const { id } = _flow.execution;
   this.server.emit('flowexecution:update', {
@@ -464,6 +503,10 @@ const get = function ({ flow, cli, server }): Reporter {
     // On the CLI there is no socket to report to, so emit is a no-op
     server: cli ? { emit: () => {} } : server,
 
+    // Where the run is being watched from: helpers/inputs asks a CLI run for
+    // its answer on the terminal, and a UI run over the socket
+    cli: Boolean(cli),
+
     stepStart,
     stepUpdate,
     mimicStart,
@@ -477,7 +520,9 @@ const get = function ({ flow, cli, server }): Reporter {
     playwrightStep: playwrigthStep,
     execution,
     diagram,
-    stepTestError
+    stepTestError,
+    inputRequest,
+    inputResolved
   };
 };
 

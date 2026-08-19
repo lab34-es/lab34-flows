@@ -19,7 +19,7 @@ const STATUS_BORDERS = {
  * A notebook cell for a ```step block: the step definition (YAML) with its
  * live execution output right below, like In[]/Out[] in a Python notebook.
  */
-export function StepCell({ segment, step, stepData, xrayTest, jiraBaseUrl }) {
+export function StepCell({ segment, step, stepData, xrayTest, jiraBaseUrl, inputRequest = null, onAnswerInput = null }) {
   const application = step?.application;
   const method = step?.method;
   const executionStatus = stepData?.execution?.status;
@@ -82,7 +82,11 @@ export function StepCell({ segment, step, stepData, xrayTest, jiraBaseUrl }) {
       )}
 
       {/* Notebook-style execution output */}
-      <ExecutionOutput stepData={stepData} />
+      <ExecutionOutput
+        stepData={stepData}
+        inputRequest={inputRequest}
+        onAnswerInput={onAnswerInput}
+      />
     </div>
   );
 }

@@ -30,7 +30,7 @@ export function FlowPage() {
   const flowPath = searchParams.get('path');
 
   const { environment, refreshTree } = useAppState();
-  const { executions, startRun, clearRun, anyRunning } = useExecutions();
+  const { executions, startRun, clearRun, answerInput, anyRunning } = useExecutions();
   const { theme } = useTheme();
 
   const [flowData, setFlowData] = useState<any>(null);
@@ -237,6 +237,15 @@ export function FlowPage() {
     };
   }, [run]);
 
+  // What the step rendered by a segment is asking the person for, if anything
+  const inputRequestFor = useMemo(() => {
+    return (segment) => {
+      if (!run || !run.stepOrder?.length) { return null; }
+      const stepId = run.stepOrder[segment.stepIndex];
+      return stepId ? run.inputs?.[stepId] : null;
+    };
+  }, [run]);
+
   if (!flowPath) {
     return (
       <div className="p-6">
@@ -413,7 +422,16 @@ export function FlowPage() {
               <Alert variant="destructive" className="mb-4">
                 <AlertCircle />
                 <AlertTitle>{run.execution.error.name || 'Execution error'}</AlertTitle>
-                <AlertDescription>{run.execution.error.message}</AlertDescription>
+                <AlertDescription>
+                  <p>{run.execution.error.message}</p>
+                  {/* The step cell carries the full picture (causes, stack);
+                      here only what the message does not already say */}
+                  {(run.execution.error.causes || []).map((cause, index) => (
+                    <p key={index} className="font-mono text-xs">
+                      {cause.name}: {cause.message}
+                    </p>
+                  ))}
+                </AlertDescription>
               </Alert>
             )}
             {parseErrors.length > 0 && (
@@ -444,6 +462,8 @@ export function FlowPage() {
                     stepData={stepDataFor(segment)}
                     xrayTest={xrayTestFor(step?.testKey)}
                     jiraBaseUrl={xray.jiraBaseUrl}
+                    inputRequest={inputRequestFor(segment)}
+                    onAnswerInput={answerInput}
                   />
                 );
               }

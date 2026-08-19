@@ -10,6 +10,8 @@ import * as replacer from '../replacer';
 import * as tester from './tester';
 import * as paths from '../paths';
 import * as reporterHelper from '../reporter';
+import * as errors from '../errors';
+import * as inputs from '../inputs';
 
 let steps: Record<string, any>[] = [];
 const applications = apps.applications;
@@ -91,7 +93,10 @@ const executeStep = async (flow, step, attemptNumber = 0) => {
   const [headers, status, body, memory] = await applications[application][method](
     {
       ...appsCtx[application],
-      reporter: flow.reporter
+      reporter: flow.reporter,
+      // Which step is running, for helpers that report against it -- an
+      // input request has to appear under the step that asked for it
+      stepId: step.id
     },
     params,
     flow
@@ -182,7 +187,7 @@ const processor = async (flow, opts) => {
           name: 'EnvironmentSetupError',
           message: `Error setting up environment for ${application}: ${err.message}`,
           code: 6,
-          originalError: err
+          originalError: errors.describe(err)
         };
         flow.reporter.execution();
         throw flow.execution.error;
@@ -330,12 +335,26 @@ const processor = async (flow, opts) => {
         // Uncomment this for extra debugging
         console.error(stepError);
 
+        // The terminal gets the error as it was thrown; the UI only gets what
+        // is put on the step. Flattening it here is what keeps the two saying
+        // the same thing -- plenty of errors (an AggregateError from a
+        // refused database connection, say) have an empty message and hold
+        // everything worth reading in their causes.
+        const described = errors.describe(stepError);
+
+        // A step that failed before its execution holder was set would
+        // otherwise fail again here, hiding the error that actually happened
+        if (!flow.steps[i].execution) {
+          flow.steps[i].execution = { times: {}, attempt: 0 };
+        }
+
         flow.steps[i].execution.status = 'error';
         
         flow.steps[i].execution.error = {
-          name: stepError.name || 'StepExecutionError',
-          message: `Error executing step ${step.id}: ${stepError.message}`,
-          code: stepError.code || 7,
+          ...described,
+          name: described.name || 'StepExecutionError',
+          message: `Error executing step ${step.id}: ${errors.summarize(described)}`,
+          code: described.code ?? 7,
           stepId: step.id
         };
         flow.reporter.stepUpdate(step.id);
@@ -355,11 +374,12 @@ const processor = async (flow, opts) => {
     if (flow.execution) {
       flow.execution.status = 'error';
       if (!flow.execution.error) {
+        const described = errors.describe(error);
         flow.execution.error = {
-          name: error.name || 'ProcessorError',
-          message: error.message,
-          code: error.code || 1,
-          originalError: error
+          ...described,
+          name: described.name || 'ProcessorError',
+          message: errors.summarize(described),
+          code: described.code ?? 1
         };
       }
     }
@@ -438,7 +458,12 @@ const runExclusive = async (flow, opts) => {
   }
   running = true;
 
-  const release = () => { running = false; };
+  const release = () => {
+    // A request nobody answered must not outlive the run that made it: the
+    // step waiting on it is gone, and the UI would keep offering the field
+    inputs.cancelAll('The flow finished before the input was answered');
+    running = false;
+  };
 
   try {
     return await run(flow, opts, release);

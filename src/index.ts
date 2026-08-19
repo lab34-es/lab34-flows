@@ -8,9 +8,11 @@
 import express from 'express';
 
 import * as applications from './helpers/applications';
+import * as errors from './helpers/errors';
 import * as flows from './helpers/flows';
 import * as httpClient from './helpers/httpClient';
 import * as httpServer from './helpers/httpServer';
+import * as inputs from './helpers/inputs';
 import * as mimicFiles from './helpers/mimicFiles';
 import * as pgClient from './helpers/pgClient';
 import * as playwright from './helpers/playwright';
@@ -22,6 +24,9 @@ import * as validate from './helpers/validate';
  * of this is emitted, so importing them costs an application nothing at run
  * time.
  */
+export type { DescribedError } from './helpers/errors';
+export type { InputRequest, TextOptions } from './helpers/inputs';
+
 export type {
   Context,
   Environment,
@@ -38,10 +43,12 @@ export type {
 
 export {
   applications,
+  errors,
   express,
   flows,
   httpClient,
   httpServer,
+  inputs,
   mimicFiles,
   pgClient,
   playwright,

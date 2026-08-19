@@ -34,7 +34,8 @@ describe('reporter.get', () => {
     for (const method of [
       'stepStart', 'stepUpdate', 'mimicStart', 'request', 'mimicRequest',
       'mimicResponse', 'mimicResponseBody', 'mimicFile', 'response', 'test',
-      'playwrightStep', 'execution', 'diagram', 'stepTestError'
+      'playwrightStep', 'execution', 'diagram', 'stepTestError',
+      'inputRequest', 'inputResolved'
     ]) {
       expect(typeof reporter[method]).toBe('function');
     }
@@ -328,5 +329,53 @@ describe('reporter.execution and diagram', () => {
 describe('reporter.stepTestError', () => {
   test('is a no-op placeholder', () => {
     expect(build().stepTestError({}, 'message')).toBeUndefined();
+  });
+});
+
+describe('reporter input requests', () => {
+  test('a pending request goes to the socket and to the terminal', () => {
+    const server = { emit: jest.fn() };
+    const reporter = build({ server });
+
+    reporter.inputRequest({
+      id: 'req-1',
+      kind: 'text',
+      label: 'Introduce the barcode to be reserved',
+      stepId: 'add-numbers'
+    });
+
+    expect(server.emit).toHaveBeenCalledWith('flowexecution:update', {
+      id: 'exec-1',
+      topic: 'input',
+      data: {
+        id: 'req-1',
+        kind: 'text',
+        label: 'Introduce the barcode to be reserved',
+        stepId: 'add-numbers',
+        status: 'pending'
+      }
+    });
+
+    // The server log is where someone looks when a run seems stuck
+    expect(printed()).toContain('WAITING FOR INPUT');
+    expect(printed()).toContain('Introduce the barcode to be reserved');
+  });
+
+  test('a resolved request tells the UI to take the field away', () => {
+    const server = { emit: jest.fn() };
+    const reporter = build({ server });
+
+    reporter.inputResolved({ id: 'req-1', stepId: 'add-numbers', label: 'anything' });
+
+    expect(server.emit).toHaveBeenCalledWith('flowexecution:update', {
+      id: 'exec-1',
+      topic: 'input',
+      data: { id: 'req-1', stepId: 'add-numbers', status: 'resolved' }
+    });
+  });
+
+  test('a CLI reporter says so, so inputs are asked on the terminal', () => {
+    expect(build({ cli: true }).cli).toBe(true);
+    expect(build({ cli: false }).cli).toBe(false);
   });
 });

@@ -47,6 +47,8 @@ export interface Context {
   env: Environment;
   /** Where a helper reports what it did, so the run log and the UI show it. */
   reporter?: Reporter;
+  /** Id of the step being run, so what a helper reports is attached to it. */
+  stepId?: string;
   /** Optional case, used to pick `<KEY>_<case>` overrides out of the env. */
   case?: string;
   [key: string]: unknown;

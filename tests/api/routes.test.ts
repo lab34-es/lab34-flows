@@ -5,6 +5,7 @@ jest.mock('yargs-parser', () => () => ({}));
 // Every route delegates to a helper; the helpers have their own suites, so
 // here we only assert the HTTP contract: status codes, shapes and error mapping.
 jest.mock('../../src/helpers/flows');
+jest.mock('../../src/helpers/inputs');
 jest.mock('../../src/helpers/bases');
 jest.mock('../../src/helpers/jira');
 jest.mock('../../src/helpers/applications');
@@ -13,6 +14,7 @@ import express from 'express';
 import request from 'supertest';
 
 import * as flows from '../../src/helpers/flows';
+import * as inputs from '../../src/helpers/inputs';
 import * as bases from '../../src/helpers/bases';
 import * as jira from '../../src/helpers/jira';
 import * as apps from '../../src/helpers/applications';
@@ -116,6 +118,42 @@ describe('POST /api/flows/start', () => {
     const res = await request(app).post('/api/flows/start').send({});
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: 'already running' });
+  });
+});
+
+describe('/api/flows/input', () => {
+  test('lists what a running flow is waiting for', async () => {
+    (inputs.list as jest.Mock).mockReturnValue([{ id: 'req-1', label: 'Barcode' }]);
+    const res = await request(app).get('/api/flows/input');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ inputs: [{ id: 'req-1', label: 'Barcode' }] });
+  });
+
+  test('answering resumes the step that asked', async () => {
+    (inputs.answer as jest.Mock).mockReturnValue(true);
+    const res = await request(app).post('/api/flows/input').send({ id: 'req-1', value: 'AC001' });
+    expect(res.status).toBe(200);
+    expect(inputs.answer).toHaveBeenCalledWith('req-1', 'AC001');
+  });
+
+  test('cancelling gives up on the request instead of answering it', async () => {
+    (inputs.cancel as jest.Mock).mockReturnValue(true);
+    const res = await request(app).post('/api/flows/input').send({ id: 'req-1', cancel: true });
+    expect(res.status).toBe(200);
+    expect(inputs.cancel).toHaveBeenCalledWith('req-1', 'Input was cancelled');
+    expect(inputs.answer).not.toHaveBeenCalled();
+  });
+
+  test('a request nobody is waiting for is a 404', async () => {
+    (inputs.answer as jest.Mock).mockReturnValue(false);
+    const res = await request(app).post('/api/flows/input').send({ id: 'gone', value: 'x' });
+    expect(res.status).toBe(404);
+  });
+
+  test('an answer without an id is a 400', async () => {
+    const res = await request(app).post('/api/flows/input').send({ value: 'x' });
+    expect(res.status).toBe(400);
+    expect(inputs.answer).not.toHaveBeenCalled();
   });
 });
 

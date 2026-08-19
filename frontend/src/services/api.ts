@@ -25,6 +25,10 @@ export const flowsApi = {
   editAI: (prompt, content) =>
     api.post('/api/flows/edit/ai', { prompt, content }, { timeout: AI_TIMEOUT }),
   start: (data) => api.post('/api/flows/start', data),
+  // What a running step is asking the person for, and the answer to it
+  pendingInputs: () => api.get('/api/flows/input'),
+  answerInput: (id, value) => api.post('/api/flows/input', { id, value }),
+  cancelInput: (id) => api.post('/api/flows/input', { id, cancel: true }),
   getUserFlow: (path) => api.get(`/api/flows/user?path=${encodeURIComponent(path)}`),
   createFolder: (path) => api.post('/api/flows/folder', { path }),
   saveFile: (path, content, overwrite = false) =>

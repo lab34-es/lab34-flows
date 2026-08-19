@@ -45,6 +45,7 @@ Features:
   - [Jira / Xray integration](#jira--xray-integration)
   - [Default examples](#default-examples)
   - [Application docs (JSDoc)](#application-docs-jsdoc)
+  - [Asking for input mid-flow](#asking-for-input-mid-flow)
   - [Flows](#flows)
   - [Tests](#tests)
   - [Playwright](#playwright) (browser automation - experimental)
@@ -716,6 +717,35 @@ Two things make that work outside any `node_modules` of this package:
 Applications still written in JavaScript (`index.js`, `mimic.js`, `require()`,
 `module.exports`) keep working: the loader accepts either extension, and the
 documentation parser recognises both export styles.
+
+## Asking for input mid-flow
+
+Some steps need a value only the person running the flow can give — the
+barcode of the parcel in their hand, a code shown on a locker screen. Ask for
+it with `inputs.text`, and it is asked wherever the flow is being watched
+from: on the terminal for a CLI run, and as a field under the step in the web
+UI, where it can also be cancelled.
+
+```ts
+import { applications, inputs } from '@lab34/flows';
+import type { Context, Parameters } from '@lab34/flows';
+
+export const waitForText = applications.handler([
+  (ctx: Context, parameters: Parameters) =>
+    inputs.text(ctx, { label: 'Introduce the barcode to be reserved' })
+      .then(text => [null, null, { text }])
+], 'waitForText');
+```
+
+`inputs.text(ctx, options)` resolves with what was typed, trimmed. `options`
+takes a `label` (the question), and `secret: true` to mask the field. The run
+waits as long as it takes — nothing times out — and the promise rejects when
+the request is cancelled, which fails the step and ends the run.
+
+Reading `process.stdin` directly does the same thing on the CLI and nothing
+useful anywhere else: the prompt goes to whatever terminal the server happens
+to be attached to, and a run started from the UI hangs with nothing on screen
+to explain why.
 
 ## Application docs (JSDoc)
 

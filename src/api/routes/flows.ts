@@ -2,6 +2,7 @@ import express from 'express';
 const router = express.Router();
 
 import * as flows from '../../helpers/flows';
+import * as inputs from '../../helpers/inputs';
 
 const sendError = (res, error, status = 400) => {
   const message = (error && error.message) || String(error);
@@ -54,6 +55,33 @@ router.post('/start', (req, res) => {
       res.send({ execution: flow.execution });
     })
     .catch(error => sendError(res, error));
+});
+
+// The requests a running flow is waiting an answer for. Only ever one in
+// practice, but a client that connected late has no other way of finding it.
+router.get('/input', (req, res) => {
+  res.send({ inputs: inputs.list() });
+});
+
+// Answer -- or give up on -- what a step asked the person running the flow
+// for. { id, value } to answer, { id, cancel: true } to abandon it, which
+// fails the step and lets the run end instead of waiting for ever.
+router.post('/input', (req, res) => {
+  const { id, value, cancel } = req.body || {};
+
+  if (!id) {
+    return sendError(res, new Error('Invalid request: "id" is required'));
+  }
+
+  const settled = cancel
+    ? inputs.cancel(id, 'Input was cancelled')
+    : inputs.answer(id, value);
+
+  if (!settled) {
+    return res.status(404).send({ error: 'That input is no longer being waited for' });
+  }
+
+  res.send({ success: true });
 });
 
 router.get('/user', (req, res) => {

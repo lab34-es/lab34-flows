@@ -17,6 +17,7 @@ import { flowsApi } from '@/services/api';
  *   execution,       // { id, status, times, error } from the runner
  *   stepOrder,       // ordered step ids (from the diagram event)
  *   steps,           // stepId -> live step data (request, response, tests...)
+ *   inputs,          // stepId -> what that step is asking the person for
  *   startError,      // error message when the run could not even start
  *   environment,
  * }
@@ -32,12 +33,14 @@ export function ExecutionProvider({ children }) {
     const { topic, data } = event;
 
     setExecutions((prev) => {
-      const current = prev[path] || { steps: {}, stepOrder: [] };
+      const current = prev[path] || { steps: {}, stepOrder: [], inputs: {} };
 
       if (topic === 'execution') {
+        // Nothing can be answered once the run is over
+        const inputs = data.status === 'running' ? current.inputs : {};
         return {
           ...prev,
-          [path]: { ...current, execution: data, status: data.status },
+          [path]: { ...current, execution: data, status: data.status, inputs },
         };
       }
 
@@ -54,6 +57,22 @@ export function ExecutionProvider({ children }) {
             steps,
           },
         };
+      }
+
+      // A step is stopped waiting for a value only a person can give. The
+      // request is keyed by step so the field appears under the step that
+      // asked for it, and 'resolved' is what takes it away again.
+      if (topic === 'input' && data && data.id) {
+        const stepId = data.stepId || '__flow__';
+        const inputs = { ...(current.inputs || {}) };
+
+        if (data.status === 'resolved') {
+          if (inputs[stepId]?.id === data.id) { delete inputs[stepId]; }
+        } else {
+          inputs[stepId] = data;
+        }
+
+        return { ...prev, [path]: { ...current, inputs } };
       }
 
       if (topic === 'step' && data && data.id) {
@@ -116,7 +135,7 @@ export function ExecutionProvider({ children }) {
   const startRun = useCallback(async (flowPath, { value, environment, format }) => {
     setExecutions((prev) => ({
       ...prev,
-      [flowPath]: { steps: {}, stepOrder: [], status: 'starting', environment },
+      [flowPath]: { steps: {}, stepOrder: [], inputs: {}, status: 'starting', environment },
     }));
 
     try {
@@ -139,6 +158,23 @@ export function ExecutionProvider({ children }) {
       }));
     }
   }, [applyEvent]);
+
+  /**
+   * Answer -- or give up on -- what a step asked for. The runner resumes (or
+   * fails) the step; the socket is what takes the field away, so nothing is
+   * removed here.
+   *
+   * @param {string} id - The request id
+   * @param {string} value - What the person typed. Ignored when cancelling.
+   * @param {boolean} [cancel]
+   */
+  const answerInput = useCallback(async (id, value, cancel = false) => {
+    if (cancel) {
+      await flowsApi.cancelInput(id);
+      return;
+    }
+    await flowsApi.answerInput(id, value);
+  }, []);
 
   const clearRun = useCallback((flowPath) => {
     setExecutions((prev) => {
@@ -167,8 +203,8 @@ export function ExecutionProvider({ children }) {
   );
 
   const value = useMemo(
-    () => ({ executions, startRun, clearRun, statusFor, anyRunning }),
-    [executions, startRun, clearRun, statusFor, anyRunning]
+    () => ({ executions, startRun, clearRun, answerInput, statusFor, anyRunning }),
+    [executions, startRun, clearRun, answerInput, statusFor, anyRunning]
   );
 
   return <ExecutionContext.Provider value={value}>{children}</ExecutionContext.Provider>;

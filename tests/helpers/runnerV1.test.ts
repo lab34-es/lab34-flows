@@ -179,6 +179,41 @@ describe('v1.run - failures', () => {
 
     expect(flow.steps[0].execution.error.message).toContain('boom');
   });
+
+  test('an error with nothing in its own message still says what happened', async () => {
+    // pg's answer to a refused connection: the message is empty and the two
+    // attempts are in .errors. Reported as-is the UI showed an empty box.
+    const refused: NodeJS.ErrnoException = new Error('connect ECONNREFUSED 127.0.0.1:5432');
+    refused.code = 'ECONNREFUSED';
+    const aggregate: any = new AggregateError([refused], '');
+    aggregate.code = 'ECONNREFUSED';
+    calculatorAdd.mockRejectedValue(aggregate);
+
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+
+    await runCli(flow);
+
+    const { error } = flow.steps[0].execution;
+    expect(error.name).toBe('AggregateError');
+    expect(error.message).toContain('connect ECONNREFUSED 127.0.0.1:5432');
+    expect(error.code).toBe('ECONNREFUSED');
+    expect(error.causes[0].message).toBe('connect ECONNREFUSED 127.0.0.1:5432');
+    expect(error.stack).toBeDefined();
+    expect(flow.execution.error.message).toContain('connect ECONNREFUSED 127.0.0.1:5432');
+  });
+
+  test('what is reported to the UI survives being serialised', async () => {
+    const looping: any = new Error('looping');
+    looping.cause = looping;
+    calculatorAdd.mockRejectedValue(looping);
+
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+
+    await runCli(flow);
+
+    expect(() => JSON.stringify(flow.steps[0].execution.error)).not.toThrow();
+    expect(() => JSON.stringify(flow.execution.error)).not.toThrow();
+  });
 });
 
 describe('v1.run - step retries', () => {
