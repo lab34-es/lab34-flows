@@ -118,6 +118,59 @@ describe('application files', () => {
   });
 });
 
+describe('createApplication', () => {
+  it('writes the template, named after the application', async () => {
+    const result = await apps.createApplication('  my-api  ');
+
+    expect(result).toMatchObject({ name: 'my-api', slug: 'my-api' });
+
+    const index = fs.readFileSync(path.join(appsDir, 'my-api', 'index.ts'), 'utf8');
+    expect(index).toContain('helloWorld');
+    // The placeholder is replaced everywhere, example steps included
+    expect(index).not.toContain('__APPLICATION_NAME__');
+    expect(index).toContain('application: my-api');
+
+    const readme = fs.readFileSync(path.join(appsDir, 'my-api', 'README.md'), 'utf8');
+    expect(readme).toContain('# my-api');
+    expect(readme).not.toContain('__APPLICATION_NAME__');
+
+    // Nested folders of the template are copied too
+    expect(fs.readFileSync(path.join(appsDir, 'my-api', 'env', 'local.env'), 'utf8'))
+      .toContain('BASE_URL=');
+  });
+
+  it('creates the applications directory when it is not there yet', async () => {
+    fs.rmSync(appsDir, { recursive: true, force: true });
+
+    await apps.createApplication('my-api');
+
+    expect(fs.existsSync(path.join(appsDir, 'my-api', 'index.ts'))).toBe(true);
+  });
+
+  it('the application it writes is parsed, with its methods', async () => {
+    await apps.createApplication('my-api');
+
+    const [parsed] = (await apps.parseApplications()).filter(app => app.slug === 'my-api');
+
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.methods.map(method => method.name).sort())
+      .toEqual(['helloWorld', 'ping', 'repeatGreeting']);
+    expect(parsed.description).toContain('my-api');
+    expect(parsed.readme).toContain('# my-api');
+  });
+
+  it('refuses a name that is taken, a path, or empty', async () => {
+    await expect(apps.createApplication('calculator')).rejects
+      .toMatchObject({ code: 'EEXISTS' });
+    await expect(apps.createApplication('nested/app')).rejects
+      .toThrow(/Invalid application name/);
+    await expect(apps.createApplication('.hidden')).rejects
+      .toThrow(/Invalid application name/);
+    await expect(apps.createApplication('   ')).rejects
+      .toThrow(/Application name is required/);
+  });
+});
+
 describe('renameApplication', () => {
   it('renames the application folder', async () => {
     const result = await apps.renameApplication('calculator', 'maths');

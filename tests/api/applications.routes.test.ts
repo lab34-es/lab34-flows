@@ -131,6 +131,27 @@ describe('application source files', () => {
   });
 });
 
+describe('POST /api/applications', () => {
+  test('creates the application from the template', async () => {
+    (apps.createApplication as jest.Mock).mockResolvedValue({ slug: 'my-api', name: 'my-api' });
+    const res = await request(app).post('/api/applications').send({ name: 'my-api' });
+    expect(res.body).toEqual({ success: true, slug: 'my-api', name: 'my-api' });
+    expect(apps.createApplication).toHaveBeenCalledWith('my-api');
+  });
+
+  test('maps a clash to 409', async () => {
+    const error: NodeJS.ErrnoException = new Error('An application named "my-api" already exists');
+    error.code = 'EEXISTS';
+    (apps.createApplication as jest.Mock).mockRejectedValue(error);
+    expect((await request(app).post('/api/applications').send({ name: 'my-api' })).status).toBe(409);
+  });
+
+  test('maps an invalid name to 400', async () => {
+    (apps.createApplication as jest.Mock).mockRejectedValue(new Error('Invalid application name'));
+    expect((await request(app).post('/api/applications').send({ name: '../x' })).status).toBe(400);
+  });
+});
+
 describe('PUT /api/applications/:application/rename', () => {
   test('renames the application folder', async () => {
     (apps.renameApplication as jest.Mock).mockResolvedValue({ slug: 'calc' });

@@ -19,6 +19,13 @@ router.get('/', (req, res) => {
     });
 });
 
+// Create an application from the template. { name }
+router.post('/', (req, res) => {
+  apps.createApplication(req.body.name)
+    .then(result => res.send({ success: true, ...result }))
+    .catch(error => sendError(res, error));
+});
+
 // Editable source files of an application (Source view in the UI)
 router.get('/:application/files', (req, res) => {
   apps.listAppFiles(req.params.application)

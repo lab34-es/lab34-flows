@@ -159,6 +159,12 @@ export function AppSidebar() {
         {/* --------------------------- Applications -------------------------- */}
         <SidebarGroup>
           <SidebarGroupLabel>Applications</SidebarGroupLabel>
+          <SidebarGroupAction
+            title="New application"
+            onClick={() => setApplicationAction({ type: 'new-application' })}
+          >
+            <Plus /> <span className="sr-only">New application</span>
+          </SidebarGroupAction>
           <SidebarGroupContent>
             {applicationsLoading ? (
               <div className="space-y-1 px-2">
@@ -169,7 +175,15 @@ export function AppSidebar() {
               <SidebarMenu>
                 {applications.length === 0 && (
                   <div className="text-muted-foreground px-2 py-1.5 text-xs">
-                    No applications found in the applications folder.
+                    No applications yet.{' '}
+                    <button
+                      type="button"
+                      className="underline underline-offset-2"
+                      onClick={() => setApplicationAction({ type: 'new-application' })}
+                    >
+                      Create one
+                    </button>{' '}
+                    to get started.
                   </div>
                 )}
                 {applications.map((app) => (
