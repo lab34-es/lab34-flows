@@ -45,7 +45,13 @@ const start = (mimicConfig, port, cb) => {
     res.json = ((data) => {
       mimicConfig.flow.reporter.mimicResponse(application, req.url);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      const response = replacer.any(data, req.body);
+      // Mimics answer with either a JSON string (what mimicFiles.get returns)
+      // or a plain object. `any` only understands strings, and the status line
+      // has already been written by this point, so letting it throw would drop
+      // the connection with no response at all.
+      const response = typeof data === 'string'
+        ? replacer.any(data, req.body)
+        : replacer.json(data, req.body);
       mimicConfig.flow.reporter.mimicResponseBody(response);
       res.end(JSON.stringify(response));
     }) as typeof res.json;
