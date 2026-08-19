@@ -12,7 +12,7 @@ import SettingsPage from '@/pages/SettingsPage';
 import AiSettings from '@/components/settings/AiSettings';
 import XraySettings from '@/components/settings/XraySettings';
 import UiSettings from '@/components/settings/UiSettings';
-import HelpSection from '@/components/settings/help/HelpSection';
+import HelpSection from '@/components/help/HelpSection';
 import { AppStateProvider } from '@/context/AppStateContext';
 import { ExecutionProvider } from '@/context/ExecutionContext';
 import { ThemeProvider } from '@/context/ThemeContext';
@@ -34,8 +34,8 @@ function Shell() {
               <Route path="ai" element={<AiSettings />} />
               <Route path="xray" element={<XraySettings />} />
               <Route path="ui" element={<UiSettings />} />
-              <Route path="help" element={<HelpSection />} />
             </Route>
+            <Route path="/help" element={<HelpSection />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

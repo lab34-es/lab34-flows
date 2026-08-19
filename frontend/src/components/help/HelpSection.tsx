@@ -33,7 +33,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Input } from '@/components/ui/input';
 import Markdown from '@/components/shared/Markdown';
 import { cn } from '@/lib/utils';
-import { HELP_CATEGORIES, HELP_TOPICS } from '@/components/settings/help/helpContent';
+import { HELP_CATEGORIES, HELP_TOPICS } from '@/components/help/helpContent';
 
 const ICONS = {
   app: AppWindow,
@@ -117,7 +117,7 @@ export function HelpSection() {
     .filter((group) => group.topics.length > 0);
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-3xl space-y-6 p-6">
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
           <LifeBuoy className="size-5" /> Help

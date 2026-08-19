@@ -6,7 +6,7 @@
 import {
   HELP_CATEGORIES,
   HELP_TOPICS,
-} from '../../../frontend/src/components/settings/help/helpContent';
+} from '../../../frontend/src/components/help/helpContent';
 
 export { HELP_CATEGORIES, HELP_TOPICS };
 
