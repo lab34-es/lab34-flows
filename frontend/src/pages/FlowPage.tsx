@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { AlertCircle, CheckCircle2, FileText, Loader2, Play, Save, Wand2, XCircle } from 'lucide-react';
+import { AlertCircle, Check, CloudOff, FileText, Loader2, Play, Wand2, XCircle, CheckCircle2 } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Markdown from '@/components/shared/Markdown';
 import AiEditDialog from '@/components/flow/AiEditDialog';
+import BlockEditor from '@/components/flow/BlockEditor';
 import FlowProperties from '@/components/flow/FlowProperties';
 import StepCell from '@/components/flow/StepCell';
 import XrayChip from '@/components/flow/XrayChip';
@@ -25,6 +26,16 @@ const RUN_STATUS_META = {
   error: { label: 'Failed', variant: 'destructive', Icon: XCircle },
 };
 
+// Writing to disk waits for a pause in the typing; re-parsing the document
+// (which is what keeps the step cells and the problem list honest) is quicker,
+// because it costs nothing but a round trip to the local API.
+const SAVE_DELAY = 700;
+const PARSE_DELAY = 350;
+
+// Keystrokes closer together than this are one undo step, so Cmd+Z walks back
+// through edits rather than through characters.
+const HISTORY_COALESCE = 600;
+
 export function FlowPage() {
   const [searchParams] = useSearchParams();
   const flowPath = searchParams.get('path');
@@ -38,7 +49,7 @@ export function FlowPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<any>(null);
   const [tab, setTab] = useState('document');
-  const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [savingProperties, setSavingProperties] = useState(false);
   const [saveError, setSaveError] = useState<any>(null);
   const [aiOpen, setAiOpen] = useState(false);
@@ -49,8 +60,37 @@ export function FlowPage() {
     tests: Record<string, any>;
   }>({ configured: null, jiraBaseUrl: '', tests: {} });
 
+  // What is on disk, as far as this page knows. The state drives the
+  // indicator; the ref is what the write queue reads, whenever it gets to run.
+  const [savedContent, setSavedContent] = useState('');
+  const savedRef = useRef('');
+  const draftRef = useRef('');
+  const relativePathRef = useRef<string | null>(null);
+
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+  useEffect(() => { relativePathRef.current = flowData?.relativePath || null; }, [flowData]);
+
+  // Writes are chained: two keystrokes apart cannot land out of order
+  const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const parsedRef = useRef('');
+  // The title the last parse found, and the one the sidebar was told about
+  const parsedTitleRef = useRef<string | null | undefined>(undefined);
+  const treeTitleRef = useRef<string | null>(null);
+
+  /**
+   * The undo stack of the Document view. It holds whole documents: the block
+   * editor rewrites the file on every keystroke, so anything finer would have
+   * to know about blocks, and the Source tab (Monaco) keeps its own history
+   * anyway.
+   */
+  const historyRef = useRef<{ entries: string[]; index: number; at: number }>({
+    entries: [],
+    index: 0,
+    at: 0,
+  });
+
   const run = flowPath ? executions[flowPath] : undefined;
-  const dirty = flowData ? draft !== flowData.plainText : false;
+  const dirty = draft !== savedContent;
 
   const loadFlow = useCallback(async () => {
     if (!flowPath) { return; }
@@ -58,8 +98,15 @@ export function FlowPage() {
     setLoadError(null);
     try {
       const response = await flowsApi.getUserFlow(flowPath);
+      const content = response.data.plainText || '';
       setFlowData(response.data);
-      setDraft(response.data.plainText || '');
+      setDraft(content);
+      savedRef.current = content;
+      setSavedContent(content);
+      parsedRef.current = content;
+      treeTitleRef.current = response.data.title || null;
+      historyRef.current = { entries: [content], index: 0, at: 0 };
+      setSaveState('idle');
     } catch (ex) {
       setLoadError(ex.response?.data?.error || ex.message);
     } finally {
@@ -74,27 +121,168 @@ export function FlowPage() {
     loadFlow();
   }, [loadFlow]);
 
+  /* ------------------------------ persistence ------------------------------ */
+
   /**
-   * Take the document the model rewrote as an unsaved change: the notebook
-   * is re-parsed so it shows the new content right away, but the file on
-   * disk is only touched when the user hits Save.
+   * Write the document to disk. There is no Save button: the file is the
+   * document, and it is kept up to date the way an editor keeps it.
+   *
+   * @param {string} content - The document to write
+   */
+  const persist = useCallback((content: string) => {
+    const path = relativePathRef.current;
+    if (!path) { return Promise.resolve(); }
+
+    writeQueueRef.current = writeQueueRef.current.then(async () => {
+      if (content === savedRef.current) { return; }
+      setSaveState('saving');
+      try {
+        await flowsApi.saveFile(path, content, true);
+        savedRef.current = content;
+        setSavedContent(content);
+        setSaveState('saved');
+        setSaveError(null);
+
+        // The sidebar shows the document's title, so it only has to hear
+        // about the saves that changed it
+        const title = parsedTitleRef.current;
+        if (title !== undefined && title !== treeTitleRef.current) {
+          treeTitleRef.current = title;
+          refreshTree();
+        }
+      } catch (ex) {
+        setSaveState('error');
+        setSaveError(ex.response?.data?.error || ex.message);
+      }
+    });
+
+    return writeQueueRef.current;
+  }, [refreshTree]);
+
+  // Autosave: a pause in the typing is what commits the document
+  useEffect(() => {
+    if (!flowData?.relativePath || draft === savedContent) { return undefined; }
+    const timer = setTimeout(() => { persist(draft); }, SAVE_DELAY);
+    return () => clearTimeout(timer);
+  }, [draft, flowData?.relativePath, persist, savedContent]);
+
+  // Leaving the flow (or the page) must not drop the last keystrokes
+  useEffect(() => {
+    const flush = () => {
+      if (draftRef.current !== savedRef.current) { persist(draftRef.current); }
+    };
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      window.removeEventListener('beforeunload', flush);
+      flush();
+    };
+  }, [flowPath, persist]);
+
+  /**
+   * Keep the notebook honest while the document is written: the steps, the
+   * problems and the title come from a re-parse of the draft, not from what
+   * was on disk when the flow was opened.
+   */
+  useEffect(() => {
+    if (!flowData || draft === parsedRef.current) { return undefined; }
+    const format = flowData.format;
+
+    const timer = setTimeout(async () => {
+      parsedRef.current = draft;
+      try {
+        const parsed = await flowsApi.parse(draft, format);
+        parsedTitleRef.current = parsed.data.title || null;
+        setFlowData((current) => (current ? {
+          ...current,
+          segments: parsed.data.segments,
+          steps: parsed.data.steps,
+          errors: parsed.data.errors,
+          title: parsed.data.title || current.title,
+        } : current));
+      } catch (ex) {
+        setSaveError(ex.response?.data?.error || ex.message);
+      }
+    }, PARSE_DELAY);
+
+    return () => clearTimeout(timer);
+  }, [draft, flowData]);
+
+  /* -------------------------------- history -------------------------------- */
+
+  /**
+   * Take an edit: it becomes the draft, and a point Cmd+Z can come back to.
+   * Edits made in quick succession are folded into one entry.
+   *
+   * @param {string} next - The new document
+   */
+  const applyEdit = useCallback((next: string) => {
+    setDraft(next);
+
+    const history = historyRef.current;
+    const now = Date.now();
+    const atTip = history.index === history.entries.length - 1;
+
+    if (atTip && history.entries.length && now - history.at < HISTORY_COALESCE) {
+      history.entries[history.index] = next;
+    } else {
+      history.entries = [...history.entries.slice(0, history.index + 1), next];
+      // A long session should not grow without bound
+      if (history.entries.length > 250) { history.entries.shift(); }
+      history.index = history.entries.length - 1;
+    }
+    history.at = now;
+  }, []);
+
+  const undo = useCallback(() => {
+    const history = historyRef.current;
+    if (history.index <= 0) { return; }
+    history.index -= 1;
+    history.at = 0;
+    setDraft(history.entries[history.index]);
+  }, []);
+
+  const redo = useCallback(() => {
+    const history = historyRef.current;
+    if (history.index >= history.entries.length - 1) { return; }
+    history.index += 1;
+    history.at = 0;
+    setDraft(history.entries[history.index]);
+  }, []);
+
+  // Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z (or Ctrl+Y) walk the document's own
+  // history. The Source tab and the dialogs keep the browser's.
+  useEffect(() => {
+    if (tab !== 'document') { return undefined; }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) { return; }
+
+      const key = event.key.toLowerCase();
+      const isUndo = key === 'z' && !event.shiftKey;
+      const isRedo = (key === 'z' && event.shiftKey) || key === 'y';
+      if (!isUndo && !isRedo) { return; }
+
+      // Anything with its own editing history keeps it
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('[role="dialog"], .monaco-editor')) { return; }
+
+      event.preventDefault();
+      if (isUndo) { undo(); } else { redo(); }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [redo, tab, undo]);
+
+  /* --------------------------------- actions -------------------------------- */
+
+  /**
+   * Take the document the model rewrote as an ordinary edit: it lands in the
+   * document, in the undo stack and — a moment later — on disk.
    */
   const handleAiEdit = async (content) => {
-    setDraft(content);
+    applyEdit(content);
     setSaveError(null);
-
-    try {
-      const parsed = await flowsApi.parse(content, flowData.format);
-      setFlowData((current) => ({
-        ...current,
-        segments: parsed.data.segments,
-        steps: parsed.data.steps,
-        errors: parsed.data.errors,
-        title: parsed.data.title || current.title,
-      }));
-    } catch (ex) {
-      setSaveError(ex.response?.data?.error || ex.message);
-    }
 
     // The previous run's step mapping no longer matches the document
     clearRun(flowPath);
@@ -104,51 +292,31 @@ export function FlowPage() {
   const handleRun = async () => {
     if (!flowData || !environment) { return; }
 
-    const content = dirty ? draft : flowData.plainText;
+    // What runs is what is on disk, so the file and the run never disagree
+    await persist(draft);
 
-    // When running unsaved changes, re-parse them first so the notebook
-    // cells match what is actually going to run.
-    if (dirty) {
-      try {
-        const parsed = await flowsApi.parse(content, flowData.format);
-        setFlowData((current) => ({
-          ...current,
-          segments: parsed.data.segments,
-          steps: parsed.data.steps,
-          errors: parsed.data.errors,
-          title: parsed.data.title || current.title,
-        }));
-        if (parsed.data.errors?.length) {
-          setTab('document');
-          return;
-        }
-      } catch (ex) {
-        setSaveError(ex.response?.data?.error || ex.message);
+    try {
+      const parsed = await flowsApi.parse(draft, flowData.format);
+      parsedRef.current = draft;
+      parsedTitleRef.current = parsed.data.title || null;
+      setFlowData((current) => ({
+        ...current,
+        segments: parsed.data.segments,
+        steps: parsed.data.steps,
+        errors: parsed.data.errors,
+        title: parsed.data.title || current.title,
+      }));
+      if (parsed.data.errors?.length) {
+        setTab('document');
         return;
       }
+    } catch (ex) {
+      setSaveError(ex.response?.data?.error || ex.message);
+      return;
     }
 
     setTab('document');
-    await startRun(flowPath, { value: content, environment, format: flowData.format });
-  };
-
-  const handleSave = async () => {
-    if (!flowData?.relativePath) { return; }
-    setSaving(true);
-    setSaveError(null);
-    try {
-      await flowsApi.saveFile(flowData.relativePath, draft, true);
-      const response = await flowsApi.getUserFlow(flowPath);
-      setFlowData(response.data);
-      setDraft(response.data.plainText || '');
-      // The old run's step mapping no longer matches the saved document
-      clearRun(flowPath);
-      refreshTree();
-    } catch (ex) {
-      setSaveError(ex.response?.data?.error || ex.message);
-    } finally {
-      setSaving(false);
-    }
+    await startRun(flowPath, { value: draft, environment, format: flowData.format });
   };
 
   /**
@@ -164,10 +332,22 @@ export function FlowPage() {
     setSavingProperties(true);
     setSaveError(null);
     try {
+      // The server rewrites the file it has, so the body has to be there first
+      await persist(draftRef.current);
       await flowsApi.saveProperties(flowData.relativePath, properties);
+
       const response = await flowsApi.getUserFlow(flowPath);
+      const content = response.data.plainText || '';
       setFlowData(response.data);
-      setDraft(response.data.plainText || '');
+      setDraft(content);
+      savedRef.current = content;
+      setSavedContent(content);
+      parsedRef.current = content;
+      historyRef.current = {
+        entries: [...historyRef.current.entries.slice(0, historyRef.current.index + 1), content],
+        index: historyRef.current.index + 1,
+        at: 0,
+      };
       refreshTree();
     } catch (ex) {
       setSaveError(ex.response?.data?.error || ex.message);
@@ -229,22 +409,36 @@ export function FlowPage() {
 
   const parseErrors = flowData?.errors || [];
 
-  const stepDataFor = useMemo(() => {
-    return (segment) => {
-      if (!run || !run.stepOrder?.length) { return undefined; }
-      const stepId = run.stepOrder[segment.stepIndex];
-      return stepId ? run.steps[stepId] : undefined;
-    };
-  }, [run]);
+  // Invalid step YAML, by step number, as the parser saw it
+  const stepErrors = useMemo(() => {
+    const errors = new Map<number, string>();
+    (flowData?.segments || []).forEach((segment) => {
+      if (segment.type === 'step' && segment.error) { errors.set(segment.stepIndex, segment.error); }
+    });
+    return errors;
+  }, [flowData]);
 
-  // What the step rendered by a segment is asking the person for, if anything
-  const inputRequestFor = useMemo(() => {
-    return (segment) => {
-      if (!run || !run.stepOrder?.length) { return null; }
-      const stepId = run.stepOrder[segment.stepIndex];
-      return stepId ? run.inputs?.[stepId] : null;
+  /**
+   * Everything a step cell shows besides its own YAML: what the parser made
+   * of it, what the run did with it, and what Jira knows about it.
+   *
+   * @param {number} stepIndex - Position of the step in the document
+   */
+  const resolveStep = useCallback((stepIndex: number) => {
+    const step = (flowData?.steps || []).find(
+      (candidate) => candidate && candidate.stepIndex === stepIndex
+    );
+    const stepId = run?.stepOrder?.[stepIndex];
+
+    return {
+      step,
+      stepData: stepId ? run?.steps?.[stepId] : undefined,
+      inputRequest: stepId ? run?.inputs?.[stepId] : null,
+      xrayTest: xrayTestFor(step?.testKey),
+      jiraBaseUrl: xray.jiraBaseUrl,
+      error: stepErrors.get(stepIndex),
     };
-  }, [run]);
+  }, [flowData, run, stepErrors, xray.jiraBaseUrl, xrayTestFor]);
 
   if (!flowPath) {
     return (
@@ -286,7 +480,7 @@ export function FlowPage() {
       <AiEditDialog
         open={aiOpen}
         onOpenChange={setAiOpen}
-        content={dirty ? draft : flowData.plainText}
+        content={draft}
         onApply={handleAiEdit}
       />
 
@@ -303,12 +497,28 @@ export function FlowPage() {
                   {runStatusMeta.label}
                 </Badge>
               )}
-              {dirty && <Badge variant="warning" className="text-[10px]">unsaved</Badge>}
             </div>
             {flowData.relativePath && (
               <p className="text-muted-foreground truncate font-mono text-xs">{flowData.relativePath}</p>
             )}
           </div>
+
+          {/* There is no Save button: this says what the file is doing */}
+          {flowData.relativePath && (
+            saveState === 'error' ? (
+              <span className="text-destructive flex items-center gap-1 text-xs" title={String(saveError || '')}>
+                <CloudOff className="size-3.5" /> Not saved
+              </span>
+            ) : saveState === 'saving' || dirty ? (
+              <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                <Loader2 className="size-3.5 animate-spin" /> Saving…
+              </span>
+            ) : saveState === 'saved' ? (
+              <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                <Check className="size-3.5" /> Saved
+              </span>
+            ) : null
+          )}
 
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList>
@@ -328,17 +538,9 @@ export function FlowPage() {
             <Wand2 />
           </Button>
 
-          {dirty && flowData.relativePath && (
-            <Button variant="outline" onClick={handleSave} disabled={saving}>
-              <Save /> {saving ? 'Saving…' : 'Save'}
-            </Button>
-          )}
-
           <Button
             onClick={handleRun}
-            // Stale parse errors must not block a run of edited (dirty)
-            // content: handleRun re-parses the draft and bails if needed
-            disabled={anyRunning || !environment || (!dirty && parseErrors.length > 0)}
+            disabled={anyRunning || !environment}
             title={!environment ? 'Select an environment in the sidebar first' : `Run on “${environment}”`}
           >
             <Play /> Run{environment ? ` · ${environment}` : ''}
@@ -354,7 +556,7 @@ export function FlowPage() {
             language="markdown"
             theme={theme === 'dark' ? 'vs-dark' : 'light'}
             value={draft}
-            onChange={(value) => setDraft(value ?? '')}
+            onChange={(value) => applyEdit(value ?? '')}
             options={{
               minimap: { enabled: false },
               fontSize: 13,
@@ -373,10 +575,8 @@ export function FlowPage() {
             <FlowProperties
               properties={flowData.properties}
               fallbackTitle={flowData.title}
-              readOnly={flowData.format !== 'markdown' || dirty}
-              readOnlyReason={flowData.format !== 'markdown'
-                ? 'YAML flows keep their metadata in the document itself — edit it in Source.'
-                : 'Save your changes in Source before editing properties.'}
+              readOnly={flowData.format !== 'markdown'}
+              readOnlyReason="YAML flows keep their metadata in the document itself — edit it in Source."
               saving={savingProperties}
               onChange={handlePropertiesChange}
             />
@@ -448,33 +648,31 @@ export function FlowPage() {
               </Alert>
             )}
 
-            {/* The notebook: markdown prose + step cells with execution output */}
-            {(flowData.segments || []).map((segment, index) => {
-              if (segment.type === 'step') {
-                const step = (flowData.steps || []).find(
-                  (candidate) => candidate && candidate.stepIndex === segment.stepIndex
-                );
-                return (
+            {/* The notebook, written in place: rendered Markdown you can type
+                into, with the step cells and their execution output */}
+            {flowData.format === 'markdown' ? (
+              <BlockEditor
+                key={flowPath}
+                value={draft}
+                onChange={applyEdit}
+                resolveStep={resolveStep}
+                onAnswerInput={answerInput}
+              />
+            ) : (
+              /* A classic YAML flow is not a Markdown document: it keeps the
+                 read-only notebook, and is edited in Source */
+              (flowData.segments || []).map((segment, index) => (
+                segment.type === 'step' ? (
                   <StepCell
                     key={index}
                     segment={segment}
-                    step={step}
-                    stepData={stepDataFor(segment)}
-                    xrayTest={xrayTestFor(step?.testKey)}
-                    jiraBaseUrl={xray.jiraBaseUrl}
-                    inputRequest={inputRequestFor(segment)}
+                    {...resolveStep(segment.stepIndex)}
                     onAnswerInput={answerInput}
                   />
-                );
-              }
-              return <Markdown key={index} className="py-2">{segment.content}</Markdown>;
-            })}
-
-            {(flowData.segments || []).length === 0 && (
-              <p className="text-muted-foreground text-sm">
-                This flow is empty. Switch to <strong>Source</strong> and start writing Markdown —
-                add executable steps with ```step code blocks.
-              </p>
+                ) : (
+                  <Markdown key={index} className="py-2">{segment.content}</Markdown>
+                )
+              ))
             )}
           </div>
         </div>

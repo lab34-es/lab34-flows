@@ -104,10 +104,14 @@ are executed. Everything else is documentation, and is rendered as such.
   output, memory usage and examples, plus its environment files.
 - **Sidebar footer › Environment** — the environment used for every run.
 - **Notebook view** — a flow rendered as a document, with each step block as a
-  cell. Press *Run* and the details stream in below each block.
-- **Document / Source toggle** — *Source* opens the raw Markdown in an editor
-  and saves it back to disk. Applications have the same toggle for their
-  \`README.md\`, \`index.ts\` and \`env/*.env\` files.
+  cell. Press *Run* and the details stream in below each block. It is also
+  where you write: click any block to edit its Markdown in place, and type
+  \`/\` for headings, callouts and steps (see *Writing in the Document view*).
+  Changes are saved as you type — there is no Save button.
+- **Document / Source toggle** — *Source* opens the whole file in a plain
+  Markdown editor, for when it is easier to work on the text as text.
+  Applications have the same toggle for their \`README.md\`, \`index.ts\` and
+  \`env/*.env\` files.
 - **Magic wand** — next to the toggle: describe a change and the model rewrites
   the document (see *Writing flows with AI*).
 - **Click a folder** and its flows — subfolders included — are listed as a
@@ -357,6 +361,60 @@ Which renders as:
 
 A blockquote without a marker stays a plain quote, so nothing you already
 wrote changes.
+`,
+  },
+  {
+    id: 'editing',
+    category: 'writing',
+    icon: 'file',
+    title: 'Writing in the Document view',
+    summary: 'Type where the document is rendered, insert blocks with "/", and never press Save.',
+    keywords: ['edit', 'editing', 'write', 'live', 'preview', 'wysiwyg', 'obsidian', 'slash', 'command', 'menu', 'insert', 'block', 'delete', 'undo', 'redo', 'autosave', 'save', 'shortcut', 'keyboard'],
+    body: `
+The **Document** view is where a flow is written. It is not a preview: click
+any paragraph, heading, list or step and that block shows its Markdown, right
+where it was rendered — like Obsidian's live preview. Click somewhere else and
+it is rendered again. The **Source** tab is still there for the whole file at
+once.
+
+## There is no Save button
+
+Every change is written to the file a moment after you stop typing. The
+toolbar says *Saving…* while the write is in flight and *Saved* once the file
+on disk matches what you see. What runs is the file, so pressing **Run** saves
+first.
+
+**Cmd/Ctrl + Z** undoes, **Cmd/Ctrl + Shift + Z** (or **Ctrl + Y**) redoes.
+Edits made in one burst of typing undo together, not character by character.
+
+## The "/" menu
+
+Type \`/\` and a list opens with everything a flow can hold — keep typing to
+filter it, ↑ ↓ to move, Enter to insert:
+
+| Group | Entries |
+|-|-|
+| Flow | Step, step with parameters, step with assertions |
+| Basic | Headings, bullet / numbered / task lists, quote, code block, table, divider, link, image |
+| Callouts | Note, Tip, Important, Warning, Caution |
+
+Nothing it inserts is special: they are Markdown templates, so \`/tip\` writes
+the same \`> [!TIP]\` block you would have typed by hand.
+
+## Keys
+
+| Key | What it does |
+|-|-|
+| Enter | Splits the block; inside a list it starts the next item, and an empty item closes the list. |
+| Shift + Enter | A line break inside the same block. |
+| Backspace at the start | Merges the block into the one above. |
+| Delete at the end | Merges the block below into this one. |
+| Backspace / Delete next to a step or a code block | Selects it — press again and it is gone. |
+| ↑ ↓ ← → | Walk from block to block, into each one's Markdown. |
+| Escape | Leaves the block, without leaving the document. |
+
+A step is edited as its YAML, inside its own cell: the header, the assertions
+and the execution output stay where they are while you type.
 `,
   },
   {
