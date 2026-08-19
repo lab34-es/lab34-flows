@@ -71,19 +71,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Deliberately no registry-url: it makes setup-node write an
+      # _authToken line into .npmrc, filled with a placeholder when no token
+      # is supplied. npm falls back to that placeholder whenever the OIDC
+      # exchange fails, so the job would publish a bogus credential and
+      # report a confusing 404. The default registry is npmjs.org anyway.
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
-          registry-url: https://registry.npmjs.org/
 
       # OIDC publishing arrived in npm 11.5.1, which is newer than the npm
-      # bundled with our Node line. Without this, npm looks for a token,
-      # finds none and fails with ENEEDAUTH.
+      # bundled with our Node line. Without this, npm never attempts the
+      # exchange and fails looking for a token with ENEEDAUTH.
       - run: npm install -g npm@latest
 
       - run: npm ci
 
       # prepublishOnly compiles src/ into dist/, which is what "files" ships.
       # Publishing over OIDC also attaches provenance to the release.
-      - run: npm publish --access=public
+      # Verbose logging keeps npm's "oidc" diagnostics in the run log; the
+      # token exchange fails silently at the default level.
+      - run: npm publish --access=public --loglevel=verbose
