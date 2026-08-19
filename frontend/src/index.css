@@ -266,6 +266,25 @@
 .flow-block-source-mono {
   @apply font-mono text-[0.8rem];
 }
+/* The line between two blocks. Two steps in a row leave nothing to click on
+   between them, so the gutter itself becomes the place to write: it takes no
+   room of its own, and shows a rule and a "+" when the pointer is over it */
+.flow-block-gap {
+  @apply relative h-0;
+}
+.flow-block-gap::before {
+  @apply absolute inset-x-0 -inset-y-1 cursor-text content-[''];
+}
+.flow-block-gap::after {
+  @apply bg-primary/50 pointer-events-none absolute inset-x-0 top-0 h-px opacity-0 transition-opacity content-[''];
+}
+.flow-block-gap-hint {
+  @apply text-primary pointer-events-none absolute top-0 -left-6 size-3.5 -translate-y-1/2 opacity-0 transition-opacity;
+}
+.flow-block-gap:hover::after,
+.flow-block-gap:hover .flow-block-gap-hint {
+  @apply opacity-100;
+}
 /* Somewhere to click under the last block, so a document always has an end
    to keep writing at */
 .flow-block-tail {

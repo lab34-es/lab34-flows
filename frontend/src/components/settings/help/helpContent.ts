@@ -369,7 +369,7 @@ wrote changes.
     icon: 'file',
     title: 'Writing in the Document view',
     summary: 'Type where the document is rendered, insert blocks with "/", and never press Save.',
-    keywords: ['edit', 'editing', 'write', 'live', 'preview', 'wysiwyg', 'obsidian', 'slash', 'command', 'menu', 'insert', 'block', 'delete', 'undo', 'redo', 'autosave', 'save', 'shortcut', 'keyboard'],
+    keywords: ['edit', 'editing', 'write', 'live', 'preview', 'wysiwyg', 'obsidian', 'slash', 'command', 'menu', 'insert', 'between', 'block', 'delete', 'undo', 'redo', 'autosave', 'save', 'shortcut', 'keyboard'],
     body: `
 The **Document** view is where a flow is written. It is not a preview: click
 any paragraph, heading, list or step and that block shows its Markdown, right
@@ -386,6 +386,21 @@ first.
 
 **Cmd/Ctrl + Z** undoes, **Cmd/Ctrl + Shift + Z** (or **Ctrl + Y**) redoes.
 Edits made in one burst of typing undo together, not character by character.
+
+## Writing between two blocks
+
+Two steps one after the other leave no line between them to click on, and
+neither does a step at the top of the document. Move the pointer into the
+gutter between them and an **insertion line** appears, with a \`+\` in the
+margin: click it and a new block opens there, ready for a heading, a
+paragraph or another step.
+
+**Cmd/Ctrl + Enter** does the same from the keyboard — a new block below the
+one you are in, or above it with **Shift**. That is the way in and out of a
+step, where Enter is an ordinary newline in the YAML.
+
+An insertion point nobody writes in is not a change: leave it and the file is
+exactly as it was.
 
 ## The "/" menu
 
@@ -407,6 +422,7 @@ the same \`> [!TIP]\` block you would have typed by hand.
 |-|-|
 | Enter | Splits the block; inside a list it starts the next item, and an empty item closes the list. |
 | Shift + Enter | A line break inside the same block. |
+| Cmd/Ctrl + Enter | Opens a new block below this one — above it with Shift. |
 | Backspace at the start | Merges the block into the one above. |
 | Delete at the end | Merges the block below into this one. |
 | Backspace / Delete next to a step or a code block | Selects it — press again and it is gone. |

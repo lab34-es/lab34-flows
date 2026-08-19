@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Plus } from 'lucide-react';
 
 import Markdown from '@/components/shared/Markdown';
 import BlockSource from '@/components/flow/BlockSource';
@@ -168,6 +169,9 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
   const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const focusBlockRef = useRef<string | null>(null);
+  // The blank block an insertion point opened, while nothing has been
+  // written in it: an insertion nobody used must leave no trace in the file
+  const pendingRef = useRef<string | null>(null);
   // The last document this editor handed upwards: anything else arriving
   // through `value` (undo, the Source tab, an AI rewrite) is an outside edit
   const emittedRef = useRef(value);
@@ -181,13 +185,29 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
 
   /* ------------------------------ plumbing ------------------------------ */
 
+  /** Take the blocks as the document, and hand the file upwards. */
   const commit = useCallback((blocks: Block[], head?: string) => {
     const next = { head: head ?? docRef.current.head, blocks };
     setDoc(next);
+
     const text = serializeDocument(next);
+    // A staged block that was never written in leaves on the way out: the
+    // file never heard about it, and does not have to hear about it going
+    if (text === emittedRef.current) return;
     emittedRef.current = text;
     onChange(text);
   }, [onChange]);
+
+  /**
+   * Take the blocks as the document, but keep them to the editor.
+   *
+   * An insertion point is a place to write, not a change: until something is
+   * typed in it, the file — and the diff, and the autosave — know nothing
+   * about the empty block holding the caret.
+   */
+  const stage = useCallback((blocks: Block[]) => {
+    setDoc({ head: docRef.current.head, blocks });
+  }, []);
 
   const startEdit = useCallback((id: string, offset?: number) => {
     setCaret((current) => ({ offset, token: current.token + 1 }));
@@ -203,10 +223,36 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
     setSlash(null);
   }, []);
 
+  /**
+   * Take out the blank block a previous insertion point opened, unless
+   * something was written in it. The block that came before it takes its
+   * separator back, so the file reads exactly as it did.
+   *
+   * @param {Block[]} blocks - The blocks to prune
+   * @returns {Object} The blocks, and where one was removed (-1 for none)
+   */
+  const dropPending = useCallback((blocks: Block[]): { blocks: Block[]; removed: number } => {
+    const id = pendingRef.current;
+    if (!id) return { blocks, removed: -1 };
+    pendingRef.current = null;
+
+    const index = blocks.findIndex((block) => block.id === id);
+    if (index < 0 || blocks[index].text.trim() !== '') return { blocks, removed: -1 };
+
+    const next = [...blocks];
+    const previous = next[index - 1];
+    if (previous) next[index - 1] = { ...previous, sep: next[index].sep };
+    next.splice(index, 1);
+
+    return { blocks: next, removed: index };
+  }, []);
+
   const stopEdit = useCallback(() => {
+    const { blocks, removed } = dropPending(docRef.current.blocks);
+    if (removed >= 0) commit(blocks);
     setEditingId(null);
     setSlash(null);
-  }, []);
+  }, [commit, dropPending]);
 
   // An outside edit replaces the document; the caret stays on the block it
   // was on when that block survived, so undo does not throw the writer out
@@ -269,6 +315,33 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
     if (!target) return;
     startEdit(target.id, where === 'end' ? sourceOf(target).length : 0);
   }, [startEdit]);
+
+  /**
+   * Open an empty paragraph at `index`, and put the caret in it.
+   *
+   * Two steps one after the other leave no line between them to click on,
+   * and neither does a step at the top of the document: this is that line.
+   *
+   * @param {number} index - Where the new block goes, in block positions
+   */
+  const insertBlockAt = useCallback((index: number) => {
+    const { blocks, removed } = dropPending(docRef.current.blocks);
+    // Pruning the last unused insertion point may have shifted the target
+    const at = removed >= 0 && removed < index ? index - 1 : index;
+
+    const next = [...blocks];
+    const previous = next[at - 1];
+    // The new block takes over the gap that used to follow the block above
+    // it, so the only blank line added is the one being written in. Opening
+    // the document itself gets the single newline a file ends on.
+    const fresh = createBlock('', previous ? previous.sep : (next.length ? '\n\n' : '\n'));
+    if (previous) next[at - 1] = { ...previous, sep: '\n\n' };
+    next.splice(at, 0, fresh);
+
+    stage(next);
+    pendingRef.current = fresh.id;
+    startEdit(fresh.id, 0);
+  }, [dropPending, stage, startEdit]);
 
   /** Split the block at the caret; the second half becomes a new block. */
   const splitBlock = useCallback((index: number, caret: number) => {
@@ -525,6 +598,14 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
     const kind = blockKind(block.text);
     const literal = kind === 'step' || kind === 'code';
 
+    // Enter is a newline inside YAML and code, and splits the block
+    // everywhere else, so opening a block of its own has a key to itself
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      insertBlockAt(event.shiftKey ? index : index + 1);
+      return;
+    }
+
     // While the menu is open it owns the keys that drive it
     if (slash && slash.blockId === block.id) {
       const matches = filterSlashCommands(slash.query);
@@ -598,7 +679,7 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
       event.preventDefault();
       insertAt(index, start, '  ');
     }
-  }, [applyCommand, handleBackspace, handleDelete, handleEnter, insertAt, moveTo, slash, stopEdit]);
+  }, [applyCommand, handleBackspace, handleDelete, handleEnter, insertAt, insertBlockAt, moveTo, slash, stopEdit]);
 
   /** Keys that reach a block nobody is typing in — a selected step, say. */
   const handleBlockKeyDown = useCallback((
@@ -615,6 +696,11 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
     if (event.key === 'Backspace' || event.key === 'Delete') {
       event.preventDefault();
       removeBlockAt(index, event.key === 'Backspace' ? 'previous' : 'next');
+      return;
+    }
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      insertBlockAt(event.shiftKey ? index : index + 1);
       return;
     }
     if (event.key === 'Enter') {
@@ -637,7 +723,7 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
       event.preventDefault();
       moveTo(index + 1, 'start');
     }
-  }, [moveTo, removeBlockAt, startEdit]);
+  }, [insertBlockAt, moveTo, removeBlockAt, startEdit]);
 
   /* ------------------------------ rendering ------------------------------ */
 
@@ -645,21 +731,37 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
 
   /** Write at the end of the document — the click target under the last block. */
   const appendBlock = useCallback(() => {
-    const blocks = [...docRef.current.blocks];
+    const blocks = docRef.current.blocks;
     const last = blocks[blocks.length - 1];
 
+    // An empty block at the end is the one to keep writing in
     if (last && sourceOf(last).trim() === '' && !isStepBlock(last)) {
+      pendingRef.current = last.id;
       startEdit(last.id, 0);
       return;
     }
 
-    const fresh = createBlock('', last ? last.sep : '\n');
-    if (last) blocks[blocks.length - 1] = { ...last, sep: '\n\n' };
-    blocks.push(fresh);
+    insertBlockAt(blocks.length);
+  }, [insertBlockAt, startEdit]);
 
-    commit(blocks);
-    startEdit(fresh.id, 0);
-  }, [commit, startEdit]);
+  /**
+   * The line between two blocks. A step followed by a step has nothing to
+   * click on between them, so the gutter itself is the place to start a
+   * heading, a paragraph or another step.
+   *
+   * @param {number} index - The block position the new block would take
+   */
+  const renderGap = (index: number) => (
+    <div
+      className="flow-block-gap"
+      title="Write here"
+      // Taking the mousedown keeps the caret where it is until the new block
+      // has one of its own — a blur in between would close the block first
+      onMouseDown={(event) => { event.preventDefault(); insertBlockAt(index); }}
+    >
+      <Plus className="flow-block-gap-hint" aria-hidden="true" />
+    </div>
+  );
 
   const renderSource = (block: Block, index: number, kind: BlockKind) => (
     <BlockSource
@@ -727,25 +829,27 @@ export function BlockEditor({ value, onChange, resolveStep, onAnswerInput }: Blo
         }
 
         return (
-          <div
-            key={block.id}
-            data-block-id={block.id}
-            data-block-kind={kind}
-            tabIndex={editing ? -1 : 0}
-            className={cn('flow-block', editing && 'flow-block-editing', selected && 'flow-block-selected')}
-            {...extra}
-            onKeyDown={(event) => handleBlockKeyDown(event, index, block.id)}
-            onFocus={(event) => {
-              // Focus on the block itself — rather than on the textarea
-              // inside it — is the block being selected
-              if (isBlockElement(event.target, block.id)) setSelectedId(block.id);
-            }}
-            onBlur={(event) => {
-              if (isBlockElement(event.target, block.id)) setSelectedId(null);
-            }}
-          >
-            {content}
-          </div>
+          <React.Fragment key={block.id}>
+            {renderGap(index)}
+            <div
+              data-block-id={block.id}
+              data-block-kind={kind}
+              tabIndex={editing ? -1 : 0}
+              className={cn('flow-block', editing && 'flow-block-editing', selected && 'flow-block-selected')}
+              {...extra}
+              onKeyDown={(event) => handleBlockKeyDown(event, index, block.id)}
+              onFocus={(event) => {
+                // Focus on the block itself — rather than on the textarea
+                // inside it — is the block being selected
+                if (isBlockElement(event.target, block.id)) setSelectedId(block.id);
+              }}
+              onBlur={(event) => {
+                if (isBlockElement(event.target, block.id)) setSelectedId(null);
+              }}
+            >
+              {content}
+            </div>
+          </React.Fragment>
         );
       })}
 
