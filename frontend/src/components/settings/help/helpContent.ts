@@ -286,6 +286,54 @@ click it in the sidebar to see them, with examples ready to paste.
 `,
   },
   {
+    id: 'callouts',
+    category: 'writing',
+    icon: 'message',
+    title: 'Notes, warnings and other callouts',
+    summary: 'Highlight something the reader must not miss, in flows and in application READMEs.',
+    keywords: ['note', 'tip', 'important', 'warning', 'caution', 'callout', 'alert', 'admonition', 'blockquote', 'markdown'],
+    body: `
+A blockquote that opens with a \`[!TYPE]\` marker is rendered as a callout —
+the same syntax GitHub and Obsidian use. It works anywhere Markdown prose is
+shown: flow documents, application READMEs and method descriptions.
+
+    > [!WARNING]
+    > This step cancels the reservation for real.
+    > Point it at the staging environment first.
+
+Five types are available:
+
+| Marker | Use it for |
+|-|-|
+| \`[!NOTE]\` | Helpful info the reader should notice. |
+| \`[!TIP]\` | Extra advice or a best practice. |
+| \`[!IMPORTANT]\` | Crucial data the reader needs. |
+| \`[!WARNING]\` | Urgent risks or negative consequences. |
+| \`[!CAUTION]\` | Dangerous actions or likely mistakes. |
+
+The body may span as many lines and blocks as you need — paragraphs, lists,
+links, inline \`code\`, everything Markdown offers. Add a custom title by
+writing it on the marker line:
+
+    > [!TIP] Keep credentials out of the flow
+    > Read them from the environment instead:
+    >
+    > - \`{{ env.API_TOKEN }}\` resolves at run time
+    > - the flow stays safe to commit
+
+Which renders as:
+
+> [!TIP] Keep credentials out of the flow
+> Read them from the environment instead:
+>
+> - \`{{ env.API_TOKEN }}\` resolves at run time
+> - the flow stays safe to commit
+
+A blockquote without a marker stays a plain quote, so nothing you already
+wrote changes.
+`,
+  },
+  {
     id: 'applications',
     category: 'writing',
     icon: 'app',
