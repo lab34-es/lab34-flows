@@ -112,7 +112,7 @@ export function GitSyncDialog({ open, onOpenChange }) {
             to track your flows and applications with the rest of your team.
           </p>
         ) : (
-          <div className="flex min-h-0 flex-col gap-4">
+          <div className="flex min-h-0 min-w-0 flex-col gap-4">
             {/* ----------------------- Branch ----------------------- */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <span className="inline-flex items-center gap-1.5 font-medium">
@@ -153,7 +153,7 @@ export function GitSyncDialog({ open, onOpenChange }) {
             </div>
 
             {/* ---------------------- Changes ----------------------- */}
-            <div>
+            <div className="min-w-0">
               <div className="text-muted-foreground mb-1.5 flex items-center justify-between text-xs">
                 <span>
                   {changes.length
@@ -172,24 +172,27 @@ export function GitSyncDialog({ open, onOpenChange }) {
               </div>
 
               {changes.length > 0 && (
-                <ul className="max-h-56 overflow-auto rounded-md border">
+                <ul className="max-h-56 overflow-auto rounded-md border [&>li]:min-w-max">
                   {changes.map((change) => {
                     const isSelected = selected.includes(change.contextPath);
                     return (
                       <li key={change.contextPath}>
                         {/* Selecting nothing commits everything, so the boxes
-                            are a narrowing, not a requirement */}
+                            are a narrowing, not a requirement. The whole list
+                            scrolls sideways as one unit (see the <ul>), so long
+                            paths stay aligned across rows instead of each row
+                            scrolling on its own. */}
                         <label className="hover:bg-accent/50 flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm">
                           <input
                             type="checkbox"
-                            className="accent-primary size-3.5"
+                            className="accent-primary size-3.5 shrink-0"
                             checked={isSelected}
                             onChange={() => toggle(change.contextPath)}
                           />
-                          <GitBadge status={change.status} className="w-3 text-center" />
+                          <GitBadge status={change.status} className="w-3 shrink-0 text-center" />
                           <span
                             className={cn(
-                              'truncate font-mono text-xs',
+                              'font-mono text-xs whitespace-nowrap',
                               decorationFor(change.status)?.className
                             )}
                             title={change.from ? `${change.from} → ${change.path}` : change.path}
@@ -197,7 +200,7 @@ export function GitSyncDialog({ open, onOpenChange }) {
                             {change.contextPath}
                           </span>
                           {change.staged && (
-                            <span className="text-muted-foreground ml-auto shrink-0 text-[10px] uppercase">
+                            <span className="text-muted-foreground shrink-0 pl-2 text-[10px] uppercase">
                               staged
                             </span>
                           )}

@@ -83,6 +83,24 @@ export const scopedStatus = (index, prefix) => ({
     const key = join(prefix, relativePath);
     return index.folders[key] || index.files[key] || null;
   },
+  /**
+   * How many changed files live at or under a path: 1 for a changed file, and
+   * every change beneath a folder so a collapsed folder can show its total.
+   * @param {string} relativePath - Path inside the prefix
+   * @returns {number}
+   */
+  count: (relativePath) => {
+    const key = join(prefix, relativePath);
+    if (index.files[key]) { return 1; }
+    if (!index.folders[key]) { return 0; }
+
+    const scope = `${key}/`;
+    let total = 0;
+    for (const filePath in index.files) {
+      if (filePath.startsWith(scope)) { total += 1; }
+    }
+    return total;
+  },
 });
 
 /**

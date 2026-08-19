@@ -29,7 +29,7 @@ export function ContextIndicator() {
     <div className="flex min-w-0 items-center gap-1.5">
       <FolderOpen className="text-muted-foreground size-4 shrink-0" />
       <span className="max-w-56 truncate text-sm font-medium" title={title}>
-        {contextInfo?.name || 'Lab34 Flows'}
+        {contextInfo?.path || 'Lab34 Flows'}
       </span>
 
       {git && (
