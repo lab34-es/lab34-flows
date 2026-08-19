@@ -6,6 +6,7 @@ import {
   FileCode2,
   Folder,
   FolderPlus,
+  Loader2,
   MoreHorizontal,
   FilePlus2,
   Pencil,
@@ -38,19 +39,42 @@ import { useExecutions } from '@/context/ExecutionContext';
 import { flowUrl, folderUrl } from '@/lib/flows';
 import { cn } from '@/lib/utils';
 
+// Above this many direct children, a folder mounts its rows one frame late.
+// Laying out thousands of rows takes long enough that the click looks
+// ignored, so the browser is given the chance to paint a spinner first.
+const DEFER_CHILDREN_ABOVE = 60;
+
 function FolderNode({ node, onAction, children }) {
   const navigate = useNavigate();
   const location = useLocation();
   // folders start collapsed: the tree opens as a short list of top-level
   // folders instead of every flow in the repository at once
   const [open, setOpen] = React.useState(false);
+  // Whether the children are on screen yet. Only big folders ever see this
+  // as false, and only for the frame the spinner is painted in
+  const [mounted, setMounted] = React.useState(false);
+
+  const childCount = node.children?.length || 0;
+
+  /**
+   * Open or close the folder, mounting a big one's children as a transition
+   * so the spinner below gets painted before the work starts.
+   * @param {boolean} next
+   */
+  const toggle = (next) => {
+    setOpen(next);
+    if (!next) { setMounted(false); return; }
+    if (childCount <= DEFER_CHILDREN_ABOVE) { setMounted(true); return; }
+    setMounted(false);
+    React.startTransition(() => setMounted(true));
+  };
 
   const isActive = location.pathname === '/flows/folder' &&
     new URLSearchParams(location.search).get('path') === node.relativePath;
 
   return (
     <SidebarMenuItem>
-      <Collapsible open={open} onOpenChange={setOpen}>
+      <Collapsible open={open} onOpenChange={toggle}>
         {/* The chevron expands the folder in place; the name opens it as a
             table. Two separate buttons, so neither steals the other's click */}
         <div className="flex items-center">
@@ -108,7 +132,14 @@ function FolderNode({ node, onAction, children }) {
         </DropdownMenu>
 
         <CollapsibleContent>
-          <SidebarMenuSub className="mr-0 pr-0">{children}</SidebarMenuSub>
+          <SidebarMenuSub className="mr-0 pr-0" aria-busy={!mounted}>
+            {mounted ? children : (
+              <div className="text-muted-foreground flex items-center gap-2 px-2 py-1.5 text-xs">
+                <Loader2 className="size-3.5 animate-spin" />
+                <span>Loading {childCount} items…</span>
+              </div>
+            )}
+          </SidebarMenuSub>
         </CollapsibleContent>
       </Collapsible>
     </SidebarMenuItem>

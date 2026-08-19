@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   Folder,
   LayoutList,
+  Loader2,
   MoreHorizontal,
   Pencil,
   Search,
@@ -101,11 +102,17 @@ export function FolderPage() {
     setError(null);
     try {
       const response = await viewsApi.query(folder, activeView.name);
-      setResult(response.data);
+      // A folder of thousands of flows takes a noticeable while to lay out.
+      // Committing the rows as a transition keeps the skeleton on screen
+      // until the table is ready, so the wait reads as loading rather than
+      // as a frozen window
+      startTransition(() => {
+        setResult(response.data);
+        setLoading(false);
+      });
     } catch (ex) {
       setError(ex.response?.data?.error || ex.message);
       setResult(null);
-    } finally {
       setLoading(false);
     }
     // runQuery is deliberately keyed on what the backend actually uses
@@ -299,10 +306,17 @@ export function FolderPage() {
             <div className="flex items-center gap-2">
               <Folder className="text-muted-foreground size-4 shrink-0" />
               <h1 className="truncate text-lg font-bold tracking-tight">{folderName}</h1>
-              <span className="text-muted-foreground text-sm">
-                {rows.length}{rows.length !== result?.rows.length ? ` of ${result?.rows.length}` : ''} flow
-                {rows.length === 1 ? '' : 's'}
-              </span>
+              {loading ? (
+                <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Loading flows…
+                </span>
+              ) : (
+                <span className="text-muted-foreground text-sm">
+                  {rows.length}{rows.length !== result?.rows.length ? ` of ${result?.rows.length}` : ''} flow
+                  {rows.length === 1 ? '' : 's'}
+                </span>
+              )}
             </div>
             {folder && <p className="text-muted-foreground truncate font-mono text-xs">{folder}</p>}
           </div>
@@ -431,11 +445,11 @@ export function FolderPage() {
 
       {/* Content */}
       <div className="min-h-0 flex-1 overflow-auto">
-        {loading && !result ? (
-          <div className="space-y-2 p-6">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-4/5" />
+        {loading ? (
+          <div className="space-y-2 p-6" aria-busy="true">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <Skeleton key={index} className={index % 3 === 2 ? 'h-8 w-4/5' : 'h-8 w-full'} />
+            ))}
           </div>
         ) : rows.length === 0 ? (
           <p className="text-muted-foreground p-6 text-sm">
