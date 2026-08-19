@@ -90,6 +90,7 @@ jobs:
 
       # prepublishOnly compiles src/ into dist/, which is what "files" ships.
       # Publishing over OIDC also attaches provenance to the release.
-      # Verbose logging keeps npm's "oidc" diagnostics in the run log; the
-      # token exchange fails silently at the default level.
-      - run: npm publish --access=public --loglevel=verbose
+      # If this ever fails, re-run with --loglevel=verbose: npm reports a
+      # failed token exchange only at verbose level and otherwise falls
+      # through to a bare ENEEDAUTH.
+      - run: npm publish --access=public
