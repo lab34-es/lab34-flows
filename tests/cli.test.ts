@@ -1,0 +1,226 @@
+// cli.ts parses argv and runs main() as a side effect of being imported, so
+// each case sets ARGV and re-imports the module in isolation.
+let ARGV: Record<string, any> = {};
+jest.mock('yargs-parser', () => () => ARGV);
+
+jest.mock('../src/helpers/paths');
+jest.mock('../src/helpers/applications');
+jest.mock('../src/helpers/flows');
+jest.mock('../src/helpers/markdownFlows');
+jest.mock('../src/helpers/runner/v1');
+jest.mock('../src/helpers/reporter', () => ({ get: jest.fn(() => ({ server: { emit: jest.fn() } })) }));
+jest.mock('../src/helpers/cli', () => ({ logo: jest.fn(), wisdom: jest.fn(), isInteractive: false }));
+jest.mock('../src/api', () => ({ start: jest.fn().mockResolvedValue(undefined) }));
+
+const spawn = jest.fn();
+jest.mock('child_process', () => ({ ...jest.requireActual('child_process'), spawn: (...a: any[]) => spawn(...a) }));
+
+import fs from 'fs';
+
+import * as paths from '../src/helpers/paths';
+import * as applications from '../src/helpers/applications';
+import * as flows from '../src/helpers/flows';
+import * as markdownFlows from '../src/helpers/markdownFlows';
+import * as runner from '../src/helpers/runner/v1';
+import * as api from '../src/api';
+
+/** Import cli.ts fresh and let its async main() settle. */
+const runCli = async () => {
+  jest.isolateModules(() => { require('../src/cli'); });
+  await new Promise(resolve => setImmediate(resolve));
+};
+
+const logged = () => (console.log as jest.Mock).mock.calls.map(c => c.join(' ')).join('\n');
+const errored = () => (console.error as jest.Mock).mock.calls.map(c => c.join(' ')).join('\n');
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  ARGV = {};
+  (paths.contextDir as jest.Mock).mockImplementation(async (p: string) => `/ctx/${p}`);
+  (applications.loadAll as jest.Mock).mockResolvedValue(undefined);
+  (flows.listCapabilities as jest.Mock).mockResolvedValue(undefined);
+  jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+  jest.spyOn(fs, 'readFileSync').mockReturnValue('title: t\nsteps: []\n' as any);
+});
+
+afterEach(() => jest.restoreAllMocks());
+
+describe('cli --v and --help', () => {
+  test('--v prints the version and exits', async () => {
+    ARGV = { v: true };
+    await runCli();
+    expect(logged()).toMatch(/^\d+\.\d+\.\d+$/m);
+    expect(process.exit).toHaveBeenCalledWith(0);
+  });
+
+  test('--help prints the usage and exits', async () => {
+    ARGV = { help: true };
+    await runCli();
+    expect(logged()).toContain('Lab34 Flows CLI Tool');
+    expect(logged()).toContain('--server');
+    expect(process.exit).toHaveBeenCalledWith(0);
+  });
+});
+
+describe('cli --debug', () => {
+  test('prints package, process and environment information', async () => {
+    ARGV = { debug: true };
+    await runCli();
+
+    const out = logged();
+    expect(out).toContain('=== DEBUG INFORMATION ===');
+    expect(out).toContain('Package Name: @lab34/flows');
+    expect(out).toContain('Node Version:');
+    expect(out).toContain('Environment Variables:');
+    expect(out).toContain('__dirname:');
+  });
+});
+
+describe('cli --capabilities', () => {
+  test('lists the capabilities and exits cleanly', async () => {
+    ARGV = { capabilities: true };
+    await runCli();
+    expect(flows.listCapabilities).toHaveBeenCalled();
+    expect(process.exit).toHaveBeenCalledWith(0);
+  });
+});
+
+describe('cli --ai', () => {
+  test('explains that AI generation moved to the UI', async () => {
+    ARGV = { ai: 'make me a flow' };
+    await runCli();
+    expect(errored()).toContain('no longer available from the CLI');
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('cli --server', () => {
+  test('builds the frontend and then starts the API', async () => {
+    ARGV = { server: true };
+    const on = jest.fn();
+    spawn.mockReturnValue({ on });
+
+    await runCli();
+
+    expect(spawn).toHaveBeenCalledWith('npm', ['run', 'build:frontend'], expect.any(Object));
+
+    // Drive the build's close handler
+    const close = on.mock.calls.find(([event]) => event === 'close')[1];
+    await close(0);
+
+    expect(api.start).toHaveBeenCalled();
+  });
+
+  test('a failed frontend build is fatal', async () => {
+    ARGV = { server: true };
+    const on = jest.fn();
+    spawn.mockReturnValue({ on });
+
+    await runCli();
+    const close = on.mock.calls.find(([event]) => event === 'close')[1];
+    await close(1);
+
+    expect(errored()).toContain('Failed to build frontend');
+  });
+});
+
+describe('cli --file', () => {
+  test('requires an environment', async () => {
+    ARGV = { file: 'flows/a.yaml' };
+    await runCli();
+    expect(errored()).toContain('No environment specified');
+  });
+
+  test('reports a file that is not there', async () => {
+    ARGV = { file: 'flows/nope.yaml', env: 'local' };
+    (fs.existsSync as jest.Mock).mockReturnValue(false);
+
+    await runCli();
+
+    expect(errored()).toContain('File not found');
+  });
+
+  test('rejects an unsupported extension', async () => {
+    ARGV = { file: 'flows/a.txt', env: 'local' };
+    await runCli();
+    expect(errored()).toContain('File must be a .md, .markdown, .yaml or .yml file');
+  });
+
+  test('runs a YAML flow', async () => {
+    ARGV = { file: 'flows/a.yaml', env: 'local' };
+    await runCli();
+
+    expect(applications.loadAll).toHaveBeenCalled();
+    expect(runner.run).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 't' }),
+      expect.objectContaining({ environment: 'local', cli: true })
+    );
+  });
+
+  test('runs a markdown flow through the markdown parser', async () => {
+    ARGV = { file: 'flows/a.md', env: 'local' };
+    (markdownFlows.toFlow as jest.Mock).mockReturnValue({ title: 'md flow', steps: [] });
+
+    await runCli();
+
+    expect(markdownFlows.toFlow).toHaveBeenCalled();
+    expect(runner.run).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'md flow' }),
+      expect.any(Object)
+    );
+  });
+
+  test('a flow file that does not parse is fatal', async () => {
+    ARGV = { file: 'flows/a.yaml', env: 'local' };
+    (fs.readFileSync as jest.Mock).mockReturnValue('steps: [1, 2' as any);
+
+    await runCli();
+
+    expect(errored()).toContain('Error parsing flow file');
+  });
+
+  test('prints the banner before running', async () => {
+    ARGV = { file: 'flows/a.yaml', env: 'local' };
+    const cliHelper = require('../src/helpers/cli');
+
+    await runCli();
+
+    expect(cliHelper.logo).toHaveBeenCalled();
+    expect(cliHelper.wisdom).toHaveBeenCalled();
+  });
+
+  test('under nodemon the run is delayed', async () => {
+    ARGV = { file: 'flows/a.yaml', env: 'local' };
+    process.env.IS_NODEMON = '1';
+    jest.useFakeTimers();
+
+    jest.isolateModules(() => { require('../src/cli'); });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await jest.advanceTimersByTimeAsync(1500);
+
+    jest.useRealTimers();
+    delete process.env.IS_NODEMON;
+
+    expect(runner.run).toHaveBeenCalled();
+  });
+
+  test('a runner failure is reported', async () => {
+    ARGV = { file: 'flows/a.yaml', env: 'local' };
+    (applications.loadAll as jest.Mock).mockRejectedValue(new Error('cannot load'));
+
+    await runCli();
+
+    expect(errored()).toContain('Error running flow');
+  });
+});
+
+describe('cli with no arguments', () => {
+  test('explains what it needs', async () => {
+    ARGV = {};
+    await runCli();
+    expect(errored()).toContain('No flow source specified');
+  });
+});
