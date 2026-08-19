@@ -561,6 +561,88 @@ export const deleteAppFile = async (applicationName, relativePath) => {
 };
 
 /**
+ * An application is a folder inside the applications directory, and flows
+ * name it as it is named there: anything that is not a plain folder name --
+ * a path, a hidden folder -- is refused.
+ * @param {string} name
+ * @returns {string} The trimmed, usable name
+ */
+const applicationNameOf = (name) => {
+  const trimmed = (name || '').trim();
+
+  if (!trimmed) {
+    throw new Error('Application name is required');
+  }
+
+  if (/[/\\]/.test(trimmed) || trimmed === '.' || trimmed === '..' || trimmed.startsWith('.')) {
+    throw new Error('Invalid application name');
+  }
+
+  return trimmed;
+};
+
+/**
+ * The files a new application starts from: a documented index.ts with example
+ * methods, its README and a local environment. They live next to the example
+ * applications rather than inside them, so seeding never copies the template
+ * itself into the user's context directory.
+ */
+const APPLICATION_TEMPLATE_DIR = path.join(__dirname, '..', 'defaults', 'application-template');
+
+/** What the template writes wherever the application's own name belongs. */
+const NAME_PLACEHOLDER = /__APPLICATION_NAME__/g;
+
+/**
+ * Copy the template into a new application folder, naming it along the way.
+ * Every template file is text, so each one is read, renamed and written.
+ */
+const copyTemplate = (source, destination, name) => {
+  fs.mkdirSync(destination, { recursive: true });
+
+  for (const entry of fs.readdirSync(source)) {
+    const from = path.join(source, entry);
+    const to = path.join(destination, entry);
+
+    if (fs.statSync(from).isDirectory()) {
+      copyTemplate(from, to, name);
+      continue;
+    }
+
+    const content = fs.readFileSync(from, 'utf8').replace(NAME_PLACEHOLDER, name);
+    fs.writeFileSync(to, content, 'utf8');
+  }
+};
+
+/**
+ * Create an application: a folder in the applications directory, holding the
+ * template -- a hello-world method writing to the flow memory, one reading it
+ * back, an HTTP call, and the README and environment that go with them.
+ * @param {string} name - A single folder name, no slashes
+ * @returns {Promise<{name: string, slug: string, path: string}>}
+ */
+export const createApplication = async (name) => {
+  const trimmed = applicationNameOf(name);
+
+  const appsPath = await paths.contextDir(['applications']);
+  const destination = path.join(appsPath, trimmed);
+
+  if (fs.existsSync(destination)) {
+    const error: NodeJS.ErrnoException = new Error(`An application named “${trimmed}” already exists`);
+    error.code = 'EEXISTS';
+    throw error;
+  }
+
+  if (!fs.existsSync(APPLICATION_TEMPLATE_DIR)) {
+    throw new Error('The application template is missing from this installation');
+  }
+
+  fs.mkdirSync(appsPath, { recursive: true });
+  copyTemplate(APPLICATION_TEMPLATE_DIR, destination, trimmed);
+
+  return { name: trimmed, slug: trimmed, path: destination };
+};
+
+/**
  * Rename an application, i.e. its folder inside the applications directory.
  * Flows reference applications by this name, so the UI warns about it.
  * @param {string} applicationName
@@ -574,15 +656,7 @@ export const renameApplication = async (applicationName, newName) => {
     throw new Error('Application not found');
   }
 
-  const trimmed = (newName || '').trim();
-
-  if (!trimmed) {
-    throw new Error('Application name is required');
-  }
-
-  if (/[/\\]/.test(trimmed) || trimmed === '.' || trimmed === '..' || trimmed.startsWith('.')) {
-    throw new Error('Invalid application name');
-  }
+  const trimmed = applicationNameOf(newName);
 
   const to = path.join(appsPath, trimmed);
 

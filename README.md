@@ -356,7 +356,11 @@ and open http://localhost:3001.
     (*standby*, *running*, *ok*, *error*). Create folders, create flows,
     upload files, and rename or delete them from the `+` menu and each row's
     actions.
-  - **Applications** — every application in your context directory. Click
+  - **Applications** — every application in your context directory. The `+`
+    button creates one: give it a name and the folder is written from a
+    template — a documented `index.ts` with a `helloWorld` method writing to
+    the flow memory, one reading it back, an HTTP call, plus its `README.md`
+    and a `local` environment — and opened, ready to edit. Click
     one to read its **README** and browse its **methods** (input parameters,
     output, memory usage and examples, from the JSDoc blocks of its
     `index.ts`), plus its environment files. Each row's actions rename the
@@ -695,8 +699,10 @@ Examples are only copied when missing, so you can edit or delete them freely.
 ## Applications are TypeScript
 
 An application is a TypeScript module: `applications/<name>/index.ts`, plus an
-optional `mimic.ts`. It imports the package that runs it, and the types it is
-written against come from there too:
+optional `mimic.ts`. Create one with the `+` of the **Applications** section of
+the sidebar — you get a working application with example methods to edit — or
+write the folder yourself. It imports the package that runs it, and the types
+it is written against come from there too:
 
 ```ts
 import { applications, httpClient } from '@lab34/flows';

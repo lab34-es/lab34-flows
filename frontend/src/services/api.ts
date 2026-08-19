@@ -51,6 +51,7 @@ export const viewsApi = {
 
 export const applicationsApi = {
   list: () => api.get('/api/applications'),
+  create: (name) => api.post('/api/applications', { name }),
   get: (slug) => api.get(`/api/applications/${encodeURIComponent(slug)}`),
   listFiles: (slug) => api.get(`/api/applications/${encodeURIComponent(slug)}/files`),
   getFile: (slug, path) =>
