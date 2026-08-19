@@ -4,8 +4,14 @@
   "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "url": "https://github.com/lab34-es/flows",
   "homepage": "https://github.com/lab34-es/flows",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lab34-es/flows.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lab34-es/flows/issues"
+  },
   "engines": {
     "node": ">=20.19.0"
   },
