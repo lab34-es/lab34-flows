@@ -385,6 +385,34 @@ and open http://localhost:3001.
     writing flows, assertions, replacers, integrations, the CLI and
     troubleshooting.
 
+### The context folder and git
+
+Everything the tool reads and writes lives in one folder — your **context
+directory** (`~/lab34-flows` by default, or whatever `--context` points at).
+Its name sits at the left of the top bar, with the full path in its tooltip.
+
+When that folder is a git repository — which is how most teams keep their
+flows — the UI says so:
+
+- The **branch** appears next to the folder name, with arrows counting the
+  commits to pull (↓) and to push (↑).
+- **Changed files are coloured in the sidebar**, with a letter at the end of
+  the row: `M` modified, `U` untracked, `A` added, `D` deleted, `R` renamed.
+  A folder takes the colour of whatever changed inside it, however deep, so a
+  collapsed folder still shows that something moved. Applications are
+  decorated the same way.
+- The **sync button** next to the folder name opens a panel with the branch,
+  its upstream, the list of changed files, a link to the repository online
+  (GitHub, Bitbucket, GitLab — worked out from the remote URL), and **Pull**,
+  **Commit** and **Push**. Tick the files you want in a commit, or leave them
+  all unticked to commit everything. A branch with no upstream gets one on its
+  first push.
+
+Pull rebases your commits on top and stashes what is uncommitted, so a dirty
+working copy is not a reason to refuse. Everything is scoped to the context
+folder: in a repository where it is one directory among many, the rest is left
+alone.
+
 ## Properties and folder views
 
 ### Properties

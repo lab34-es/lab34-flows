@@ -53,6 +53,21 @@ export const contextDir = async (pathParts) => {
   return finalPath;
 };
 
+/**
+ * The context directory itself: where every flow, application and config file
+ * of this run lives.
+ * @returns {Promise<string>} Absolute path
+ */
+export const contextRoot = async () => contextDir([]);
+
+/**
+ * Whether the context directory was chosen with --context, rather than being
+ * the default one under the home folder. The UI says so, because "which
+ * folder am I looking at" is a different question in each case.
+ * @returns {boolean}
+ */
+export const hasCustomContext = () => Boolean(argv.context);
+
 export const createFolder = async (folderPath) => {
   // create if not exists
   if (!fs.existsSync(folderPath)) {

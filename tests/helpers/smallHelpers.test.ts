@@ -126,6 +126,22 @@ describe('helpers/paths', () => {
     expect(process.exit).toHaveBeenCalledWith(1);
   });
 
+  test('contextRoot is the context directory itself', async () => {
+    const paths = require('../../src/helpers/paths');
+    expect(await paths.contextRoot()).toBe(path.join(HOME, 'lab34-flows'));
+    expect(paths.hasCustomContext()).toBe(false);
+  });
+
+  test('hasCustomContext is true once --context was given', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-'));
+    ARGV = { context: dir };
+    jest.resetModules();
+    const paths = require('../../src/helpers/paths');
+    expect(paths.hasCustomContext()).toBe(true);
+    expect(await paths.contextRoot()).toBe(dir);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
   test('createFolder creates the folder only when it is missing', async () => {
     const paths = require('../../src/helpers/paths');
     const dir = path.join(os.tmpdir(), `mk-${Date.now()}`, 'nested');

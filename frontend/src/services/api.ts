@@ -15,6 +15,10 @@ const api = axios.create({
 // and, when the first answer is not valid, for a second attempt.
 const AI_TIMEOUT = 240000;
 
+// A pull or a push waits on the network, and on whatever the remote asks of
+// the credential helper before that.
+const GIT_TIMEOUT = 120000;
+
 // API methods
 export const flowsApi = {
   list: () => api.get('/api/flows'),
@@ -72,6 +76,16 @@ export const applicationsApi = {
   getRawEnv: (slug, env) => api.get(`/api/applications/${encodeURIComponent(slug)}/envs/${env}/raw`),
   updateRawEnv: (slug, env, content) =>
     api.put(`/api/applications/${encodeURIComponent(slug)}/envs/${env}/raw`, { content }),
+};
+
+// The context directory the app is working in, and the git repository it may
+// live in. Pull/commit/push all act on that same folder.
+export const contextApi = {
+  get: () => api.get('/api/context'),
+  pull: () => api.post('/api/context/git/pull', {}, { timeout: GIT_TIMEOUT }),
+  commit: (message, paths) =>
+    api.post('/api/context/git/commit', { message, paths }, { timeout: GIT_TIMEOUT }),
+  push: () => api.post('/api/context/git/push', {}, { timeout: GIT_TIMEOUT }),
 };
 
 export const environmentApi = {

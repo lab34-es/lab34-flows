@@ -213,7 +213,8 @@ export function AppSidebar() {
                     to get started.
                   </div>
                 )}
-                {applications.map((app) => (
+                {applications.map((app) => {
+                  return (
                   <SidebarMenuItem key={app.slug}>
                     <SidebarMenuButton
                       isActive={location.pathname === `/applications/${app.slug}`}
@@ -245,7 +246,8 @@ export function AppSidebar() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </SidebarMenuItem>
-                ))}
+                  );
+                })}
               </SidebarMenu>
             )}
           </SidebarGroupContent>
