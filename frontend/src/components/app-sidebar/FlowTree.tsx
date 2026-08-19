@@ -41,7 +41,9 @@ import { cn } from '@/lib/utils';
 function FolderNode({ node, onAction, children }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [open, setOpen] = React.useState(true);
+  // folders start collapsed: the tree opens as a short list of top-level
+  // folders instead of every flow in the repository at once
+  const [open, setOpen] = React.useState(false);
 
   const isActive = location.pathname === '/flows/folder' &&
     new URLSearchParams(location.search).get('path') === node.relativePath;
