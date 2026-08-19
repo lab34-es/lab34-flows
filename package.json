@@ -21,6 +21,7 @@
     "install:frontend": "npm --prefix frontend install",
     "test": "jest",
     "test:coverage": "jest --coverage",
+    "coverage:badge": "npm run test:coverage && node scripts/coverage-badge.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "audit:ci": "npm audit --audit-level=critical",

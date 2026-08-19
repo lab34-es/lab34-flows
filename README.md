@@ -1,5 +1,10 @@
 # Flows
 
+[![CI](https://github.com/lab34-es/lab34-flows/actions/workflows/ci.yml/badge.svg)](https://github.com/lab34-es/lab34-flows/actions/workflows/ci.yml)
+[![Coverage](https://raw.githubusercontent.com/lab34-es/lab34-flows/master/.github/badges/coverage.svg)](https://github.com/lab34-es/lab34-flows/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@lab34/flows)](https://www.npmjs.com/package/@lab34/flows)
+[![license](https://img.shields.io/npm/l/@lab34/flows)](https://www.npmjs.com/package/@lab34/flows)
+
 Heavily opinionated tool to help you test E2E flows and behaviours.
 
 📖 **Documentation website:** [flows.lab34.es](https://flows.lab34.es/) — generated from the app's built-in Help section (source in [`website/`](website/)).
@@ -45,6 +50,7 @@ Features:
   - [Playwright](#playwright) (browser automation - experimental)
   - [Replacers](#replacers)
   - [Environment variables](#environment-variables)
+  - [Development](#development)
 
 ## General info
 
@@ -1192,3 +1198,58 @@ PGDATABASE=production
 PGSSL_ENABLED=true
 PGSSL_CA=/path/to/custom-ca.pem
 ```
+
+
+## Development
+
+The package is written in TypeScript and published as CommonJS: `src/` compiles
+into `dist/`, which is what `npm publish` ships (together with the type
+declarations). Consumers keep using `require('@lab34/flows')` unchanged.
+
+```bash
+npm install              # root: the CLI, the API and the helpers
+npm run install:frontend # the web UI
+
+npm run dev              # API on :3001, restarted on change (tsx, no build step)
+npm run frontend         # web UI on :3000
+npm run dev:full         # both at once
+
+npm run build            # compile src/ -> dist/ and copy the bundled examples
+npm run typecheck        # tsc over src/ and tests/, no emit
+npm run lint             # eslint + typescript-eslint
+npm test                 # jest
+npm run test:coverage    # jest with the coverage gate
+npm run coverage:badge   # refresh .github/badges/coverage.svg
+npm run audit:ci         # fail if any critical advisory is present
+```
+
+### Quality gates
+
+Every pull request, and every push to `master`, runs
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml). A change cannot land
+unless all of it passes:
+
+| Gate | What it checks |
+| --- | --- |
+| Lint | `eslint` over `src/` and `tests/`, clean |
+| Types | `tsc --noEmit`, clean |
+| Coverage | statements, branches, functions and lines of `src/` all **above 80%** |
+| Audit | `npm audit` finds **no critical** advisory in the root, frontend or website tree |
+| Build | `dist/` compiles and `node dist/cli.js --help` runs; the frontend builds |
+
+The coverage threshold lives in
+[`jest.config.js`](jest.config.js) (`coverageThreshold`), so the number is
+defined once and the CI job simply runs `npm run test:coverage`. Coverage is
+collected from *all* of `src/`, not only the files a test happens to import —
+otherwise an untested module would silently not count.
+
+The same gates run again against the exact commit being released, in
+[`.github/workflows/npm-publish.yml`](.github/workflows/npm-publish.yml),
+before anything is published.
+
+### Dependency pinning
+
+Every dependency is recorded as an exact version, with no `^` or `~` range, in
+all three package trees. `.npmrc` sets `save-exact=true` so `npm install <pkg>`
+keeps it that way. Upgrades are deliberate, reviewable commits rather than
+something that drifts in on a fresh install.

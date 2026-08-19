@@ -28,6 +28,10 @@ module.exports = {
 
   setupFilesAfterEnv: ['<rootDir>/tests/jest.setup.ts'],
 
+  // The console spies in tests/jest.setup.ts are re-installed per test, so the
+  // previous one has to be restored or they would nest run after run.
+  restoreMocks: true,
+
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.d.ts',

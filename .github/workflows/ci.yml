@@ -1,0 +1,185 @@
+# Quality gates for every pull request and every push to master.
+#
+# A pull request cannot be merged, and master cannot go green, unless:
+#   - eslint and the TypeScript compiler are both clean
+#   - every test passes
+#   - coverage of src/ is above 80% on statements, branches, functions and
+#     lines (enforced by coverageThreshold in jest.config.js, so the numbers
+#     live in one place rather than being restated here)
+#   - npm audit reports no critical vulnerability, in any of the three
+#     package trees
+#   - the package and the frontend both build
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+# Cancel superseded runs on the same branch: only the latest matters.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Matches "engines" in package.json; .npmrc sets engine-strict, so this has
+  # to satisfy it.
+  NODE_VERSION: '22'
+
+jobs:
+  quality:
+    name: Lint, types and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test with coverage
+        # Fails the job when any metric falls below the 80% threshold.
+        run: npm run test:coverage
+
+      - name: Summarise coverage
+        if: always()
+        run: |
+          if [ ! -f coverage/coverage-summary.json ]; then
+            echo "No coverage summary was produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          node -e '
+            const t = require("./coverage/coverage-summary.json").total;
+            const rows = ["statements", "branches", "functions", "lines"].map(k => {
+              const m = t[k];
+              const mark = m.pct >= 80 ? ":white_check_mark:" : ":x:";
+              return `| ${k} | ${m.pct.toFixed(2)}% | ${m.covered}/${m.total} | ${mark} |`;
+            });
+            console.log("## Coverage\n");
+            console.log("| Metric | Covered | Ratio | 80% gate |");
+            console.log("| --- | --- | --- | --- |");
+            console.log(rows.join("\n"));
+          ' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 14
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # --audit-level=critical makes npm exit non-zero only when a critical
+      # advisory is present, which is what blocks the merge. High and below are
+      # reported in the job summary so they stay visible without blocking.
+      - name: Audit (root)
+        run: npm audit --audit-level=critical
+
+      - name: Audit (frontend)
+        run: npm audit --audit-level=critical --prefix frontend
+
+      - name: Audit (website)
+        run: npm audit --audit-level=critical --prefix website
+
+      - name: Report non-critical advisories
+        if: always()
+        run: |
+          {
+            echo "## Dependency audit"
+            echo
+            echo "| Package tree | critical | high | moderate | low |"
+            echo "| --- | --- | --- | --- | --- |"
+            for dir in . frontend website; do
+              counts=$(npm audit --json --prefix "$dir" 2>/dev/null \
+                | node -e '
+                  let raw = "";
+                  process.stdin.on("data", c => raw += c);
+                  process.stdin.on("end", () => {
+                    const v = (JSON.parse(raw).metadata || {}).vulnerabilities || {};
+                    console.log(`${v.critical || 0}|${v.high || 0}|${v.moderate || 0}|${v.low || 0}`);
+                  });
+                ')
+              echo "| ${dir} | ${counts//|/ | } |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the package
+        run: npm run build
+
+      - name: Check the CLI starts from the compiled output
+        run: node dist/cli.js --help
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Build the frontend
+        run: npm run build:frontend
+
+  badge:
+    name: Refresh the coverage badge
+    needs: [quality, audit, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+      - run: npm run test:coverage
+      - run: node scripts/coverage-badge.js
+
+      - name: Commit the badge when it changed
+        run: |
+          if git diff --quiet -- .github/badges/coverage.svg; then
+            echo "Coverage badge unchanged."
+            exit 0
+          fi
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add .github/badges/coverage.svg
+          git commit -m 'Update the coverage badge [skip ci]'
+          git push
