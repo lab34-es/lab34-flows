@@ -286,16 +286,42 @@ click it in the sidebar to see them, with examples ready to paste.
 `,
   },
   {
-    id: 'callouts',
+    id: 'markdown',
     category: 'writing',
-    icon: 'message',
-    title: 'Notes, warnings and other callouts',
-    summary: 'Highlight something the reader must not miss, in flows and in application READMEs.',
-    keywords: ['note', 'tip', 'important', 'warning', 'caution', 'callout', 'alert', 'admonition', 'blockquote', 'markdown'],
+    icon: 'file',
+    title: 'Markdown in flows',
+    summary: 'Everything you can write around the steps — and how to make a note or a warning stand out.',
+    keywords: ['markdown', 'prose', 'note', 'tip', 'important', 'warning', 'caution', 'callout', 'alert', 'admonition', 'blockquote', 'table', 'heading', 'list', 'image', 'link', 'readme'],
     body: `
+A flow is a Markdown document. Everything that is not a \`step\` block is
+prose, and the document view renders it — it is where you explain what the
+scenario covers, what has to be true before it runs, and what to look at when
+it fails. The same renderer draws application READMEs and method
+descriptions, so everything below works in all three.
+
+## What you can write
+
+Standard Markdown, with the GitHub extensions:
+
+| Syntax | Result |
+|-|-|
+| \`# Title\`, \`## Section\` | Headings. |
+| \`**bold**\`, \`*italic*\` | Emphasis. |
+| \`- item\`, \`1. item\` | Bullet and numbered lists. |
+| \`[text](https://…)\` | A link, opened in a new tab. |
+| \`![alt](./diagram.png)\` | An image, scaled to the document width. |
+| Backticked text | Inline code. |
+| A fenced block | A code block, highlighted by language. |
+| Pipe tables | Tables. |
+| \`---\` | A separator. |
+
+A fenced block tagged \`step\` is the one exception: it is not prose, it is an
+executable step. See *Step blocks*.
+
+## Notes, warnings and other callouts
+
 A blockquote that opens with a \`[!TYPE]\` marker is rendered as a callout —
-the same syntax GitHub and Obsidian use. It works anywhere Markdown prose is
-shown: flow documents, application READMEs and method descriptions.
+the same syntax GitHub and Obsidian use.
 
     > [!WARNING]
     > This step cancels the reservation for real.

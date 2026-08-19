@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   AppWindow,
+  ArrowUpRight,
   FilePlus2,
   FolderPlus,
   MoreHorizontal,
@@ -105,6 +106,32 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+
+        {/* Anchors cannot live inside the menu button above (it is itself a
+            button), so the two outbound links sit on their own row. */}
+        <div className="text-muted-foreground flex items-center gap-2 px-2 text-xs group-data-[collapsible=icon]:hidden">
+          <a
+            href="https://flows.lab34.es"
+            target="_blank"
+            rel="noreferrer"
+            className="hover:text-sidebar-accent-foreground inline-flex items-center gap-1 underline-offset-4 hover:underline"
+          >
+            Website
+            <ArrowUpRight className="size-3" />
+          </a>
+          <span aria-hidden="true" className="opacity-40">
+            ·
+          </span>
+          <a
+            href="https://lab34.es"
+            target="_blank"
+            rel="noreferrer"
+            className="hover:text-sidebar-accent-foreground inline-flex items-center gap-1 underline-offset-4 hover:underline"
+          >
+            lab34
+            <ArrowUpRight className="size-3" />
+          </a>
+        </div>
       </SidebarHeader>
 
       <SidebarContent>
