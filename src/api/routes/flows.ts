@@ -23,10 +23,10 @@ router.get('/tree', (req, res) => {
     .catch(error => sendError(res, error, 500));
 });
 
-// Parse raw flow content (markdown or YAML) into segments/steps
+// Parse raw flow content into segments/steps
 router.post('/parse', (req, res) => {
   try {
-    res.send(flows.parseValue(req.body.value || '', req.body.format || null));
+    res.send(flows.parseValue(req.body.value || ''));
   }
   catch (error) {
     sendError(res, error);

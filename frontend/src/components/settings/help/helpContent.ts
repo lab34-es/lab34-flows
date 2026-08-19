@@ -84,8 +84,7 @@ When there is no frontmatter title, the first \`#\` heading is used.
 Regular code blocks (\`\`\`js\`, \`\`\`bash\`…) are **not** steps: only \`step\` blocks
 are executed. Everything else is documentation, and is rendered as such.
 
-> Legacy YAML flows (\`.yaml\` / \`.yml\` files with a \`steps:\` list) still work and
-> are rendered in the same notebook UI.
+Flows are \`.md\` (or \`.markdown\`) files: that is the only flow format.
 `,
   },
   {
@@ -154,9 +153,6 @@ chips, and an ISO date sorts chronologically. Adding a property asks which kind
 of value to start from, and from then on the value itself is the type.
 
 Properties are what folder views filter and sort on — see *Folder views*.
-
-> Legacy YAML flows keep their metadata in the document itself, so they are
-> edited in the **Source** tab rather than here.
 `,
   },
   {
@@ -219,7 +215,7 @@ same thing. Four namespaces are available:
 |-|-|
 | \`note.<property>\` | A frontmatter property of the flow |
 | \`file.<property>\` | \`name\`, \`basename\`, \`path\`, \`folder\`, \`ext\`, \`size\`, \`ctime\`, \`mtime\`, \`tags\` |
-| \`flow.<property>\` | \`title\`, \`description\`, \`format\`, \`steps\`, \`hasErrors\` |
+| \`flow.<property>\` | \`title\`, \`description\`, \`steps\`, \`hasErrors\` |
 | \`formula.<name>\` | Another formula |
 
     filters:
@@ -1031,7 +1027,7 @@ of waiting for a final report.
 
 | Flag | What it does |
 |-|-|
-| \`--file\` | Path to the flow (\`.md\` or \`.yaml\`). Required unless \`--server\`. |
+| \`--file\` | Path to the flow (\`.md\`). Required unless \`--server\`. |
 | \`--env\` | Environment to run in. Required with \`--file\`. |
 | \`--server\` | Start the web UI on http://localhost:3001. |
 | \`--context\` | Use another context directory instead of \`~/lab34-flows\`. |

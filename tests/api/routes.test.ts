@@ -58,24 +58,24 @@ describe('GET /api/flows/tree', () => {
 });
 
 describe('POST /api/flows/parse', () => {
-  test('passes value and format through to the parser', async () => {
-    (flows.parseValue as jest.Mock).mockReturnValue({ format: 'markdown', steps: [] });
-    const res = await request(app).post('/api/flows/parse').send({ value: '# t', format: 'markdown' });
+  test('passes the value through to the parser', async () => {
+    (flows.parseValue as jest.Mock).mockReturnValue({ steps: [] });
+    const res = await request(app).post('/api/flows/parse').send({ value: '# t' });
     expect(res.status).toBe(200);
-    expect(flows.parseValue).toHaveBeenCalledWith('# t', 'markdown');
+    expect(flows.parseValue).toHaveBeenCalledWith('# t');
   });
 
-  test('defaults to an empty value and no format', async () => {
+  test('defaults to an empty value', async () => {
     (flows.parseValue as jest.Mock).mockReturnValue({});
     await request(app).post('/api/flows/parse').send({});
-    expect(flows.parseValue).toHaveBeenCalledWith('', null);
+    expect(flows.parseValue).toHaveBeenCalledWith('');
   });
 
   test('a parse error becomes a 400', async () => {
-    (flows.parseValue as jest.Mock).mockImplementation(() => { throw new Error('bad yaml'); });
+    (flows.parseValue as jest.Mock).mockImplementation(() => { throw new Error('bad flow'); });
     const res = await request(app).post('/api/flows/parse').send({ value: 'x' });
     expect(res.status).toBe(400);
-    expect(res.body).toEqual({ error: 'bad yaml' });
+    expect(res.body).toEqual({ error: 'bad flow' });
   });
 });
 

@@ -202,21 +202,6 @@ describe('markdownFlows', () => {
       expect(parsed.title).toBe('T');
       expect(parsed.steps).toHaveLength(1);
       expect(parsed.steps[0]).toMatchObject({ application: 'a', method: 'b' });
-      expect(markdownFlows.isMarkdownFlow(doc)).toBe(true);
-    });
-  });
-
-  describe('isMarkdownFlow', () => {
-    it('detects markdown flows', () => {
-      expect(markdownFlows.isMarkdownFlow(SAMPLE)).toBe(true);
-    });
-
-    it('rejects YAML flows', () => {
-      expect(markdownFlows.isMarkdownFlow('steps:\n  - application: a\n    method: b\n')).toBe(false);
-    });
-
-    it('rejects plain markdown without steps', () => {
-      expect(markdownFlows.isMarkdownFlow('# Hi\n\n```js\ncode\n```\n')).toBe(false);
     });
   });
 

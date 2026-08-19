@@ -57,16 +57,12 @@ function renameKey(properties, from, to) {
  * @param {Object} props
  * @param {Object} props.properties - The flow's frontmatter
  * @param {string} props.fallbackTitle - Shown when there is no title property
- * @param {boolean} props.readOnly
- * @param {string} props.readOnlyReason - Why, shown to the user
  * @param {boolean} props.saving
  * @param {Function} props.onChange - Called with the whole new frontmatter
  */
 export function FlowProperties({
   properties,
   fallbackTitle,
-  readOnly,
-  readOnlyReason,
   saving,
   onChange,
 }) {
@@ -87,13 +83,11 @@ export function FlowProperties({
   const setValue = (key, value) => commit({ ...meta, [key]: value });
 
   const startEditing = (key) => {
-    if (readOnly) { return; }
     setEditing({ key, field: 'value' });
     setDraft(toInputValue(meta[key]));
   };
 
   const startRenaming = (key) => {
-    if (readOnly) { return; }
     setEditing({ key, field: 'name' });
     setDraft(key);
   };
@@ -174,12 +168,10 @@ export function FlowProperties({
       return (
         <button
           type="button"
-          disabled={readOnly}
           onClick={() => setValue(key, !value)}
           className={cn(
             'border-input flex size-4 items-center justify-center rounded-sm border',
-            value && 'bg-primary text-primary-foreground border-primary',
-            readOnly && 'cursor-default opacity-60'
+            value && 'bg-primary text-primary-foreground border-primary'
           )}
           aria-label={`${key}: ${value ? 'yes' : 'no'}`}
           aria-pressed={Boolean(value)}
@@ -193,7 +185,6 @@ export function FlowProperties({
       return (
         <button
           type="button"
-          disabled={readOnly}
           onClick={() => startEditing(key)}
           className="flex w-full flex-wrap gap-1 text-left"
         >
@@ -219,7 +210,6 @@ export function FlowProperties({
     return (
       <button
         type="button"
-        disabled={readOnly}
         onClick={() => startEditing(key)}
         className="w-full truncate text-left text-sm"
       >
@@ -259,9 +249,7 @@ export function FlowProperties({
     return (
       <button
         type="button"
-        disabled={readOnly}
         onClick={() => {
-          if (readOnly) { return; }
           setEditing({ key, field: 'value' });
           setDraft(toInputValue(value ?? ''));
         }}
@@ -294,7 +282,6 @@ export function FlowProperties({
                 ) : (
                   <button
                     type="button"
-                    disabled={readOnly}
                     onClick={() => startRenaming(key)}
                     className="text-muted-foreground w-full truncate text-left text-sm"
                     title={`${key} — click to rename`}
@@ -306,16 +293,14 @@ export function FlowProperties({
 
               <dd className="min-w-0 flex-1">{renderValue(key)}</dd>
 
-              {!readOnly && (
-                <button
-                  type="button"
-                  onClick={() => remove(key)}
-                  className="text-muted-foreground hover:text-destructive shrink-0 opacity-0 group-hover/prop:opacity-100"
-                  aria-label={`Remove the ${key} property`}
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => remove(key)}
+                className="text-muted-foreground hover:text-destructive shrink-0 opacity-0 group-hover/prop:opacity-100"
+                aria-label={`Remove the ${key} property`}
+              >
+                <Trash2 className="size-3.5" />
+              </button>
             </div>
           ))}
         </dl>
@@ -355,7 +340,7 @@ export function FlowProperties({
         )}
 
         <div className="flex items-center gap-2 pt-1">
-          {!readOnly && !adding && (
+          {!adding && (
             <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setAdding(true)}>
               <Plus /> Add property
             </Button>
@@ -364,9 +349,6 @@ export function FlowProperties({
             <span className="text-muted-foreground flex items-center gap-1 text-xs">
               <Loader2 className="size-3 animate-spin" /> Saving…
             </span>
-          )}
-          {readOnly && readOnlyReason && (
-            <span className="text-muted-foreground px-1 text-xs">{readOnlyReason}</span>
           )}
         </div>
       </div>

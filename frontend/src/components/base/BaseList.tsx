@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, FileCode2, FileText } from 'lucide-react';
+import { AlertTriangle, FileText } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import StatusDot from '@/components/shared/StatusDot';
@@ -25,7 +25,6 @@ export function BaseList({ columns, rows }) {
   return (
     <ul className="divide-y">
       {rows.map((row) => {
-        const Icon = row.format === 'markdown' ? FileText : FileCode2;
         const label = nameColumn && !isEmpty(row.values?.[nameColumn.id])
           ? formatValue(row.values[nameColumn.id])
           : row.title;
@@ -35,7 +34,7 @@ export function BaseList({ columns, rows }) {
             <Link to={flowUrl(row)} className="group/name block">
               <div className="flex items-center gap-2">
                 <StatusDot status={statusFor(row.path)} />
-                <Icon className="text-muted-foreground size-4 shrink-0" />
+                <FileText className="text-muted-foreground size-4 shrink-0" />
                 <span className="text-info truncate font-medium group-hover/name:underline">{label}</span>
                 {row.hasErrors && (
                   <AlertTriangle className="text-destructive size-3.5 shrink-0" aria-label="has problems" />

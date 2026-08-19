@@ -179,7 +179,7 @@ export function FilterEditor({ filters, available, matched, total, errors, onCha
                     <li><code>priority &gt; 5</code>, <code>owner == &quot;ana&quot;</code>, <code>reviewed != true</code></li>
                     <li><code>owner.contains(&quot;an&quot;)</code>, <code>tags.contains(&quot;smoke&quot;)</code>, <code>owner.isEmpty()</code></li>
                     <li><code>file.hasTag(&quot;smoke&quot;)</code>, <code>file.inFolder(&quot;payments&quot;)</code>, <code>file.hasProperty(&quot;owner&quot;)</code></li>
-                    <li><code>flow.steps &gt; 3</code>, <code>flow.hasErrors</code>, <code>flow.format == &quot;markdown&quot;</code></li>
+                    <li><code>flow.steps &gt; 3</code>, <code>flow.hasErrors</code></li>
                     <li>Combine with <code>&amp;&amp;</code>, <code>||</code> and <code>!</code></li>
                   </ul>
                   <p>

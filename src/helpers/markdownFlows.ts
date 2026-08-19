@@ -16,9 +16,8 @@ import YAML from 'yaml';
  *       b: 2
  *   ```
  *
- * The content of a step block is YAML, using the exact same step schema as
- * the classic YAML flows (application, method, parameters, test, mimic,
- * retry...).
+ * The content of a step block is YAML: application, method, parameters,
+ * test, mimic, retry...
  *
  * Flow-level metadata (title, description, version, latentApplications...)
  * can be provided in an optional YAML frontmatter at the very top of the
@@ -370,18 +369,6 @@ const parse = (content): ParsedMarkdownFlow => {
 };
 
 /**
- * Whether a document looks like a markdown flow (i.e. contains at least one
- * fenced "step" block).
- * @param {string} content
- * @returns {boolean}
- */
-const isMarkdownFlow = (content) => {
-  if (!content || typeof content !== 'string') { return false; }
-  const { body } = parseFrontmatter(content);
-  return splitSegments(body).some(segment => segment.type === 'step');
-};
-
-/**
  * Build the flow object expected by the runners from a markdown document.
  * Throws when the document contains invalid step blocks.
  *
@@ -417,7 +404,6 @@ export {
   parseFrontmatter,
   withFrontmatter,
   splitSegments,
-  isMarkdownFlow,
   isStepInfo,
   toFlow
 };

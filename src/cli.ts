@@ -6,7 +6,7 @@ import * as applications from './helpers/applications';
 /**
  * Lab34 Flows CLI Tool
  * 
- * A command-line interface for running flow definitions from YAML files.
+ * A command-line interface for running Markdown flow definitions.
  * 
  * Usage:
  *   node cli.js --file <path-to-flow-file> --env <environment> [--debug] [--help]
@@ -14,7 +14,7 @@ import * as applications from './helpers/applications';
  *   node cli.js --server
  *
  * Options:
- *   --file         Path to the flow definition file (.md or .yaml)
+ *   --file         Path to the flow definition file (.md)
  *   --context      Context directory
  *   --capabilities List all available capabilities from the contents of ~/flows
  *   --env          Environment to run the flow in (required for --file)
@@ -35,7 +35,6 @@ process.env.NODE_NO_HTTP2 = '1';
 
 // Core dependencies
 import fs from 'fs';
-import YAML from 'yaml';
 import yargsParser from 'yargs-parser';
 
 const argv = yargsParser(process.argv.slice(2));
@@ -69,7 +68,7 @@ Usage:
   lab34-flows --server [--context=<context>]
 
 Options:
-  --file          Path to the flow definition file (.md markdown flow or .yaml) (required if not using --server)
+  --file          Path to the flow definition file (.md markdown flow) (required if not using --server)
   --capabilities  List all available capabilities from the contents of ~/flows
   --server        Start the web server with built frontend and API
   --env           Environment to run the flow in (required for --file)
@@ -148,13 +147,13 @@ function parseArguments() {
 }
 
 /**
- * Validate the YAML file path
- * @param {string} filePath - Path to the YAML file
+ * Validate the flow file path
+ * @param {string} filePath - Path to the flow file
  * @returns {boolean} True if valid, otherwise exits with error
  */
 async function validateFilePath(filePath) {
   if (!filePath) {
-    exitWithError('No file specified. Use --file <path-to-yaml-file>');
+    exitWithError('No file specified. Use --file <path-to-flow-file>');
   }
 
   const fullFilePath = await paths.contextDir(filePath);
@@ -163,28 +162,24 @@ async function validateFilePath(filePath) {
     exitWithError(`File not found: ${fullFilePath}`);
   }
 
-  const isSupported = ['yaml', 'yml', 'md', 'markdown'].some(ext => fullFilePath.toLowerCase().endsWith(`.${ext}`));
+  const isSupported = ['md', 'markdown'].some(ext => fullFilePath.toLowerCase().endsWith(`.${ext}`));
   if (!isSupported) {
-    exitWithError('File must be a .md, .markdown, .yaml or .yml file');
+    exitWithError('File must be a .md or .markdown file');
   }
 
   return fullFilePath;
 }
 
 /**
- * Parse a flow file (markdown or YAML)
+ * Parse a Markdown flow file
  * @param {string} filePath - Path to the flow file
  * @returns {Object} Parsed flow definition
  */
 async function parseFlowFile(filePath) {
   try {
     const content = fs.readFileSync(filePath, 'utf8');
-    const isMarkdown = ['md', 'markdown'].some(ext => filePath.toLowerCase().endsWith(`.${ext}`));
-    if (isMarkdown) {
-      const markdownFlows = require('./helpers/markdownFlows');
-      return markdownFlows.toFlow(content);
-    }
-    return YAML.parse(content);
+    const markdownFlows = require('./helpers/markdownFlows');
+    return markdownFlows.toFlow(content);
   } catch (error) {
     exitWithError(`Error parsing flow file: ${error.message}`);
   }
@@ -192,7 +187,7 @@ async function parseFlowFile(filePath) {
 
 /**
  * Run the flow with the specified options
- * @param {Object} flowConfig - Flow configuration from YAML
+ * @param {Object} flowConfig - Parsed flow configuration
  * @param {Object} options - Runtime options
  */
 async function runFlow(flowConfig, options) {
@@ -294,7 +289,7 @@ async function main() {
     
     // Validate file path
     const flowFilePath = await validateFilePath(args.file);
-    // Parse the flow file (markdown or YAML)
+    // Parse the flow file
     const flowConfig = await parseFlowFile(flowFilePath);
 
     // Set up options

@@ -157,7 +157,6 @@ describe('aiFlows.create', () => {
 
     expect(result).toEqual({
       flow: DOCUMENT.trim(),
-      format: 'markdown',
       provider: 'ollama',
       model: 'llama3.1'
     });

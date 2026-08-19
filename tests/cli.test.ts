@@ -40,7 +40,8 @@ beforeEach(() => {
   (applications.loadAll as jest.Mock).mockResolvedValue(undefined);
   (flows.listCapabilities as jest.Mock).mockResolvedValue(undefined);
   jest.spyOn(fs, 'existsSync').mockReturnValue(true);
-  jest.spyOn(fs, 'readFileSync').mockReturnValue('title: t\nsteps: []\n' as any);
+  jest.spyOn(fs, 'readFileSync').mockReturnValue('# t\n\n```step\napplication: a\nmethod: b\n```\n' as any);
+  (markdownFlows.toFlow as jest.Mock).mockReturnValue({ title: 't', steps: [] });
 });
 
 afterEach(() => jest.restoreAllMocks());
@@ -126,13 +127,13 @@ describe('cli --server', () => {
 
 describe('cli --file', () => {
   test('requires an environment', async () => {
-    ARGV = { file: 'flows/a.yaml' };
+    ARGV = { file: 'flows/a.md' };
     await runCli();
     expect(errored()).toContain('No environment specified');
   });
 
   test('reports a file that is not there', async () => {
-    ARGV = { file: 'flows/nope.yaml', env: 'local' };
+    ARGV = { file: 'flows/nope.md', env: 'local' };
     (fs.existsSync as jest.Mock).mockReturnValue(false);
 
     await runCli();
@@ -143,11 +144,11 @@ describe('cli --file', () => {
   test('rejects an unsupported extension', async () => {
     ARGV = { file: 'flows/a.txt', env: 'local' };
     await runCli();
-    expect(errored()).toContain('File must be a .md, .markdown, .yaml or .yml file');
+    expect(errored()).toContain('File must be a .md or .markdown file');
   });
 
-  test('runs a YAML flow', async () => {
-    ARGV = { file: 'flows/a.yaml', env: 'local' };
+  test('runs the flow through the runner', async () => {
+    ARGV = { file: 'flows/a.md', env: 'local' };
     await runCli();
 
     expect(applications.loadAll).toHaveBeenCalled();
@@ -171,8 +172,10 @@ describe('cli --file', () => {
   });
 
   test('a flow file that does not parse is fatal', async () => {
-    ARGV = { file: 'flows/a.yaml', env: 'local' };
-    (fs.readFileSync as jest.Mock).mockReturnValue('steps: [1, 2' as any);
+    ARGV = { file: 'flows/a.md', env: 'local' };
+    (markdownFlows.toFlow as jest.Mock).mockImplementation(() => {
+      throw new Error('Invalid markdown flow: step 1: Invalid step YAML');
+    });
 
     await runCli();
 
@@ -180,7 +183,7 @@ describe('cli --file', () => {
   });
 
   test('prints the banner before running', async () => {
-    ARGV = { file: 'flows/a.yaml', env: 'local' };
+    ARGV = { file: 'flows/a.md', env: 'local' };
     const cliHelper = require('../src/helpers/cli');
 
     await runCli();
@@ -190,7 +193,7 @@ describe('cli --file', () => {
   });
 
   test('under nodemon the run is delayed', async () => {
-    ARGV = { file: 'flows/a.yaml', env: 'local' };
+    ARGV = { file: 'flows/a.md', env: 'local' };
     process.env.IS_NODEMON = '1';
     jest.useFakeTimers();
 
@@ -208,7 +211,7 @@ describe('cli --file', () => {
   });
 
   test('a runner failure is reported', async () => {
-    ARGV = { file: 'flows/a.yaml', env: 'local' };
+    ARGV = { file: 'flows/a.md', env: 'local' };
     (applications.loadAll as jest.Mock).mockRejectedValue(new Error('cannot load'));
 
     await runCli();

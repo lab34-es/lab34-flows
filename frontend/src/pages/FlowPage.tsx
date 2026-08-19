@@ -8,11 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import Markdown from '@/components/shared/Markdown';
 import AiEditDialog from '@/components/flow/AiEditDialog';
 import BlockEditor from '@/components/flow/BlockEditor';
 import FlowProperties from '@/components/flow/FlowProperties';
-import StepCell from '@/components/flow/StepCell';
 import XrayChip from '@/components/flow/XrayChip';
 import { flowsApi, jiraApi } from '@/services/api';
 import { useAppState } from '@/context/AppStateContext';
@@ -185,12 +183,11 @@ export function FlowPage() {
    */
   useEffect(() => {
     if (!flowData || draft === parsedRef.current) { return undefined; }
-    const format = flowData.format;
 
     const timer = setTimeout(async () => {
       parsedRef.current = draft;
       try {
-        const parsed = await flowsApi.parse(draft, format);
+        const parsed = await flowsApi.parse(draft);
         parsedTitleRef.current = parsed.data.title || null;
         setFlowData((current) => (current ? {
           ...current,
@@ -296,7 +293,7 @@ export function FlowPage() {
     await persist(draft);
 
     try {
-      const parsed = await flowsApi.parse(draft, flowData.format);
+      const parsed = await flowsApi.parse(draft);
       parsedRef.current = draft;
       parsedTitleRef.current = parsed.data.title || null;
       setFlowData((current) => ({
@@ -316,7 +313,7 @@ export function FlowPage() {
     }
 
     setTab('document');
-    await startRun(flowPath, { value: draft, environment, format: flowData.format });
+    await startRun(flowPath, { value: draft, environment });
   };
 
   /**
@@ -490,7 +487,6 @@ export function FlowPage() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h1 className="truncate text-lg font-bold tracking-tight">{flowData.title}</h1>
-              <Badge variant="outline" className="text-[10px] uppercase">{flowData.format}</Badge>
               {runStatusMeta && (
                 <Badge variant={runStatusMeta.variant} className="gap-1">
                   <runStatusMeta.Icon className={runStatusMeta.iconClass ? `size-3 ${runStatusMeta.iconClass}` : 'size-3'} />
@@ -575,8 +571,6 @@ export function FlowPage() {
             <FlowProperties
               properties={flowData.properties}
               fallbackTitle={flowData.title}
-              readOnly={flowData.format !== 'markdown'}
-              readOnlyReason="YAML flows keep their metadata in the document itself — edit it in Source."
               saving={savingProperties}
               onChange={handlePropertiesChange}
             />
@@ -650,30 +644,13 @@ export function FlowPage() {
 
             {/* The notebook, written in place: rendered Markdown you can type
                 into, with the step cells and their execution output */}
-            {flowData.format === 'markdown' ? (
-              <BlockEditor
-                key={flowPath}
-                value={draft}
-                onChange={applyEdit}
-                resolveStep={resolveStep}
-                onAnswerInput={answerInput}
-              />
-            ) : (
-              /* A classic YAML flow is not a Markdown document: it keeps the
-                 read-only notebook, and is edited in Source */
-              (flowData.segments || []).map((segment, index) => (
-                segment.type === 'step' ? (
-                  <StepCell
-                    key={index}
-                    segment={segment}
-                    {...resolveStep(segment.stepIndex)}
-                    onAnswerInput={answerInput}
-                  />
-                ) : (
-                  <Markdown key={index} className="py-2">{segment.content}</Markdown>
-                )
-              ))
-            )}
+            <BlockEditor
+              key={flowPath}
+              value={draft}
+              onChange={applyEdit}
+              resolveStep={resolveStep}
+              onAnswerInput={answerInput}
+            />
           </div>
         </div>
       )}

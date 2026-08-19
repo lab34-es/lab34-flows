@@ -245,7 +245,7 @@ const validateDocument = (document, catalogue) => {
  * @param {string} options.prompt - The prompt to send
  * @param {Array<Object>} options.catalogue - Applications catalogue
  * @param {string} [options.provider] - Overrides the configured provider
- * @returns {Promise<{flow: string, format: string, provider: string, model: string}>}
+ * @returns {Promise<{flow: string, provider: string, model: string}>}
  */
 const generateDocument = async ({ prompt, catalogue, provider }) => {
   let currentPrompt = prompt;
@@ -258,7 +258,7 @@ const generateDocument = async ({ prompt, catalogue, provider }) => {
     lastProblems = validateDocument(flow, catalogue);
 
     if (!lastProblems.length) {
-      return { flow, format: 'markdown', provider: result.provider, model: result.model };
+      return { flow, provider: result.provider, model: result.model };
     }
 
     currentPrompt = [
@@ -279,7 +279,7 @@ const generateDocument = async ({ prompt, catalogue, provider }) => {
 /**
  * Create a Markdown flow from a natural language description.
  * @param {Object} body - { prompt, provider }
- * @returns {Promise<{flow: string, format: string, provider: string, model: string}>}
+ * @returns {Promise<{flow: string, provider: string, model: string}>}
  */
 export const create = async (body) => {
   const prompt = (body && body.prompt ? String(body.prompt) : '').trim();
@@ -300,7 +300,7 @@ export const create = async (body) => {
 /**
  * Rewrite an existing flow following an instruction.
  * @param {Object} body - { prompt, content, provider }
- * @returns {Promise<{flow: string, format: string, provider: string, model: string}>}
+ * @returns {Promise<{flow: string, provider: string, model: string}>}
  */
 export const edit = async (body) => {
   const prompt = (body && body.prompt ? String(body.prompt) : '').trim();

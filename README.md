@@ -16,7 +16,7 @@ Heavily opinionated tool to help you test E2E flows and behaviours.
 
 Features:
 
-- Define flows as **Markdown documents**: write any content — prose, headings, lists — and mark the executable steps as ```` ```step ```` code blocks. (Legacy YAML flows keep working.)
+- Define flows as **Markdown documents**: write any content — prose, headings, lists — and mark the executable steps as ```` ```step ```` code blocks.
 - **Notebook-style UI**: run a flow and the execution details of each step (request, response, assertions, timings) appear right below its code block.
 - Web UI built with [shadcn/ui](https://ui.shadcn.com): sidebar with your flows (with live status indicators), folders, uploads, and your applications with their docs.
 - Ships with **example applications and flows** (calculator, httpbin, jsonplaceholder), seeded on first run.
@@ -114,9 +114,6 @@ Additionally:
 1. You can mimic the behaviour of dependant applications, by adding a *mimic* section to each step's definition.
 2. You can define test cases for each step, and the tool will execute them.
 
-> Legacy YAML flows (`.yaml` / `.yml` files with a `steps:` list) are still
-> fully supported, and are rendered in the same notebook UI.
-
 ## Setup
 
 ```bash
@@ -140,7 +137,7 @@ $env:NODE_PATH = "$env:NVM_SYMLINK\node_modules"
 
 ## Usage
 
-The Lab34 Flows CLI tool provides a professional command-line interface for running flow definitions (Markdown or YAML), and a web UI.
+The Lab34 Flows CLI tool provides a professional command-line interface for running Markdown flow definitions, and a web UI.
 
 ### Usage
 
@@ -155,7 +152,7 @@ lab34-flows --capabilities
 
 |Parameter|Description|
 |-|-|
-|`--file`|Path to the flow definition file, `.md` or `.yaml` (required if not using --server)|
+|`--file`|Path to the flow definition file, `.md` (required if not using --server)|
 |`--server`|Start the web UI (builds the frontend and serves it on http://localhost:3001)|
 |`--env`|Environment to run the flow in (required for --file)|
 |`--debug`|Print debug information including environment variables and Node.js variables|
@@ -421,9 +418,6 @@ sorts numerically, a `true` / `false` renders as a checkbox, a list renders as
 chips, and an ISO date sorts chronologically. Adding a property asks which
 kind of value to start with, and from then on the value itself is the type.
 
-> Properties are edited on Markdown flows. Legacy YAML flows keep their
-> metadata in the document itself, so they are edited in the **Source** tab.
-
 ### Folder views
 
 Click a folder in the sidebar and its flows — **including those in
@@ -483,7 +477,7 @@ available:
 | --- | --- |
 | `note.<property>` | A frontmatter property of the flow |
 | `file.<property>` | `name`, `basename`, `path`, `folder`, `ext`, `size`, `ctime`, `mtime`, `tags` |
-| `flow.<property>` | `title`, `description`, `format`, `steps`, `hasErrors` |
+| `flow.<property>` | `title`, `description`, `steps`, `hasErrors` |
 | `formula.<name>` | Another formula |
 
 ```yaml
@@ -904,9 +898,8 @@ Which keys a method writes or reads is documented with the
 
 ## Flows
 
-Flows are defined in Markdown format (see [General info](#general-info));
-legacy YAML flows are still supported. Examples are seeded into the `flows`
-folder of your context directory.
+Flows are defined in Markdown format (see [General info](#general-info)).
+Examples are seeded into the `flows` folder of your context directory.
 
 Though, you can have your own flows in your own computer / repository, and share them with your team.
 

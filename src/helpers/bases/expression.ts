@@ -23,7 +23,7 @@ export type Token =
  *
  *   note.<property>     a frontmatter property of the flow
  *   file.<property>     something about the file itself (name, path, mtime...)
- *   flow.<property>     something the parser knows (format, steps, hasErrors)
+ *   flow.<property>     something the parser knows (title, steps, hasErrors)
  *   formula.<name>      another formula, computed lazily
  *
  * A bare identifier is shorthand for `note.<identifier>`, so `priority` and

@@ -26,7 +26,7 @@ const parentOf = (relativePath) =>
 
 const baseNameOf = (relativePath) => relativePath.split('/').pop();
 
-const FLOW_EXTENSION = /\.(md|markdown|yaml|yml)$/i;
+const FLOW_EXTENSION = /\.(md|markdown)$/i;
 
 /**
  * Dialogs for the sidebar file actions: new flow, new folder, rename and
@@ -88,9 +88,9 @@ export function FlowDialogs({ action, onClose }) {
     const trimmed = name.trim();
     if (!trimmed) { return; }
 
-    const hasExtension = /\.(md|markdown|yaml|yml)$/i.test(trimmed);
+    const hasExtension = /\.(md|markdown)$/i.test(trimmed);
     const fileName = hasExtension ? trimmed : `${trimmed}.md`;
-    const title = fileName.replace(/\.(md|markdown|yaml|yml)$/i, '');
+    const title = fileName.replace(/\.(md|markdown)$/i, '');
     const relativePath = joinPath(action.parentPath, fileName);
 
     setBusy(true);
@@ -150,7 +150,7 @@ export function FlowDialogs({ action, onClose }) {
     if (!trimmed) { return; }
 
     const from = action.targetPath;
-    // Flows keep their format unless the new name states another one
+    // Flows keep their extension unless the new name states another one
     const fileName = action.isFolder || FLOW_EXTENSION.test(trimmed)
       ? trimmed
       : `${trimmed}${(from.match(FLOW_EXTENSION) || ['.md'])[0]}`;

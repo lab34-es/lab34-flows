@@ -82,7 +82,7 @@ const HEADLINE_PROPERTIES = ['title', 'description'];
 const FILE_PROPERTIES = ['file.name', 'file.basename', 'file.path', 'file.folder', 'file.ext',
   'file.size', 'file.ctime', 'file.mtime', 'file.tags'];
 
-const FLOW_PROPERTIES = ['flow.title', 'flow.description', 'flow.format', 'flow.steps',
+const FLOW_PROPERTIES = ['flow.title', 'flow.description', 'flow.steps',
   'flow.hasErrors'];
 
 const DEFAULT_VIEW = {
@@ -323,7 +323,6 @@ const buildScope = (entry, formulas) => {
   const flow = {
     title: parsed ? parsed.title : null,
     description: parsed ? parsed.description : null,
-    format: parsed ? parsed.format : null,
     steps: parsed && Array.isArray(parsed.steps) ? parsed.steps.length : 0,
     hasErrors: Boolean(parsed && parsed.errors && parsed.errors.length)
   };
@@ -404,12 +403,12 @@ const collectFlows = async (folderRelativePath) => {
       }
 
       const ext = path.extname(item).toLowerCase().substring(1);
-      if (!['md', 'markdown', 'yaml', 'yml'].includes(ext)) { continue; }
+      if (!['md', 'markdown'].includes(ext)) { continue; }
 
       let parsed: any = null;
       try {
         const raw = fs.readFileSync(fullPath, 'utf8');
-        parsed = flows.parseValue(raw, ['md', 'markdown'].includes(ext) ? 'markdown' : 'yaml');
+        parsed = flows.parseValue(raw);
       }
       catch {
         parsed = null;
@@ -592,7 +591,6 @@ const query = async ({ folder = '', view: viewName, document }: {
       relativePath: entry.relativePath,
       name: path.basename(entry.relativePath),
       title: (entry.parsed && entry.parsed.title) || path.basename(entry.relativePath),
-      format: entry.parsed ? entry.parsed.format : null,
       hasErrors: Boolean(entry.parsed && entry.parsed.errors && entry.parsed.errors.length),
       values
     };

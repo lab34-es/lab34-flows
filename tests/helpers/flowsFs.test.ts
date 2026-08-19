@@ -32,10 +32,6 @@ const MARKDOWN = [
   'Intro', '', '```step', 'application: calculator', 'method: add', '```', ''
 ].join('\n');
 
-const YAML_FLOW = [
-  'title: Legacy', 'steps:', '  - application: calculator', '    method: add', ''
-].join('\n');
-
 beforeEach(() => {
   jest.clearAllMocks();
   fs.rmSync(flowsDir, { recursive: true, force: true });
@@ -52,12 +48,12 @@ describe('flows.list', () => {
 
   test('finds flows at the root and in subfolders', async () => {
     write('a.md', MARKDOWN);
-    write('team/b.yaml', YAML_FLOW);
+    write('team/b.markdown', MARKDOWN);
 
     const list = await flows.list();
 
     expect(list).toHaveLength(2);
-    expect(list.map(f => f.relativePath).sort()).toEqual(['a.md', path.join('team', 'b.yaml')]);
+    expect(list.map(f => f.relativePath).sort()).toEqual(['a.md', path.join('team', 'b.markdown')]);
   });
 
   test('reports the category from the containing folder', async () => {
@@ -283,14 +279,14 @@ describe('flows.start', () => {
       .rejects.toThrow(/"value" and "environment" are required/);
   });
 
-  test('rejects YAML that does not parse', async () => {
-    await expect(flows.start({ value: 'steps: [1, 2', environment: 'local', format: 'yaml' }, {}))
-      .rejects.toThrow(/Invalid YAML flow/);
+  test('rejects a step block that does not parse', async () => {
+    await expect(flows.start({ value: '```step\n[broken\n```\n', environment: 'local' }, {}))
+      .rejects.toThrow(/Invalid markdown flow/);
   });
 
-  test('rejects a flow with no steps', async () => {
-    await expect(flows.start({ value: 'title: x', environment: 'local', format: 'yaml' }, {}))
-      .rejects.toThrow('Flow has no steps to execute');
+  test('rejects a document with no steps', async () => {
+    await expect(flows.start({ value: '# Just prose\n', environment: 'local' }, {}))
+      .rejects.toThrow(/no ```step blocks found/);
   });
 
   test('runs a markdown flow through the runner', async () => {
@@ -305,16 +301,6 @@ describe('flows.start', () => {
       { environment: 'local', reporter: { cli: false, server: 'socket' } }
     );
     expect(result).toEqual({ execution: { id: 'e1' } });
-    run.mockRestore();
-  });
-
-  test('runs a YAML flow too', async () => {
-    const run = jest.spyOn(runner, 'run').mockResolvedValue({ execution: { id: 'e2' } });
-    (apps.loadAll as jest.Mock).mockResolvedValue(undefined);
-
-    await flows.start({ value: YAML_FLOW, environment: 'local', format: 'yaml' }, {});
-
-    expect(run).toHaveBeenCalled();
     run.mockRestore();
   });
 

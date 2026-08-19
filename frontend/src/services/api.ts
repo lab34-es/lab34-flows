@@ -19,7 +19,7 @@ const AI_TIMEOUT = 240000;
 export const flowsApi = {
   list: () => api.get('/api/flows'),
   tree: () => api.get('/api/flows/tree'),
-  parse: (value, format) => api.post('/api/flows/parse', { value, format }),
+  parse: (value) => api.post('/api/flows/parse', { value }),
   createAI: (prompt) =>
     api.post('/api/flows/create/ai', { prompt }, { timeout: AI_TIMEOUT }),
   editAI: (prompt, content) =>

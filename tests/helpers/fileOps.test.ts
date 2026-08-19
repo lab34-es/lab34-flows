@@ -255,7 +255,7 @@ describe('flows.saveProperties', () => {
       properties: { title: 'Checkout', owner: 'bruno', priority: 5 }
     });
 
-    const parsed = flows.parseValue(fs.readFileSync(flowPath, 'utf8'), 'markdown');
+    const parsed = flows.parseValue(fs.readFileSync(flowPath, 'utf8'));
     expect(parsed.properties).toEqual({ title: 'Checkout', owner: 'bruno', priority: 5 });
     expect(parsed.steps).toHaveLength(1);
     expect(fs.readFileSync(flowPath, 'utf8')).toContain(BODY);
@@ -278,7 +278,7 @@ describe('flows.saveProperties', () => {
     });
 
     expect(fs.readFileSync(flowPath, 'utf8')).toContain('\nepic: null\n');
-    expect(flows.parseValue(fs.readFileSync(flowPath, 'utf8'), 'markdown').properties.epic).toBeNull();
+    expect(flows.parseValue(fs.readFileSync(flowPath, 'utf8')).properties.epic).toBeNull();
   });
 
   it('removes a property that is no longer sent', async () => {
@@ -287,16 +287,8 @@ describe('flows.saveProperties', () => {
       properties: { title: 'Checkout' }
     });
 
-    expect(flows.parseValue(fs.readFileSync(flowPath, 'utf8'), 'markdown').properties)
+    expect(flows.parseValue(fs.readFileSync(flowPath, 'utf8')).properties)
       .toEqual({ title: 'Checkout' });
-  });
-
-  it('refuses YAML flows, which keep their metadata in the document itself', async () => {
-    write(path.join(flowsDir, 'team', 'legacy.yaml'), 'title: Legacy\nsteps: []\n');
-    await expect(flows.saveProperties({
-      relativePath: 'team/legacy.yaml',
-      properties: { owner: 'ana' }
-    })).rejects.toThrow(/only be edited on Markdown flows/);
   });
 
   it('refuses to escape the flows directory', async () => {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowDown, ArrowUp, Check, FileCode2, FileText, Minus } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, Check, FileText, Minus } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import {
@@ -106,7 +106,6 @@ export function BaseTable({ columns, rows, sort, onToggleSort }) {
 
       <TableBody>
         {rows.map((row) => {
-          const Icon = row.format === 'markdown' ? FileText : FileCode2;
           return (
             <TableRow key={row.relativePath}>
               {columns.map((column, index) => (
@@ -121,7 +120,7 @@ export function BaseTable({ columns, rows, sort, onToggleSort }) {
                       title={row.relativePath}
                     >
                       <StatusDot status={statusFor(row.path)} />
-                      <Icon className="text-muted-foreground size-3.5 shrink-0" />
+                      <FileText className="text-muted-foreground size-3.5 shrink-0" />
                       <span className="text-info truncate group-hover/name:underline">
                         {isEmpty(row.values?.[column.id]) ? row.name : formatValue(row.values[column.id])}
                       </span>

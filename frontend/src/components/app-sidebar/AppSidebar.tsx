@@ -258,7 +258,7 @@ export function AppSidebar() {
       <input
         ref={uploadInputRef}
         type="file"
-        accept=".md,.markdown,.yaml,.yml"
+        accept=".md,.markdown"
         className="hidden"
         onChange={handleUploadFile}
       />

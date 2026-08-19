@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ChevronRight,
   FileText,
-  FileCode2,
   Folder,
   FolderPlus,
   MoreHorizontal,
@@ -125,7 +124,6 @@ function FlowNode({ node, onAction }) {
     new URLSearchParams(location.search).get('path') === node.path;
 
   const status = statusFor(node.path);
-  const Icon = node.format === 'markdown' ? FileText : FileCode2;
 
   return (
     <SidebarMenuItem>
@@ -135,7 +133,7 @@ function FlowNode({ node, onAction }) {
         title={node.relativePath}
       >
         <StatusDot status={status} />
-        <Icon className="text-muted-foreground" />
+        <FileText className="text-muted-foreground" />
         <span>{node.title || node.name}</span>
       </SidebarMenuButton>
 

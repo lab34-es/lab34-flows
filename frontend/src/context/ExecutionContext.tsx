@@ -132,14 +132,14 @@ export function ExecutionProvider({ children }) {
     };
   }, [applyEvent]);
 
-  const startRun = useCallback(async (flowPath, { value, environment, format }) => {
+  const startRun = useCallback(async (flowPath, { value, environment }) => {
     setExecutions((prev) => ({
       ...prev,
       [flowPath]: { steps: {}, stepOrder: [], inputs: {}, status: 'starting', environment },
     }));
 
     try {
-      const response = await flowsApi.start({ value, environment, format });
+      const response = await flowsApi.start({ value, environment });
       const execution = response.data.execution;
 
       idToPath.current[execution.id] = flowPath;

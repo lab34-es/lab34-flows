@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import YAML from 'yaml';
 
 import * as paths from './paths';
 import * as apps from './applications';
@@ -18,26 +17,24 @@ export interface FlowTreeNode {
   children?: FlowTreeNode[];
   title?: string;
   path?: string;
-  format?: string | null;
   stepsCount?: number;
   hasErrors?: boolean;
 }
 
-const ALLOWED_FILE_FORMATS = ['md', 'markdown', 'yaml', 'yml'];
-const MARKDOWN_FORMATS = ['md', 'markdown'];
+const ALLOWED_FILE_FORMATS = ['md', 'markdown'];
 
 /**
  * Generate a brand new Markdown flow from a natural language description.
  * Only available from the UI: see helpers/aiFlows.
  * @param {Object} body - { prompt }
- * @returns {Promise<{flow: string, format: string, provider: string, model: string}>}
+ * @returns {Promise<{flow: string, provider: string, model: string}>}
  */
 export const createAI = async (body) => aiFlows.create(body || {});
 
 /**
  * Rewrite an existing flow following an instruction.
  * @param {Object} body - { prompt, content }
- * @returns {Promise<{flow: string, format: string, provider: string, model: string}>}
+ * @returns {Promise<{flow: string, provider: string, model: string}>}
  */
 export const editAI = async (body) => aiFlows.edit(body || {});
 
@@ -58,54 +55,7 @@ const titleFromFileName = (fileName) => {
 };
 
 /**
- * Whether a flow file path points to a markdown flow.
- * @param {string} flowPath
- * @returns {boolean}
- */
-const isMarkdownPath = (flowPath) => {
-  const ext = path.extname(flowPath).toLowerCase().substring(1);
-  return MARKDOWN_FORMATS.includes(ext);
-};
-
-/**
- * Parse raw flow content (markdown or YAML) into a normalized structure
- * shared by the API and the UI:
- * { format, title, description, segments, steps, errors }
- *
- * Segments describe the document in order, so the UI can render it as a
- * notebook: markdown segments are plain content, step segments are the
- * executable cells.
- *
- * @param {string} value - Raw file content
- * @param {string|null} format - 'markdown' | 'yaml' | null (auto-detect)
- * @returns {Object}
- */
-/**
- * Detect the format of raw flow content. A document containing ```step
- * fences is markdown — unless it also parses as a YAML object with a
- * `steps` list (e.g. a YAML flow whose strings embed markdown examples),
- * in which case YAML wins.
- * @param {string} value
- * @returns {'markdown'|'yaml'}
- */
-const detectFormat = (value) => {
-  if (!markdownFlows.isMarkdownFlow(value)) {
-    return 'yaml';
-  }
-  try {
-    const asYaml = YAML.parse(value);
-    if (asYaml && typeof asYaml === 'object' && Array.isArray(asYaml.steps)) {
-      return 'yaml';
-    }
-  }
-  catch {
-    // Not YAML at all: markdown
-  }
-  return 'markdown';
-};
-
-/**
- * The flow-level Xray link, out of the raw frontmatter/YAML "xray" block.
+ * The flow-level Xray link, out of the frontmatter "xray" block.
  * Only a trimmed, non-empty testKey makes it through: anything else is as
  * good as no link at all.
  * @param {*} source - Whatever the "xray" key holds in the file
@@ -120,100 +70,39 @@ const flowXray = (source) => {
   return testKey ? { testKey } : null;
 };
 
-const parseValue = (value, format: 'markdown' | 'yaml' | null = null) => {
-  const isMarkdown = format === 'markdown' ||
-    (format !== 'yaml' && detectFormat(value) === 'markdown');
-
-  if (isMarkdown) {
-    const parsed = markdownFlows.parse(value);
-    return {
-      format: 'markdown',
-      title: parsed.title,
-      description: parsed.description,
-      version: parsed.version,
-      xray: flowXray(parsed.xray),
-      // The frontmatter as written, so the UI can render it as a property
-      // list and the folder views can filter and sort on it
-      properties: parsed.meta,
-      segments: parsed.segments,
-      steps: parsed.steps,
-      errors: parsed.errors
-    };
-  }
-
-  // Classic YAML flow: synthesize one step segment per step so the UI can
-  // render YAML flows with the same notebook look.
-  let contents;
-  try {
-    contents = YAML.parse(value);
-  }
-  catch (ex) {
-    return {
-      format: 'yaml',
-      title: null,
-      description: null,
-      properties: {},
-      segments: [],
-      steps: [],
-      errors: [{ message: `Invalid YAML: ${ex.message}` }]
-    };
-  }
-
-  if (!contents || typeof contents !== 'object') {
-    return {
-      format: 'yaml',
-      title: null,
-      description: null,
-      properties: {},
-      segments: [],
-      steps: [],
-      errors: [{ message: 'Flow file must contain a YAML object' }]
-    };
-  }
-
-  const steps = Array.isArray(contents.steps) ? contents.steps : [];
-
-  const segments: Record<string, any>[] = [];
-  if (contents.description) {
-    segments.push({ type: 'markdown', content: contents.description });
-  }
-  steps.forEach((step, index) => {
-    segments.push({
-      type: 'step',
-      content: YAML.stringify(step).trim(),
-      info: 'step',
-      stepIndex: index
-    });
-  });
-
-  // A YAML flow has no frontmatter: everything but the step list plays that
-  // role, so folder views treat both formats alike
-  const properties = { ...contents };
-  delete properties.steps;
+/**
+ * Parse raw flow content into a normalized structure shared by the API and
+ * the UI: { title, description, properties, segments, steps, errors }
+ *
+ * Segments describe the document in order, so the UI can render it as a
+ * notebook: markdown segments are plain content, step segments are the
+ * executable cells.
+ *
+ * @param {string} value - Raw file content
+ * @returns {Object}
+ */
+const parseValue = (value) => {
+  const parsed = markdownFlows.parse(value);
 
   return {
-    format: 'yaml',
-    title: contents.title || null,
-    description: contents.description || null,
-    version: contents.version,
-    xray: flowXray(contents.xray),
-    properties,
-    segments,
-    steps: steps.map((step, index) => {
-      if (step && typeof step === 'object' && !Array.isArray(step)) {
-        return { ...step, stepIndex: index };
-      }
-      return step;
-    }),
-    errors: []
+    title: parsed.title,
+    description: parsed.description,
+    version: parsed.version,
+    xray: flowXray(parsed.xray),
+    // The frontmatter as written, so the UI can render it as a property
+    // list and the folder views can filter and sort on it
+    properties: parsed.meta,
+    segments: parsed.segments,
+    steps: parsed.steps,
+    errors: parsed.errors
   };
 };
 
 export { parseValue };
 
 /**
- * Given the location of a flow file (markdown or YAML), return its parsed
- * content, or null when it cannot be parsed at all.
+ * Given the location of a flow file, return its parsed content, or null when
+ * it cannot be parsed at all.
  * @param {string} flowPath
  * @returns {Object|null}
  */
@@ -224,10 +113,9 @@ const getContent = (flowPath) => {
 
   try {
     const raw = fs.readFileSync(flowPath, 'utf8');
-    const parsed = parseValue(raw, isMarkdownPath(flowPath) ? 'markdown' : 'yaml');
+    const parsed = parseValue(raw);
 
     contents = {
-      format: parsed.format,
       title: parsed.title,
       description: parsed.description,
       stepsCount: parsed.steps.length,
@@ -263,7 +151,7 @@ export const getUserFlow = async (flowPath) => {
   }
 
   const raw = fs.readFileSync(resolved, 'utf8');
-  const parsed = parseValue(raw, isMarkdownPath(resolved) ? 'markdown' : 'yaml');
+  const parsed = parseValue(raw);
 
   return {
     ...parsed,
@@ -349,7 +237,7 @@ export { resolveWithinFlows };
  * including empty folders, so the UI can render a file explorer.
  * @returns {Promise<Array>} tree nodes:
  *   { type: 'folder', name, relativePath, children }
- *   { type: 'flow', name, title, relativePath, path, format, stepsCount }
+ *   { type: 'flow', name, title, relativePath, path, stepsCount }
  */
 export const tree = async () => {
   const flowsDir = await paths.contextDir(['flows']);
@@ -397,7 +285,6 @@ export const tree = async () => {
         title: (content && content.title) || titleFromFileName(item),
         relativePath: itemRelative,
         path: fullPath,
-        format: content ? content.format : (isMarkdownPath(fullPath) ? 'markdown' : 'yaml'),
         stepsCount: content ? content.stepsCount : 0,
         hasErrors: Boolean(content && content.errors && content.errors.length)
       });
@@ -469,14 +356,11 @@ export const saveFile = async ({ relativePath, content, overwrite = false }) => 
 };
 
 /**
- * Rewrite the frontmatter of a markdown flow, leaving its body untouched.
+ * Rewrite the frontmatter of a flow, leaving its body untouched.
  *
  * "title" and "description" are written first, because the document view
  * renders them above the property list and reading the file should match what
  * the UI shows.
- *
- * Legacy YAML flows have no frontmatter — their whole document is metadata —
- * so they are rejected rather than reformatted behind the user's back.
  *
  * @param {Object} options
  * @param {string} options.relativePath - Flow path relative to the flows dir
@@ -496,10 +380,6 @@ export const saveProperties = async ({ relativePath, properties }) => {
 
   if (!fs.existsSync(absolute) || fs.statSync(absolute).isDirectory()) {
     throw new Error('Flow not found');
-  }
-
-  if (!isMarkdownPath(absolute)) {
-    throw new Error('Properties can only be edited on Markdown flows. Use the Source tab for YAML flows.');
   }
 
   // An empty text property is written as a bare "key:" rather than 'key: ""',
@@ -620,8 +500,7 @@ export const remove = async (relativePath) => {
 export const start = async (body, opts) => {
   const {
     value,
-    environment,
-    format
+    environment
   } = body;
 
   const {
@@ -634,23 +513,8 @@ export const start = async (body, opts) => {
     return Promise.reject(new Error('Invalid request: "value" and "environment" are required'));
   }
 
-  const isMarkdown = format === 'markdown' ||
-    (format !== 'yaml' && detectFormat(value) === 'markdown');
-
-  let flowAsJson;
-
-  if (isMarkdown) {
-    // Throws a descriptive error when a step block contains invalid YAML
-    flowAsJson = markdownFlows.toFlow(value);
-  }
-  else {
-    try {
-      flowAsJson = YAML.parse(value);
-    }
-    catch (ex) {
-      return Promise.reject(new Error(`Invalid YAML flow: ${ex.message}`));
-    }
-  }
+  // Throws a descriptive error when a step block contains invalid YAML
+  const flowAsJson = markdownFlows.toFlow(value);
 
   if (!flowAsJson || !Array.isArray(flowAsJson.steps) || !flowAsJson.steps.length) {
     return Promise.reject(new Error('Flow has no steps to execute'));
