@@ -708,9 +708,11 @@ describe('several projects', () => {
     expect(status.created).toBe(2);
     // The progress bar spans the whole pull, not the project being read
     expect(status.total).toBe(2);
+    // written() lists what is on disk sorted, so the folders come back in
+    // alphabetical order rather than in the order they were pulled
     expect(written()).toEqual([
-      `ACME/${pull.NO_FEATURE}/${pull.NO_STORY}/ACME-7_another-test.md`,
-      `ABC/${pull.NO_FEATURE}/${pull.NO_STORY}/ABC-125_orphan-test.md`
+      `ABC/${pull.NO_FEATURE}/${pull.NO_STORY}/ABC-125_orphan-test.md`,
+      `ACME/${pull.NO_FEATURE}/${pull.NO_STORY}/ACME-7_another-test.md`
     ]);
   });
 
