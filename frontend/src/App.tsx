@@ -1,9 +1,9 @@
 import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
-import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { Separator } from '@/components/ui/separator';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import AppSidebar from '@/components/app-sidebar/AppSidebar';
+import TopBar from '@/components/shared/TopBar';
 import HomePage from '@/pages/HomePage';
 import FlowPage from '@/pages/FlowPage';
 import FolderPage from '@/pages/FolderPage';
@@ -22,11 +22,7 @@ function Shell() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="h-svh min-h-0 overflow-hidden">
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <span className="text-muted-foreground text-sm">Lab34 Flows</span>
-        </header>
+        <TopBar />
         <div className="flex min-h-0 flex-1 flex-col overflow-auto">
           <Routes>
             <Route path="/" element={<HomePage />} />

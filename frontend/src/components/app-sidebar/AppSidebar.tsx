@@ -4,12 +4,10 @@ import {
   AppWindow,
   FilePlus2,
   FolderPlus,
-  Globe,
   MoreHorizontal,
   Pencil,
   Plus,
   RefreshCw,
-  Settings,
   Upload,
   Workflow,
 } from 'lucide-react';
@@ -17,7 +15,6 @@ import {
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupAction,
   SidebarGroupContent,
@@ -37,14 +34,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import FlowTree from '@/components/app-sidebar/FlowTree';
 import FlowDialogs from '@/components/app-sidebar/FlowDialogs';
@@ -56,7 +45,7 @@ import { folderUrl } from '@/lib/flows';
 export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { tree, treeLoading, refreshTree, applications, applicationsLoading, environments, environment, setEnvironment } = useAppState();
+  const { tree, treeLoading, refreshTree, applications, applicationsLoading } = useAppState();
 
   const [action, setAction] = useState<any>(null);
   const [applicationAction, setApplicationAction] = useState<any>(null);
@@ -221,37 +210,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={location.pathname.startsWith('/settings')}
-              onClick={() => navigate('/settings')}
-              title="AI, Xray, UI and help"
-            >
-              <Settings className="text-muted-foreground" />
-              <span>Settings</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-
-        <div className="grid gap-1 px-2 pb-1">
-          <Label className="text-muted-foreground flex items-center gap-1 text-xs">
-            <Globe className="size-3" /> Environment
-          </Label>
-          <Select value={environment || undefined} onValueChange={setEnvironment}>
-            <SelectTrigger size="sm" className="w-full" aria-label="Environment">
-              <SelectValue placeholder="Select environment" />
-            </SelectTrigger>
-            <SelectContent>
-              {environments.map((env) => (
-                <SelectItem key={env} value={env}>{env}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </SidebarFooter>
 
       <SidebarRail />
 

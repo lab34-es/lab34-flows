@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LifeBuoy, Palette, Sparkles, Ticket } from 'lucide-react';
+import { Palette, Sparkles, Ticket } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -22,12 +22,6 @@ const SECTIONS = [
     label: 'UI',
     description: 'Theme and appearance',
     icon: Palette,
-  },
-  {
-    to: '/settings/help',
-    label: 'Help',
-    description: 'Guides and reference',
-    icon: LifeBuoy,
   },
 ];
 

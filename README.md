@@ -46,6 +46,7 @@ Features:
   - [Default examples](#default-examples)
   - [Application docs (JSDoc)](#application-docs-jsdoc)
   - [Asking for input mid-flow](#asking-for-input-mid-flow)
+  - [Flow memory](#flow-memory)
   - [Flows](#flows)
   - [Tests](#tests)
   - [Playwright](#playwright) (browser automation - experimental)
@@ -799,6 +800,92 @@ export const add = applications.handler([
 ```
 
 A `README.md` in the application folder is rendered in the UI as well.
+
+## Flow memory
+
+A flow carries one plain object called the **memory**. It starts empty on every
+run, any step can write to it, and every later step can read it — that is how
+the id created by step 2 ends up in the body of step 5.
+
+### Writing it
+
+A method returns `[headers, status, body, memory]`. The first three describe
+the response; the **fourth**, which is optional, is what the step contributes
+to the memory:
+
+```ts
+const [headers, status, responseBody] = await httpClient.post(ctx, '/posts', { body });
+const memory = responseBody && responseBody.id ? { lastPostId: responseBody.id } : {};
+return [headers, status, responseBody, memory];
+```
+
+Writing conditionally like that is the normal thing to do: remember the id only
+when there was one, so a failed call leaves no stale value behind for the steps
+that follow. Omit the fourth value entirely — as most methods do — and the step
+writes nothing.
+
+When the step returns, what it wrote is merged into the flow memory: new keys
+are added, keys that already existed are overwritten by the newer step, and
+keys the step did not mention are left untouched. The merge is shallow, so an
+object is replaced whole rather than merged field by field.
+
+### Reading it from a flow
+
+Anywhere inside a step's `parameters`, a Handlebars template reads the memory
+as it stands when that step starts:
+
+```step
+application: calculator
+method: multiply
+parameters:
+  body:
+    a: "{{ memory.lastResult }}"
+    b: 2
+```
+
+Nested values work the same way (`{{ memory.user.id }}`). Worth knowing:
+
+- A step only sees what the steps **above** it wrote. A key nothing has written
+  yet resolves to an empty string.
+- Only `parameters` are templated. `test` assertions are **not**, so
+  `{{ memory.x }}` in a test is compared literally — write the expected value
+  out, or assert it with a `$expr:` expression.
+- Interpolated values arrive as **text**: `a: "{{ memory.lastResult }}"` passes
+  the string `"42"`, not the number `42`. Methods that expect numbers should
+  accept numeric strings, as `calculator` does.
+- `{{ memory.user }}` renders `[object Object]` — interpolate the leaf value,
+  or read the object from application code.
+- `{{ }}` HTML-escapes its output (`&` becomes `&amp;`). Triple braces
+  `{{{ }}}` skip the escaping, but a value containing a double quote will break
+  the step.
+- Parameters are resolved once, before the first attempt, so a `retry` re-sends
+  exactly what was sent the first time instead of re-reading the memory.
+- Memory is never shared between flows and does not survive a run.
+
+### Reading it from application code
+
+A method's third argument is the flow, so `flow.memory` is the whole object:
+
+```ts
+export const readBack = applications.handler([
+  (ctx: Context, parameters: Parameters, flow: Flow) =>
+    httpClient.get(ctx, `/posts/${flow.memory.lastPostId}`)
+], 'readBack');
+```
+
+`validate.body` can do it declaratively through `fallbacks`, which fill a
+missing field from the memory before the schema is checked:
+
+```ts
+validate.body({
+  type: 'object',
+  properties: { token: { type: 'string' } },
+  fallbacks: { token: [{ type: 'memory', key: 'authToken' }] }
+})
+```
+
+Which keys a method writes or reads is documented with the
+[`@memory` tag](#application-docs-jsdoc), and the UI lists them per method.
 
 ## Flows
 
