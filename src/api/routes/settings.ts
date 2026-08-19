@@ -44,7 +44,7 @@ router.get('/jira', (req, res) => {
     .catch(error => sendError(res, error, 500));
 });
 
-// { kind, jiraBaseUrl, projectKey, cloud: { xrayBaseUrl, clientId, clientSecret },
+// { kind, jiraBaseUrl, projectKeys, cloud: { xrayBaseUrl, clientId, clientSecret },
 //   server: { personalAccessToken } }
 router.put('/jira', (req, res) => {
   jira.saveSettings(req.body)
@@ -59,7 +59,8 @@ router.post('/jira/test', (req, res) => {
     .catch(error => sendError(res, error));
 });
 
-// Download every test of the project into the flows "xray" folder. Answers as
+// Download every test of the projects into the flows "xray" folder, one folder
+// per project key. Answers as
 // soon as the pull has started: the progress is pushed over the socket as
 // "xraypull:update", and can be read back from GET /jira/pull.
 router.post('/jira/pull', (req, res) => {

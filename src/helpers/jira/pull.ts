@@ -1,16 +1,19 @@
 /**
- * Pull every Xray Test of a project into the flows folder.
+ * Pull every Xray Test of the configured projects into the flows folder.
  *
- * The tests land under "flows/xray", and how they are laid out inside it
- * depends on what the integration can actually see:
+ * The tests of a project land under "flows/xray/<PROJECT KEY>", so several
+ * projects can be pulled side by side without ever sharing a folder. Inside
+ * that folder the layout depends on what the integration can actually see:
  *
  *   - Xray Cloud and Xray Server/DC know their own Test Repository, so the
- *     folders on disk are the folders the user sees in Xray.
+ *     folders on disk are the folders the user sees in Xray:
+ *
+ *       xray/<PROJECT>/<REPOSITORY FOLDERS>/<TEST>_<slug>.md
  *
  *   - Jira Cloud with an API token has no Xray API to ask, so the layout is
  *     rebuilt from Jira's own hierarchy:
  *
- *       xray/<FEATURE>_<slug>/<STORY>_<slug>/<TEST>_<slug>.md
+ *       xray/<PROJECT>/<FEATURE>_<slug>/<STORY>_<slug>/<TEST>_<slug>.md
  *
  *     A test that is not a child of anything gets its feature and story from
  *     its related work — the parent field first, then the issue links — and
@@ -24,8 +27,10 @@
  * off, a flow whose frontmatter already carries that xray.testKey is left
  * exactly as it is and counted as skipped.
  *
- * One pull runs at a time, and its progress is both readable (status()) and
- * pushed over the socket, because the UI shows it in a modal.
+ * One pull runs at a time — it walks the projects one after the other — and
+ * its progress is both readable (status()) and pushed over the socket,
+ * because the UI shows it in a modal. The counters, the log and the progress
+ * bar span the whole pull, not one project of it.
  */
 
 import fs from 'fs';
@@ -35,9 +40,11 @@ import * as flows from '../flows';
 import * as markdownFlows from '../markdownFlows';
 import * as client from './client';
 import * as adf from './adf';
+import * as projects from './projects';
 import * as testDoc from './testDoc';
 
-// Everything a pull writes lives here, relative to the flows directory
+// Everything a pull writes lives here, relative to the flows directory, one
+// folder per project key inside it
 const ROOT = 'xray';
 
 // Where a test goes when Jira has nothing to say about its hierarchy
@@ -126,6 +133,7 @@ export interface PullState {
   message: string;
   strategy: string | null;
   folder: string;
+  projectKeys: string[];
   projectKey: string | null;
   overwrite: boolean;
   total: number | null;
@@ -150,6 +158,7 @@ const idle = (): PullState => ({
   message: 'No pull has run yet.',
   strategy: null,
   folder: ROOT,
+  projectKeys: [],
   projectKey: null,
   overwrite: true,
   total: null,
@@ -175,7 +184,12 @@ let lastEmit = 0;
  * The current progress, as the API and the socket send it.
  * @returns {Object}
  */
-const status = () => ({ ...state, errors: [...state.errors], log: [...state.log] });
+const status = () => ({
+  ...state,
+  projectKeys: [...state.projectKeys],
+  errors: [...state.errors],
+  log: [...state.log]
+});
 
 /**
  * Push the progress to whoever is watching. Called for every test, so it is
@@ -214,6 +228,20 @@ const phase = (next, message) => {
   state.message = message;
   log(message);
   emit(true);
+};
+
+/**
+ * Add what a project holds to the total the progress bar is measured against.
+ * Every project adds its own once, so the bar spans the whole pull.
+ *
+ * @param {Object} ctx - The project being pulled
+ * @param {*} total - What the search says the project holds
+ */
+const addTotal = (ctx, total) => {
+  if (ctx.counted || typeof total !== 'number') { return; }
+
+  ctx.counted = true;
+  state.total = (state.total || 0) + total;
 };
 
 /**
@@ -597,7 +625,7 @@ const pullXrayCloud = async (settings, ctx) => {
     stopped,
     onNotice: (message) => log(message, 'warn'),
     onPage: (tests, total) => {
-      if (state.total === null) { state.total = total; }
+      addTotal(ctx, total);
 
       tests.forEach(test => {
         if (stopped()) { return; }
@@ -650,14 +678,14 @@ const pullXrayServer = async (settings, ctx) => {
   const jql = `project = "${ctx.projectKey}" AND issuetype = Test ORDER BY key ASC`;
 
   phase('downloading', `Reading the tests of ${ctx.projectKey} from Jira…`);
-  state.total = await client.countIssues(settings, jql);
+  addTotal(ctx, await client.countIssues(settings, jql));
 
   await client.searchIssues(settings, {
     jql,
     fields: ['summary', 'description', 'status', 'issuetype', ...Object.values(detailIds)],
     stopped,
     onPage: async (issues, total) => {
-      if (state.total === null && typeof total === 'number') { state.total = total; }
+      addTotal(ctx, total);
 
       // A test that is skipped is not asked for its steps: the point of
       // skipping is that nothing is downloaded for it either
@@ -765,14 +793,14 @@ const pullJiraHierarchy = async (settings, ctx) => {
   const jql = `project = "${ctx.projectKey}" AND issuetype = Test ORDER BY key ASC`;
 
   phase('downloading', `Reading the tests of ${ctx.projectKey} from Jira…`);
-  state.total = await client.countIssues(settings, jql);
+  addTotal(ctx, await client.countIssues(settings, jql));
 
   await client.searchIssues(settings, {
     jql,
     fields: testFields,
     stopped,
     onPage: async (page, total) => {
-      if (state.total === null && typeof total === 'number') { state.total = total; }
+      addTotal(ctx, total);
 
       state.phase = 'resolving';
       state.message = `Resolving the hierarchy of ${page.length} test(s)…`;
@@ -849,40 +877,115 @@ const pullJiraHierarchy = async (settings, ctx) => {
 /* ---------------------------------- Run ---------------------------------- */
 
 /**
- * Run a pull from start to finish, updating the progress as it goes.
+ * Pull one project into its own folder under "xray".
+ *
  * @param {Object} settings - Full Jira settings
- * @param {Object} ctx - The running pull
+ * @param {Object} base - The running pull
+ * @param {string} projectKey
  */
-const run = async (settings, ctx) => {
+const runProject = async (settings, base, projectKey) => {
+  // Everything but the folder and the project is shared with the rest of the
+  // pull — the index of what is already on disk above all, so a test that
+  // changed project is moved instead of written twice
+  const ctx = {
+    ...base,
+    projectKey,
+    rootDir: path.join(base.rootDir, projectKey),
+    counted: false
+  };
+
+  // The folder is left to the first test that lands in it: a project with
+  // nothing to pull leaves nothing behind
+  phase('starting', `Pulling the tests of ${projectKey} into "${ROOT}/${projectKey}"…`);
+
+  if (settings.kind === 'cloud') { await pullXrayCloud(settings, ctx); }
+  else if (settings.kind === 'basic') { await pullJiraHierarchy(settings, ctx); }
+  else { await pullXrayServer(settings, ctx); }
+};
+
+/**
+ * Delete the folders the pull emptied: the ones a move left behind inside a
+ * project, and whatever a previous version of the tool wrote straight into
+ * "xray". The project folders themselves stay, and so does "xray".
+ *
+ * @param {Object} base - The running pull
+ */
+const pruneMoved = (base) => {
+  const pulled = new Set(base.projectKeys.map(key => key.toUpperCase()));
+
+  fs.readdirSync(base.rootDir, { withFileTypes: true })
+    .filter(entry => entry.isDirectory())
+    .forEach(entry => {
+      const dir = path.join(base.rootDir, entry.name);
+
+      if (!pulled.has(entry.name.toUpperCase())) {
+        pruneEmpty(dir);
+        return;
+      }
+
+      fs.readdirSync(dir, { withFileTypes: true })
+        .filter(child => child.isDirectory())
+        .forEach(child => pruneEmpty(path.join(dir, child.name)));
+    });
+};
+
+/**
+ * Run a pull from start to finish, updating the progress as it goes. The
+ * projects are pulled one after the other, and one that fails does not stop
+ * the ones behind it: it is logged and the pull moves on.
+ *
+ * @param {Object} settings - Full Jira settings
+ * @param {Object} base - The running pull
+ */
+const run = async (settings, base) => {
   try {
-    phase('starting', `Pulling the tests of ${ctx.projectKey} into "${ROOT}"…`);
+    phase('starting', `Pulling the tests of ${base.projectKeys.join(', ')} into "${ROOT}"…`);
 
-    ctx.existing = indexExisting(ctx.rootDir);
+    base.existing = indexExisting(base.rootDir);
 
-    const already = Object.keys(ctx.existing).length;
+    const already = Object.keys(base.existing).length;
 
     log(`${already} test(s) already pulled.`);
-    log(ctx.overwrite
+    log(base.overwrite
       ? 'Tests already pulled are updated with what Jira says now.'
       : 'Tests already pulled are left as they are: only tests that are not in "xray" yet are written.');
 
-    if (settings.kind === 'cloud') { await pullXrayCloud(settings, ctx); }
-    else if (settings.kind === 'basic') { await pullJiraHierarchy(settings, ctx); }
-    else { await pullXrayServer(settings, ctx); }
+    let broken = 0;
 
-    // The folders a move emptied go, the "xray" folder itself stays
-    if (state.moved) {
-      fs.readdirSync(ctx.rootDir, { withFileTypes: true })
-        .filter(entry => entry.isDirectory())
-        .forEach(entry => pruneEmpty(path.join(ctx.rootDir, entry.name)));
+    for (const projectKey of base.projectKeys) {
+      if (stopped()) { break; }
+
+      state.projectKey = projectKey;
+
+      try {
+        await runProject(settings, base, projectKey);
+      }
+      catch (error) {
+        broken += 1;
+        const message = (error && error.message) || String(error);
+
+        state.errors.push({ key: projectKey, message });
+        log(`${projectKey} could not be pulled: ${message}`, 'error');
+        emit(true);
+      }
     }
+
+    // The folders a move emptied go, the project folders and "xray" itself stay
+    if (state.moved) { pruneMoved(base); }
 
     if (stopped()) {
       phase('cancelled', `Stopped after ${state.processed} test(s).`);
     }
+    else if (broken === base.projectKeys.length) {
+      // Every project failed the same way — bad credentials, Jira down: that
+      // is the pull failing, not a project of it
+      state.error = state.errors.length ? state.errors[state.errors.length - 1].message : 'The pull failed.';
+      phase('error', state.error);
+    }
     else {
       const skipped = state.skipped ? `, ${state.skipped} left as they were` : '';
-      phase('done', `${state.processed} test(s) pulled into "${ROOT}"${skipped}.`);
+      const missed = broken ? `, ${broken} project(s) could not be read` : '';
+      phase('done', `${state.processed} test(s) pulled into "${ROOT}"${skipped}${missed}.`);
     }
   }
   catch (error) {
@@ -911,14 +1014,18 @@ const start = async (settings, options: { io?: any } = {}) => {
     throw new Error('A pull is already running.');
   }
 
-  const projectKey = String((settings && settings.projectKey) || '').trim();
+  const projectKeys = projects.parseKeys(settings && (settings.projectKeys === undefined
+    ? settings.projectKey
+    : settings.projectKeys));
 
-  if (!projectKey) {
-    throw new Error('Set the project key first: a pull downloads the tests of one Jira project.');
+  if (!projectKeys.length) {
+    throw new Error('Set the project key first: a pull downloads the tests of the Jira projects it is given.');
   }
 
-  if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(projectKey)) {
-    throw new Error(`"${projectKey}" is not a Jira project key.`);
+  const wrong = projects.firstInvalid(projectKeys);
+
+  if (wrong) {
+    throw new Error(`"${wrong}" is not a Jira project key.`);
   }
 
   const { flowsDir, absolute } = await flows.resolveWithinFlows(ROOT);
@@ -935,13 +1042,14 @@ const start = async (settings, options: { io?: any } = {}) => {
     phase: 'starting',
     message: 'Starting…',
     strategy: settings.kind === 'basic' ? 'jira-hierarchy' : 'xray-repository',
-    projectKey,
+    projectKeys,
+    projectKey: projectKeys[0],
     overwrite,
     startedAt: new Date().toISOString()
   };
 
-  const ctx = {
-    projectKey,
+  const base = {
+    projectKeys,
     flowsDir,
     rootDir: absolute,
     jiraBaseUrl: settings.jiraBaseUrl || '',
@@ -951,7 +1059,7 @@ const start = async (settings, options: { io?: any } = {}) => {
 
   // Deliberately not awaited: the caller gets its answer now, the pull keeps
   // going and reports over the socket
-  run(settings, ctx);
+  run(settings, base);
 
   return status();
 };

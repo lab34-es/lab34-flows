@@ -80,6 +80,16 @@ describe('PUT /api/settings/jira', () => {
     expect((configHelper as any).__get().cloud.clientSecret).toBe('super-secret');
   });
 
+  test('takes the project keys as the comma separated list the UI sends', async () => {
+    const response = await request(app)
+      .put('/api/settings/jira')
+      .send({ projectKeys: 'ABC, ACME' })
+      .expect(200);
+
+    expect(response.body.projectKeys).toEqual(['ABC', 'ACME']);
+    expect((configHelper as any).__get().projectKeys).toEqual(['ABC', 'ACME']);
+  });
+
   test('answers 400 with the reason when the input is wrong', async () => {
     const response = await request(app)
       .put('/api/settings/jira')

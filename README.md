@@ -522,7 +522,7 @@ The link is declared in the flow itself, so it travels with the document:
 title: Fraud detection
 description: A payment above the limit is held for review
 xray:
-  testKey: BOP-1234
+  testKey: ABC-1234
 ---
 
 # Fraud detection
@@ -532,7 +532,7 @@ The customer pays more than their daily limit.
 ```step
 application: payments
 method: pay
-testKey: BOP-1235
+testKey: ABC-1235
 parameters:
   body:
     amount: 5000
@@ -569,9 +569,10 @@ supported:
   Jira at **your profile > Personal Access Tokens**.
 
 In all three cases, **Jira URL** (e.g. `https://your-company.atlassian.net`) is
-what every test key is linked to. **Project key** is what a pull downloads, and
-is only kept for reference otherwise. **Test connection** validates the
-credentials for real, against Xray (Cloud) or against Jira's `myself` endpoint.
+what every test key is linked to. **Project keys** is what a pull downloads: one
+or more Jira project keys, separated by commas (`ABC, ACME`), each pulled into a
+folder of its own. **Test connection** validates the credentials for real,
+against Xray (Cloud) or against Jira's `myself` endpoint.
 
 Nothing is downloaded until a flow that mentions a test key is rendered, and
 every key is downloaded at most once per run of the tool. When the integration
@@ -581,10 +582,12 @@ flow never fails to render, or to run, because of Jira.
 
 ### Pulling tests
 
-**Settings › Xray › Pull tests** downloads every Test of the configured project
-into an `xray` folder inside your flows, one Markdown document per test, and
-shows what it is doing in a modal while it runs. The pull happens on the
-server, so closing the modal does not stop it.
+**Settings › Xray › Pull tests** downloads every Test of the configured projects
+into an `xray` folder inside your flows — one folder per project key, one
+Markdown document per test — and shows what it is doing in a modal while it
+runs. The pull happens on the server, so closing the modal does not stop it.
+The projects are pulled one after the other: one that cannot be read is logged
+and the pull carries on with the next.
 
 Each document is a normal Markdown flow with **no `step` blocks yet**: Jira
 owns the title, the description and the Xray test details, you write the steps.
@@ -593,13 +596,13 @@ owns the title, the description and the Xray test details, you write the steps.
 ---
 title: Pay with an expired card
 xray:
-  testKey: BOP-123
+  testKey: ABC-123
   status: To Do
   issueType: Test
   testType: Manual
-  feature: BOP-10
-  userStory: BOP-42
-  url: https://acme.atlassian.net/browse/BOP-123
+  feature: ABC-10
+  userStory: ABC-42
+  url: https://acme.atlassian.net/browse/ABC-123
 ---
 
 # Pay with an expired card
@@ -636,21 +639,23 @@ custom fields, and a plain **Jira Cloud API token** reaches only whatever Xray
 exposes as a Jira field. When a pull cannot read the details, it says so in the
 log and leaves the block a previous pull wrote untouched.
 
-How the folders are laid out depends on what the integration can see:
+Every test lands under the folder of its project — `xray/ABC`, `xray/ACME` —
+and how the folders are laid out inside it depends on what the integration can
+see:
 
 - **Xray Cloud** and **Jira Server / Data Center** know their own Test
   Repository, so the folders on disk are the folders you see in Xray:
 
   ```
-  xray/Authentication/Login/BOP-200_login-with-valid-credentials.md
+  xray/ABC/Authentication/Login/ABC-200_login-with-valid-credentials.md
   ```
 
 - **Jira Cloud (API token)** has no Xray API to ask, so the layout is rebuilt
   from Jira's own hierarchy — the feature and the user story of every test:
 
   ```
-  xray/<FEATURE>_<slug>/<STORY>_<slug>/<TEST>_<slug>.md
-  xray/BOP-10_checkout/BOP-42_pay-with-a-card/BOP-123_pay-with-an-expired-card.md
+  xray/<PROJECT>/<FEATURE>_<slug>/<STORY>_<slug>/<TEST>_<slug>.md
+  xray/ABC/ABC-10_checkout/ABC-42_pay-with-a-card/ABC-123_pay-with-an-expired-card.md
   ```
 
   A test that is a child of a story or an epic is filed under it. A test that

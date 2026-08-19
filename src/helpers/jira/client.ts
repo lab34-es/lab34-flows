@@ -289,7 +289,7 @@ const cloudDetails = (result) => ({
  *
  * @param {Object} settings - Full Jira settings
  * @param {Object} options
- * @param {string} options.jql - Which tests to walk, e.g. 'project = "BOP"'
+ * @param {string} options.jql - Which tests to walk, e.g. 'project = "ABC"'
  * @param {Function} options.onPage - async (tests, total) => void. Each test is
  *   { key, summary, description, status, issueType, testType, issueId, folder,
  *     details }

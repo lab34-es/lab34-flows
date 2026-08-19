@@ -122,20 +122,20 @@ describe('client.fetchTests - Xray Cloud', () => {
       return Promise.resolve(graphqlAnswer([{
         issueId: '1',
         testType: { name: 'Manual' },
-        jira: { key: 'BOP-1', summary: 'Pay', status: { name: 'To Do' }, issuetype: { name: 'Test' } }
+        jira: { key: 'ABC-1', summary: 'Pay', status: { name: 'To Do' }, issuetype: { name: 'Test' } }
       }]));
     });
   });
 
   test('returns the tests keyed by issue key', async () => {
-    const found = await client.fetchTests(CLOUD, ['BOP-1']);
-    expect(found['BOP-1']).toEqual(expect.objectContaining({
-      key: 'BOP-1', summary: 'Pay', status: 'To Do', issueType: 'Test', testType: 'Manual'
+    const found = await client.fetchTests(CLOUD, ['ABC-1']);
+    expect(found['ABC-1']).toEqual(expect.objectContaining({
+      key: 'ABC-1', summary: 'Pay', status: 'To Do', issueType: 'Test', testType: 'Manual'
     }));
   });
 
   test('keys are batched, a hundred at a time', async () => {
-    const keys = Array.from({ length: 150 }, (_, i) => `BOP-${i}`);
+    const keys = Array.from({ length: 150 }, (_, i) => `ABC-${i}`);
     await client.fetchTests(CLOUD, keys);
 
     const graphqlCalls = (axios.post as jest.Mock).mock.calls.filter(([url]) => url.endsWith('/graphql'));
@@ -151,7 +151,7 @@ describe('client.fetchTests - Xray Cloud', () => {
       return Promise.resolve(graphqlAnswer([]));
     });
 
-    await expect(client.fetchTests(CLOUD, ['BOP-1'])).resolves.toEqual({});
+    await expect(client.fetchTests(CLOUD, ['ABC-1'])).resolves.toEqual({});
     expect(graphqlCalls).toBe(2);
   });
 
@@ -161,7 +161,7 @@ describe('client.fetchTests - Xray Cloud', () => {
       return Promise.reject(httpError(401));
     });
 
-    await expect(client.fetchTests(CLOUD, ['BOP-1'])).rejects.toThrow(/read tests from Xray Cloud/);
+    await expect(client.fetchTests(CLOUD, ['ABC-1'])).rejects.toThrow(/read tests from Xray Cloud/);
   });
 
   test('a non-401 failure reports without retrying', async () => {
@@ -170,7 +170,7 @@ describe('client.fetchTests - Xray Cloud', () => {
       return Promise.reject(httpError(500));
     });
 
-    await expect(client.fetchTests(CLOUD, ['BOP-1'])).rejects.toThrow(/HTTP 500/);
+    await expect(client.fetchTests(CLOUD, ['ABC-1'])).rejects.toThrow(/HTTP 500/);
   });
 
   test('GraphQL errors are surfaced and flagged', async () => {
@@ -179,7 +179,7 @@ describe('client.fetchTests - Xray Cloud', () => {
       return Promise.resolve({ data: { errors: [{ message: 'unknown field' }] } });
     });
 
-    await expect(client.fetchTests(CLOUD, ['BOP-1'])).rejects.toThrow(/Xray Cloud: unknown field/);
+    await expect(client.fetchTests(CLOUD, ['ABC-1'])).rejects.toThrow(/Xray Cloud: unknown field/);
   });
 
   test('an answer with no data yields nothing', async () => {
@@ -188,55 +188,55 @@ describe('client.fetchTests - Xray Cloud', () => {
       return Promise.resolve({ data: {} });
     });
 
-    await expect(client.fetchTests(CLOUD, ['BOP-1'])).resolves.toEqual({});
+    await expect(client.fetchTests(CLOUD, ['ABC-1'])).resolves.toEqual({});
   });
 });
 
 describe('client.fetchTests - plain Jira REST', () => {
   test('basic auth sends an Authorization: Basic header', async () => {
     (axios.get as jest.Mock).mockResolvedValue({
-      data: { key: 'BOP-1', id: '10', fields: { summary: 'S', status: { name: 'Done' }, issuetype: { name: 'Test' } } }
+      data: { key: 'ABC-1', id: '10', fields: { summary: 'S', status: { name: 'Done' }, issuetype: { name: 'Test' } } }
     });
 
-    const found = await client.fetchTests(BASIC, ['BOP-1']);
+    const found = await client.fetchTests(BASIC, ['ABC-1']);
 
-    expect(found['BOP-1']).toEqual(expect.objectContaining({ summary: 'S', status: 'Done', testType: null }));
+    expect(found['ABC-1']).toEqual(expect.objectContaining({ summary: 'S', status: 'Done', testType: null }));
     const [, options] = (axios.get as jest.Mock).mock.calls[0];
     expect(options.headers.Authorization).toMatch(/^Basic /);
   });
 
   test('a personal access token sends a Bearer header', async () => {
-    (axios.get as jest.Mock).mockResolvedValue({ data: { key: 'BOP-1', fields: {} } });
+    (axios.get as jest.Mock).mockResolvedValue({ data: { key: 'ABC-1', fields: {} } });
 
-    await client.fetchTests(SERVER, ['BOP-1']);
+    await client.fetchTests(SERVER, ['ABC-1']);
 
     const [, options] = (axios.get as jest.Mock).mock.calls[0];
     expect(options.headers.Authorization).toBe('Bearer pat');
   });
 
   test('missing fields become nulls', async () => {
-    (axios.get as jest.Mock).mockResolvedValue({ data: { key: 'BOP-1', fields: {} } });
-    const found = await client.fetchTests(SERVER, ['BOP-1']);
-    expect(found['BOP-1']).toEqual(expect.objectContaining({ summary: null, status: null, issueType: null }));
+    (axios.get as jest.Mock).mockResolvedValue({ data: { key: 'ABC-1', fields: {} } });
+    const found = await client.fetchTests(SERVER, ['ABC-1']);
+    expect(found['ABC-1']).toEqual(expect.objectContaining({ summary: null, status: null, issueType: null }));
   });
 
   test('a 404 or 400 means "not found", not a failure', async () => {
     (axios.get as jest.Mock).mockRejectedValue(httpError(404));
-    await expect(client.fetchTests(SERVER, ['BOP-1'])).resolves.toEqual({});
+    await expect(client.fetchTests(SERVER, ['ABC-1'])).resolves.toEqual({});
 
     (axios.get as jest.Mock).mockRejectedValue(httpError(400));
-    await expect(client.fetchTests(SERVER, ['BOP-1'])).resolves.toEqual({});
+    await expect(client.fetchTests(SERVER, ['ABC-1'])).resolves.toEqual({});
   });
 
   test('any other failure is reported', async () => {
     (axios.get as jest.Mock).mockRejectedValue(httpError(500));
-    await expect(client.fetchTests(SERVER, ['BOP-1'])).rejects.toThrow(/read BOP-1 from Jira/);
+    await expect(client.fetchTests(SERVER, ['ABC-1'])).rejects.toThrow(/read ABC-1 from Jira/);
   });
 
   test('keys are upper-cased in the result', async () => {
-    (axios.get as jest.Mock).mockResolvedValue({ data: { key: 'bop-1', fields: {} } });
-    const found = await client.fetchTests(SERVER, ['bop-1']);
-    expect(found['BOP-1']).toBeDefined();
+    (axios.get as jest.Mock).mockResolvedValue({ data: { key: 'ABC-1', fields: {} } });
+    const found = await client.fetchTests(SERVER, ['ABC-1']);
+    expect(found['ABC-1']).toBeDefined();
   });
 });
 
@@ -289,6 +289,6 @@ describe('client.fetchIssuesByKeys', () => {
 describe('client.countIssues', () => {
   test('returns the total the search reports', async () => {
     (axios.get as jest.Mock).mockResolvedValue({ data: { total: 42, issues: [] } });
-    await expect(client.countIssues(BASIC, 'project = BOP')).resolves.toBe(42);
+    await expect(client.countIssues(BASIC, 'project = ABC')).resolves.toBe(42);
   });
 });

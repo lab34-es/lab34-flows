@@ -92,6 +92,14 @@ describe('jira.normalize', () => {
   test('falls back to a known kind when the stored one is unknown', () => {
     expect(jira.normalize({ kind: 'onprem' }).kind).toBe('cloud');
   });
+
+  test('reads the project keys as a list, whatever shape they were stored in', () => {
+    expect(jira.normalize({ projectKeys: 'ABC, ACME , ABC,' }).projectKeys).toEqual(['ABC', 'ACME']);
+    expect(jira.normalize({ projectKeys: ['ABC', 'ACME'] }).projectKeys).toEqual(['ABC', 'ACME']);
+    // What settings written before there were several projects hold
+    expect(jira.normalize({ projectKey: 'ABC' }).projectKeys).toEqual(['ABC']);
+    expect(jira.normalize({}).projectKeys).toEqual([]);
+  });
 });
 
 describe('jira.isConfigured', () => {
@@ -174,6 +182,15 @@ describe('jira.saveSettings', () => {
     expect((configHelper as any).__get().cloud.clientSecret).toBeUndefined();
   });
 
+  test('saves the project keys as a list, and rejects a key that is not one', async () => {
+    const settings = await jira.saveSettings({ projectKeys: 'ABC, ACME' });
+
+    expect(settings.projectKeys).toEqual(['ABC', 'ACME']);
+
+    await expect(jira.saveSettings({ projectKeys: 'ABC, 1=1' }))
+      .rejects.toThrow(/"1=1" is not a Jira project key/);
+  });
+
   test('rejects an unknown kind and malformed URLs', async () => {
     await expect(jira.saveSettings({ kind: 'onprem' }))
       .rejects.toThrow(/Unknown Jira integration type/);
@@ -185,19 +202,19 @@ describe('jira.saveSettings', () => {
     (configHelper as any).__set(CLOUD_SETTINGS);
     (axios.post as jest.Mock)
       .mockResolvedValueOnce({ data: '"jwt"' })
-      .mockResolvedValueOnce(graphqlResponse(['BOP-1']));
+      .mockResolvedValueOnce(graphqlResponse(['ABC-1']));
 
-    await jira.getTests(['BOP-1']);
+    await jira.getTests(['ABC-1']);
     expect(cache.size()).toBe(1);
 
-    await jira.saveSettings({ projectKey: 'BOP' });
+    await jira.saveSettings({ projectKey: 'ABC' });
     expect(cache.size()).toBe(0);
   });
 });
 
 describe('jira.getTests, without the integration configured', () => {
   test('answers empty without reaching out to Jira', async () => {
-    const result = await jira.getTests(['BOP-1', 'BOP-2']);
+    const result = await jira.getTests(['ABC-1', 'ABC-2']);
 
     expect(result).toEqual({ configured: false, jiraBaseUrl: '', tests: {} });
     expect(axios.post).not.toHaveBeenCalled();
@@ -211,81 +228,81 @@ describe('jira.getTests, on Xray Cloud', () => {
   test('authenticates once and reads every key in a single GraphQL call', async () => {
     (axios.post as jest.Mock)
       .mockResolvedValueOnce({ data: '"jwt-token"' })
-      .mockResolvedValueOnce(graphqlResponse(['BOP-1', 'BOP-2']));
+      .mockResolvedValueOnce(graphqlResponse(['ABC-1', 'ABC-2']));
 
-    const result = await jira.getTests(['BOP-1', 'BOP-2']);
+    const result = await jira.getTests(['ABC-1', 'ABC-2']);
 
     expect(axios.post).toHaveBeenCalledTimes(2);
     expect((axios.post as jest.Mock).mock.calls[0][0]).toBe('https://xray.cloud.getxray.app/api/v2/authenticate');
     expect((axios.post as jest.Mock).mock.calls[0][1]).toEqual({ client_id: 'client-id', client_secret: 'client-secret' });
-    expect(jqlCalls()).toEqual(['key in (BOP-1, BOP-2)']);
+    expect(jqlCalls()).toEqual(['key in (ABC-1, ABC-2)']);
     expect((axios.post as jest.Mock).mock.calls[1][2].headers.Authorization).toBe('Bearer jwt-token');
 
     expect(result.configured).toBe(true);
     expect(result.jiraBaseUrl).toBe('https://acme.atlassian.net');
-    expect(result.tests['BOP-1']).toEqual({
-      key: 'BOP-1',
+    expect(result.tests['ABC-1']).toEqual({
+      key: 'ABC-1',
       found: true,
-      summary: 'Summary of BOP-1',
+      summary: 'Summary of ABC-1',
       status: 'To Do',
       issueType: 'Test',
       testType: 'Manual',
-      issueId: 'id-BOP-1'
+      issueId: 'id-ABC-1'
     });
   });
 
   test('downloads every key once per process', async () => {
     (axios.post as jest.Mock)
       .mockResolvedValueOnce({ data: '"jwt-token"' })
-      .mockResolvedValueOnce(graphqlResponse(['BOP-1']))
-      .mockResolvedValueOnce(graphqlResponse(['BOP-2']));
+      .mockResolvedValueOnce(graphqlResponse(['ABC-1']))
+      .mockResolvedValueOnce(graphqlResponse(['ABC-2']));
 
-    await jira.getTests(['BOP-1']);
+    await jira.getTests(['ABC-1']);
     // Same key again: served from memory, nothing is downloaded
-    await jira.getTests(['BOP-1']);
+    await jira.getTests(['ABC-1']);
     // Only the key that was never seen reaches Xray
-    const result = await jira.getTests(['BOP-1', 'BOP-2']);
+    const result = await jira.getTests(['ABC-1', 'ABC-2']);
 
-    expect(jqlCalls()).toEqual(['key in (BOP-1)', 'key in (BOP-2)']);
-    expect(Object.keys(result.tests).sort()).toEqual(['BOP-1', 'BOP-2']);
+    expect(jqlCalls()).toEqual(['key in (ABC-1)', 'key in (ABC-2)']);
+    expect(Object.keys(result.tests).sort()).toEqual(['ABC-1', 'ABC-2']);
   });
 
   test('normalizes the keys, so casing and duplicates cost nothing', async () => {
     (axios.post as jest.Mock)
       .mockResolvedValueOnce({ data: '"jwt-token"' })
-      .mockResolvedValueOnce(graphqlResponse(['BOP-1']));
+      .mockResolvedValueOnce(graphqlResponse(['ABC-1']));
 
-    const result = await jira.getTests([' bop-1 ', 'BOP-1', 'not a key']);
+    const result = await jira.getTests([' ABC-1 ', 'ABC-1', 'not a key']);
 
-    expect(jqlCalls()).toEqual(['key in (BOP-1)']);
-    expect(Object.keys(result.tests)).toEqual(['BOP-1']);
+    expect(jqlCalls()).toEqual(['key in (ABC-1)']);
+    expect(Object.keys(result.tests)).toEqual(['ABC-1']);
   });
 
   test('concurrent requests for the same key share a single download', async () => {
     (axios.post as jest.Mock)
       .mockResolvedValueOnce({ data: '"jwt-token"' })
       .mockImplementationOnce(() => new Promise(resolve => {
-        setTimeout(() => resolve(graphqlResponse(['BOP-1'])), 10);
+        setTimeout(() => resolve(graphqlResponse(['ABC-1'])), 10);
       }));
 
     const [first, second] = await Promise.all([
-      jira.getTests(['BOP-1']),
-      jira.getTests(['BOP-1'])
+      jira.getTests(['ABC-1']),
+      jira.getTests(['ABC-1'])
     ]);
 
-    expect(jqlCalls()).toEqual(['key in (BOP-1)']);
-    expect(first.tests['BOP-1'].summary).toBe('Summary of BOP-1');
-    expect(second.tests['BOP-1'].summary).toBe('Summary of BOP-1');
+    expect(jqlCalls()).toEqual(['key in (ABC-1)']);
+    expect(first.tests['ABC-1'].summary).toBe('Summary of ABC-1');
+    expect(second.tests['ABC-1'].summary).toBe('Summary of ABC-1');
   });
 
   test('marks as not found the keys Xray does not know about', async () => {
     (axios.post as jest.Mock)
       .mockResolvedValueOnce({ data: '"jwt-token"' })
-      .mockResolvedValueOnce(graphqlResponse(['BOP-1']));
+      .mockResolvedValueOnce(graphqlResponse(['ABC-1']));
 
-    const result = await jira.getTests(['BOP-1', 'BOP-404']);
+    const result = await jira.getTests(['ABC-1', 'ABC-404']);
 
-    expect(result.tests['BOP-404']).toEqual({ key: 'BOP-404', found: false });
+    expect(result.tests['ABC-404']).toEqual({ key: 'ABC-404', found: false });
   });
 
   test('reports failures per key, and retries them on the next render', async () => {
@@ -295,15 +312,15 @@ describe('jira.getTests, on Xray Cloud', () => {
         response: { status: 500, data: { error: 'boom' } }
       }))
       // The JWT is still good: only the failed key is downloaded again
-      .mockResolvedValueOnce(graphqlResponse(['BOP-1']));
+      .mockResolvedValueOnce(graphqlResponse(['ABC-1']));
 
-    const failed = await jira.getTests(['BOP-1']);
-    expect(failed.tests['BOP-1'].error).toMatch(/Could not read tests from Xray Cloud/);
+    const failed = await jira.getTests(['ABC-1']);
+    expect(failed.tests['ABC-1'].error).toMatch(/Could not read tests from Xray Cloud/);
     // A failure is not remembered: the key is downloaded again next time
     expect(cache.size()).toBe(0);
 
-    const recovered = await jira.getTests(['BOP-1']);
-    expect(recovered.tests['BOP-1'].found).toBe(true);
+    const recovered = await jira.getTests(['ABC-1']);
+    expect(recovered.tests['ABC-1'].found).toBe(true);
   });
 
   test('surfaces GraphQL errors as a per key error', async () => {
@@ -311,9 +328,9 @@ describe('jira.getTests, on Xray Cloud', () => {
       .mockResolvedValueOnce({ data: '"jwt-token"' })
       .mockResolvedValueOnce({ data: { errors: [{ message: 'Not authorized' }] } });
 
-    const result = await jira.getTests(['BOP-1']);
+    const result = await jira.getTests(['ABC-1']);
 
-    expect(result.tests['BOP-1'].error).toMatch(/Not authorized/);
+    expect(result.tests['ABC-1'].error).toMatch(/Not authorized/);
   });
 });
 
@@ -324,19 +341,19 @@ describe('jira.getTests, on Jira Server/DC', () => {
     (axios.get as jest.Mock).mockResolvedValueOnce({
       data: {
         id: '10001',
-        key: 'BOP-1',
+        key: 'ABC-1',
         fields: { summary: 'Login works', status: { name: 'Done' }, issuetype: { name: 'Test' } }
       }
     });
 
-    const result = await jira.getTests(['BOP-1']);
+    const result = await jira.getTests(['ABC-1']);
 
     expect(axios.get).toHaveBeenCalledTimes(1);
     const [url, options] = (axios.get as jest.Mock).mock.calls[0];
-    expect(url).toBe('https://jira.acme.com/rest/api/2/issue/BOP-1');
+    expect(url).toBe('https://jira.acme.com/rest/api/2/issue/ABC-1');
     expect(options.headers.Authorization).toBe('Bearer pat-token');
-    expect(result.tests['BOP-1']).toEqual({
-      key: 'BOP-1',
+    expect(result.tests['ABC-1']).toEqual({
+      key: 'ABC-1',
       found: true,
       summary: 'Login works',
       status: 'Done',
@@ -351,9 +368,9 @@ describe('jira.getTests, on Jira Server/DC', () => {
       response: { status: 404, data: {} }
     }));
 
-    const result = await jira.getTests(['BOP-404']);
+    const result = await jira.getTests(['ABC-404']);
 
-    expect(result.tests['BOP-404']).toEqual({ key: 'BOP-404', found: false });
+    expect(result.tests['ABC-404']).toEqual({ key: 'ABC-404', found: false });
   });
 });
 
@@ -364,20 +381,20 @@ describe('jira.getTests, on Jira Cloud with Basic auth', () => {
     (axios.get as jest.Mock).mockResolvedValueOnce({
       data: {
         id: '10001',
-        key: 'BOP-1',
+        key: 'ABC-1',
         fields: { summary: 'Login works', status: { name: 'Done' }, issuetype: { name: 'Test' } }
       }
     });
 
-    const result = await jira.getTests(['BOP-1']);
+    const result = await jira.getTests(['ABC-1']);
 
     expect(axios.get).toHaveBeenCalledTimes(1);
     const [url, options] = (axios.get as jest.Mock).mock.calls[0];
-    expect(url).toBe('https://acme.atlassian.net/rest/api/2/issue/BOP-1');
+    expect(url).toBe('https://acme.atlassian.net/rest/api/2/issue/ABC-1');
     const expected = Buffer.from('jane@acme.com:api-token', 'utf8').toString('base64');
     expect(options.headers.Authorization).toBe(`Basic ${expected}`);
-    expect(result.tests['BOP-1']).toEqual({
-      key: 'BOP-1',
+    expect(result.tests['ABC-1']).toEqual({
+      key: 'ABC-1',
       found: true,
       summary: 'Login works',
       status: 'Done',

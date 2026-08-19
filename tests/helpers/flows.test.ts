@@ -76,25 +76,25 @@ describe('flows.parseValue', () => {
       '---',
       'title: MD flow',
       'xray:',
-      '  testKey: " BOP-2049 "',
+      '  testKey: " ABC-2049 "',
       '---',
       '',
       'Intro',
       ''
     ].join('\n'), 'markdown');
 
-    expect(parsed.xray).toEqual({ testKey: 'BOP-2049' });
+    expect(parsed.xray).toEqual({ testKey: 'ABC-2049' });
   });
 
   it('passes the xray block of YAML flows through too', () => {
-    const parsed = flows.parseValue(`${YAML_FLOW}xray:\n  testKey: BOP-7\n`, 'yaml');
-    expect(parsed.xray).toEqual({ testKey: 'BOP-7' });
+    const parsed = flows.parseValue(`${YAML_FLOW}xray:\n  testKey: ABC-7\n`, 'yaml');
+    expect(parsed.xray).toEqual({ testKey: 'ABC-7' });
   });
 
   it('answers a null xray when there is none, or it is malformed', () => {
     expect(flows.parseValue(MARKDOWN).xray).toBeNull();
     expect(flows.parseValue(YAML_FLOW).xray).toBeNull();
-    expect(flows.parseValue('---\nxray: BOP-1\n---\nIntro\n', 'markdown').xray).toBeNull();
+    expect(flows.parseValue('---\nxray: ABC-1\n---\nIntro\n', 'markdown').xray).toBeNull();
     expect(flows.parseValue('---\nxray:\n  testKey: ""\n---\nIntro\n', 'markdown').xray).toBeNull();
   });
 });

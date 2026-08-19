@@ -3,6 +3,11 @@
 # The same gates a pull request has to clear are re-run here, against the exact
 # commit being released: a release must not ship code that is untested, below
 # the coverage threshold, or carrying a critical advisory.
+#
+# Every job takes its Node version from .nvmrc, so the pipelines, the website
+# build and a local `nvm use` all run the same release. Keep .nvmrc on a Node
+# LTS line that satisfies "engines" in package.json; .npmrc sets engine-strict,
+# so an end-of-life or too-old release fails `npm ci` outright.
 
 name: Node.js Package
 
@@ -13,9 +18,6 @@ on:
 permissions:
   contents: read
 
-env:
-  NODE_VERSION: '22'
-
 jobs:
   verify:
     name: Verify the release commit
@@ -25,7 +27,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
@@ -61,7 +63,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
           registry-url: https://registry.npmjs.org/
 
