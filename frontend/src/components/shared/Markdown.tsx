@@ -1,19 +1,30 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Info, Lightbulb, MessageSquareWarning, OctagonAlert, TriangleAlert } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import CodeBlock from '@/components/shared/CodeBlock';
+import remarkCallouts, { type CalloutType } from '@/lib/remark-callouts';
+
+const CALLOUT_ICONS: Record<CalloutType, React.ComponentType<{ className?: string }>> = {
+  note: Info,
+  tip: Lightbulb,
+  important: MessageSquareWarning,
+  warning: TriangleAlert,
+  caution: OctagonAlert,
+};
 
 /**
  * Markdown renderer for flow prose and application READMEs.
- * Fenced code blocks are highlighted with Prism.
+ * Fenced code blocks are highlighted with Prism, and GitHub-style
+ * `> [!NOTE]` blockquotes are rendered as callouts.
  */
 export function Markdown({ children, className }: { children?: any; className?: string }) {
   return (
     <div className={cn('markdown-body', className)}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkCallouts]}
         components={{
           // Fenced code blocks arrive as <pre><code class="language-x">…</code></pre>.
           // Replace the whole <pre> with the highlighted CodeBlock; inline
@@ -34,6 +45,24 @@ export function Markdown({ children, className }: { children?: any; className?: 
               <a {...props} target="_blank" rel="noreferrer">
                 {linkChildren}
               </a>
+            );
+          },
+          // remark-callouts turns `> [!NOTE]` blockquotes into divs carrying
+          // the callout type; every other div renders as-is.
+          div({ children: divChildren, node: _node, ...props }) {
+            const type = (props as any)['data-callout'] as CalloutType | undefined;
+            if (!type || !CALLOUT_ICONS[type]) return <div {...props}>{divChildren}</div>;
+
+            const Icon = CALLOUT_ICONS[type];
+            const title = (props as any)['data-callout-title'] as string;
+            return (
+              <div {...props} className={cn('markdown-callout', (props as any).className)}>
+                <p className="markdown-callout-title">
+                  <Icon className="markdown-callout-icon" />
+                  {title}
+                </p>
+                {divChildren}
+              </div>
             );
           },
         }}

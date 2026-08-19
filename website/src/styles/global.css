@@ -1236,6 +1236,57 @@ code {
   margin: 1.5rem 0;
   color: var(--grey);
 }
+
+/* Callouts: `> [!NOTE]` and friends, same markers the app renders. */
+.fl-prose .callout {
+  --callout-accent: #3a6ea5;
+  border: 1px solid color-mix(in oklab, var(--callout-accent) 30%, transparent);
+  border-left: 3px solid var(--callout-accent);
+  background: color-mix(in oklab, var(--callout-accent) 7%, transparent);
+  border-radius: 5px;
+  padding: 14px 18px;
+  margin: 1.5rem 0;
+}
+.fl-prose .callout > :first-child {
+  margin-top: 0;
+}
+.fl-prose .callout > :last-child {
+  margin-bottom: 0;
+}
+.fl-prose .callout-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--callout-accent);
+  margin-bottom: 0.5rem;
+}
+.fl-prose .callout-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.fl-prose .callout[data-callout='tip'] {
+  --callout-accent: var(--pass);
+}
+.fl-prose .callout[data-callout='important'] {
+  --callout-accent: #6b4fa8;
+}
+.fl-prose .callout[data-callout='warning'] {
+  --callout-accent: var(--brass-text);
+}
+.fl-prose .callout[data-callout='caution'] {
+  --callout-accent: #a63d33;
+}
+.dark .fl-prose .callout {
+  --callout-accent: #7fa9d6;
+}
+.dark .fl-prose .callout[data-callout='important'] {
+  --callout-accent: #a892d9;
+}
+.dark .fl-prose .callout[data-callout='caution'] {
+  --callout-accent: #d98a80;
+}
 .fl-prose hr {
   border: none;
   border-top: 1px solid var(--line-soft);
