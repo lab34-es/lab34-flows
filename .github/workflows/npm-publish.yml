@@ -58,6 +58,16 @@ jobs:
     name: Publish to npm
     needs: verify
     runs-on: ubuntu-latest
+
+    # Trusted publishing: npm trades this short-lived OIDC token for a
+    # publish credential, so there is no long-lived NPM_TOKEN to expire,
+    # rotate or leak. The trusted publisher configured on npmjs.com names
+    # this repository and this workflow file; if either moves, update it
+    # there or the exchange is refused.
+    permissions:
+      contents: read
+      id-token: write
+
     steps:
       - uses: actions/checkout@v4
 
@@ -67,14 +77,13 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org/
 
+      # OIDC publishing arrived in npm 11.5.1, which is newer than the npm
+      # bundled with our Node line. Without this, npm looks for a token,
+      # finds none and fails with ENEEDAUTH.
+      - run: npm install -g npm@latest
+
       - run: npm ci
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
-          package-manager-cache: false  # never use caching in release builds
-      - run: npm ci
-      - run: npm run build --if-present
-      - run: npm test
-      - run: npm publish  # Or: npm stage publish
+      # prepublishOnly compiles src/ into dist/, which is what "files" ships.
+      # Publishing over OIDC also attaches provenance to the release.
+      - run: npm publish --access=public
