@@ -16,6 +16,9 @@ const ALLOWED_METHODS = [
   'click',
   'type',
   'waitForSelector',
+  'assertTitle',
+  // TODO: 'assert' and 'route' are accepted but have no implementation yet;
+  // a step using either is validated and then silently does nothing.
   'assert',
   'route',
   'screenshot',
@@ -284,6 +287,20 @@ export const run = (ctx, yamlFile, stepParams) => {
             debug('Checking selector: %s', parameters.selector);
             await page.check(parameters.selector, {
               position: parameters.position,
+              timeout: parameters.timeout
+            });
+            break;
+          case 'dblclick':
+            debug('Double clicking on selector: %s', parameters.selector);
+            await page.dblclick(parameters.selector, {
+              button: parameters.button || 'left',
+              delay: parameters.delay,
+              timeout: parameters.timeout
+            });
+            break;
+          case 'focus':
+            debug('Focusing selector: %s', parameters.selector);
+            await page.focus(parameters.selector, {
               timeout: parameters.timeout
             });
             break;
