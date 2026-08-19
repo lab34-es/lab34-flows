@@ -372,7 +372,11 @@ and open http://localhost:3001.
 - **Notebook view** — a flow renders as a document; each ```` ```step ````
   block is a cell. Press **Run** and the execution details of each step
   stream in below its block: status, timing, request, response and
-  assertions. Edit the raw Markdown in the **Source** tab and save.
+  assertions. It is also where the flow is written: click any block to edit
+  its Markdown where it is rendered, type `/` for headings, callouts and
+  steps, and delete a block with Backspace — the file is saved as you type
+  (Cmd/Ctrl+Z undoes). The **Source** tab still opens the whole file in a
+  plain Markdown editor.
 - The environment selector (sidebar footer) picks the environment used for
   runs.
 - **Settings** has a sidebar of its own, with one section per concern:
