@@ -343,7 +343,7 @@ export { values };
  * @returns {Object} - Processed JSON object after template rendering
  * @throws {Error} - If the resulting template cannot be parsed as JSON
  */
-export const json = (input, data) => {
+export const json = (input, data?) => {
   // Convert object to string if needed
   if (typeof input === 'object') {
     input = JSON.stringify(input);
@@ -372,7 +372,7 @@ export const json = (input, data) => {
  * @param {Object} data - Additional data to merge with the default values for template processing
  * @returns {string} - Processed string after template rendering
  */
-export const string = (input, data) => {
+export const string = (input, data?) => {
   if (!data) {data = {};}
   const template = handlebars.compile(input);
   return template(Object.assign({}, data, values()));
@@ -385,7 +385,7 @@ export const string = (input, data) => {
  * @param {Object} values - Additional data to merge with the default values for template processing
  * @returns {Object|string} - Processed result, either as JSON object or string
  */
-export const any = (input, values) => {
+export const any = (input, values?) => {
   if (!values) {values = {};}
   
   // Skip empty input

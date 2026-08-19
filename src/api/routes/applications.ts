@@ -106,39 +106,6 @@ router.get('/:application/envs/:env', (req, res) => {
     });
 });
 
-// Update a specific environment variable in an env file
-router.put('/:application/envs/:env/:key', (req, res) => {
-  const { application, env, key } = req.params;
-  const { value } = req.body;
-
-  if (value === undefined) {
-    return res.status(400).json({ error: 'Value is required' });
-  }
-
-  apps.parseApplications()
-    .then(list => {
-      const app = list.find(app => app.slug === application);
-      if (!app) {
-        res.status(404).json({ error: 'Application not found' });
-        return;
-      }
-
-      const envFile = app.envFiles.find(envFile => envFile.name === env);
-      if (!envFile) {
-        res.status(404).json({ error: 'Environment file not found' });
-        return;
-      }
-
-      return apps.updateEnvFile(envFile.path, key, value);
-    })
-    .then(() => {
-      res.json({ 
-        success: true, 
-        message: `Updated ${key} in ${application}/${env}` 
-      });
-    });
-});
-
 // Get the raw content of an env file for editing
 router.get('/:application/envs/:env/raw', (req, res) => {
   const { application, env } = req.params;
@@ -194,6 +161,40 @@ router.put('/:application/envs/:env/raw', (req, res) => {
         message: `Updated ${application}/${env}.env`
       });
     });
+});
+
+// Update a specific environment variable in an env file
+router.put('/:application/envs/:env/:key', async (req, res) => {
+  const { application, env, key } = req.params;
+  const { value } = req.body;
+
+  if (value === undefined) {
+    return res.status(400).json({ error: 'Value is required' });
+  }
+
+  try {
+    const list = await apps.parseApplications();
+
+    const app = list.find(app => app.slug === application);
+    if (!app) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    const envFile = app.envFiles.find(envFile => envFile.name === env);
+    if (!envFile) {
+      return res.status(404).json({ error: 'Environment file not found' });
+    }
+
+    await apps.updateEnvFile(envFile.path, key, value);
+
+    res.json({
+      success: true,
+      message: `Updated ${key} in ${application}/${env}`
+    });
+  }
+  catch (error) {
+    sendError(res, error, 500);
+  }
 });
 
 export default router;

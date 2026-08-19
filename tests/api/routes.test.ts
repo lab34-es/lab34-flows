@@ -1,0 +1,282 @@
+// yargs-parser v22 is ESM-only; Node's require(esm) handles it at runtime,
+// but jest's module system does not — mock it out.
+jest.mock('yargs-parser', () => () => ({}));
+
+// Every route delegates to a helper; the helpers have their own suites, so
+// here we only assert the HTTP contract: status codes, shapes and error mapping.
+jest.mock('../../src/helpers/flows');
+jest.mock('../../src/helpers/bases');
+jest.mock('../../src/helpers/jira');
+jest.mock('../../src/helpers/applications');
+
+import express from 'express';
+import request from 'supertest';
+
+import * as flows from '../../src/helpers/flows';
+import * as bases from '../../src/helpers/bases';
+import * as jira from '../../src/helpers/jira';
+import * as apps from '../../src/helpers/applications';
+
+import defineRoutes from '../../src/api/routes';
+
+const app = express();
+app.use(express.json());
+defineRoutes(app);
+
+beforeEach(() => jest.clearAllMocks());
+
+describe('GET /api/flows', () => {
+  test('returns the list', async () => {
+    (flows.list as jest.Mock).mockResolvedValue([{ name: 'a.md' }]);
+    const res = await request(app).get('/api/flows');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([{ name: 'a.md' }]);
+  });
+
+  test('a helper failure becomes a 500', async () => {
+    (flows.list as jest.Mock).mockRejectedValue(new Error('disk gone'));
+    const res = await request(app).get('/api/flows');
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'disk gone' });
+  });
+});
+
+describe('GET /api/flows/tree', () => {
+  test('returns the tree', async () => {
+    (flows.tree as jest.Mock).mockResolvedValue([{ type: 'folder', name: 'examples' }]);
+    const res = await request(app).get('/api/flows/tree');
+    expect(res.status).toBe(200);
+    expect(res.body[0].name).toBe('examples');
+  });
+
+  test('a helper failure becomes a 500', async () => {
+    (flows.tree as jest.Mock).mockRejectedValue(new Error('nope'));
+    expect((await request(app).get('/api/flows/tree')).status).toBe(500);
+  });
+});
+
+describe('POST /api/flows/parse', () => {
+  test('passes value and format through to the parser', async () => {
+    (flows.parseValue as jest.Mock).mockReturnValue({ format: 'markdown', steps: [] });
+    const res = await request(app).post('/api/flows/parse').send({ value: '# t', format: 'markdown' });
+    expect(res.status).toBe(200);
+    expect(flows.parseValue).toHaveBeenCalledWith('# t', 'markdown');
+  });
+
+  test('defaults to an empty value and no format', async () => {
+    (flows.parseValue as jest.Mock).mockReturnValue({});
+    await request(app).post('/api/flows/parse').send({});
+    expect(flows.parseValue).toHaveBeenCalledWith('', null);
+  });
+
+  test('a parse error becomes a 400', async () => {
+    (flows.parseValue as jest.Mock).mockImplementation(() => { throw new Error('bad yaml'); });
+    const res = await request(app).post('/api/flows/parse').send({ value: 'x' });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'bad yaml' });
+  });
+});
+
+describe('AI flow routes', () => {
+  test('POST /create/ai returns the generated flow', async () => {
+    (flows.createAI as jest.Mock).mockResolvedValue({ content: '# generated' });
+    const res = await request(app).post('/api/flows/create/ai').send({ prompt: 'p' });
+    expect(res.status).toBe(200);
+    expect(flows.createAI).toHaveBeenCalledWith({ prompt: 'p' });
+  });
+
+  test('POST /create/ai maps a failure to 400', async () => {
+    (flows.createAI as jest.Mock).mockRejectedValue(new Error('no provider'));
+    const res = await request(app).post('/api/flows/create/ai').send({ prompt: 'p' });
+    expect(res.status).toBe(400);
+  });
+
+  test('POST /edit/ai returns the rewritten flow', async () => {
+    (flows.editAI as jest.Mock).mockResolvedValue({ content: '# edited' });
+    const res = await request(app).post('/api/flows/edit/ai').send({ prompt: 'p', content: 'c' });
+    expect(res.status).toBe(200);
+  });
+
+  test('POST /edit/ai maps a failure to 400', async () => {
+    (flows.editAI as jest.Mock).mockRejectedValue(new Error('boom'));
+    expect((await request(app).post('/api/flows/edit/ai').send({})).status).toBe(400);
+  });
+});
+
+describe('POST /api/flows/start', () => {
+  test('answers with just the execution handle', async () => {
+    (flows.start as jest.Mock).mockResolvedValue({ execution: { id: 'exec-1' }, steps: ['lots'] });
+    const res = await request(app).post('/api/flows/start').send({ path: 'a.md' });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ execution: { id: 'exec-1' } });
+  });
+
+  test('a failure to start maps to 400', async () => {
+    (flows.start as jest.Mock).mockRejectedValue(new Error('already running'));
+    const res = await request(app).post('/api/flows/start').send({});
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'already running' });
+  });
+});
+
+describe('GET /api/flows/user', () => {
+  test('reads the flow at the given path', async () => {
+    (flows.getUserFlow as jest.Mock).mockResolvedValue({ title: 'T' });
+    const res = await request(app).get('/api/flows/user').query({ path: 'examples/a.md' });
+    expect(res.status).toBe(200);
+    expect(flows.getUserFlow).toHaveBeenCalledWith('examples/a.md');
+  });
+
+  test('a missing flow is a 404', async () => {
+    (flows.getUserFlow as jest.Mock).mockRejectedValue(new Error('not found'));
+    const res = await request(app).get('/api/flows/user').query({ path: 'nope.md' });
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'not found' });
+  });
+});
+
+describe('flow file and folder routes', () => {
+  test('POST /folder creates a folder', async () => {
+    (flows.createFolder as jest.Mock).mockResolvedValue({ relativePath: 'new' });
+    const res = await request(app).post('/api/flows/folder').send({ path: 'new' });
+    expect(res.body).toEqual({ success: true, relativePath: 'new' });
+    expect(flows.createFolder).toHaveBeenCalledWith('new');
+  });
+
+  test('POST /file forwards path, content and overwrite', async () => {
+    (flows.saveFile as jest.Mock).mockResolvedValue({ relativePath: 'a.md' });
+    await request(app).post('/api/flows/file').send({ path: 'a.md', content: '# t', overwrite: true });
+    expect(flows.saveFile).toHaveBeenCalledWith({
+      relativePath: 'a.md', content: '# t', overwrite: true
+    });
+  });
+
+  test('POST /file defaults overwrite to false', async () => {
+    (flows.saveFile as jest.Mock).mockResolvedValue({});
+    await request(app).post('/api/flows/file').send({ path: 'a.md', content: 'x' });
+    expect((flows.saveFile as jest.Mock).mock.calls[0][0].overwrite).toBe(false);
+  });
+
+  test('an existing file maps EEXISTS to 409', async () => {
+    const error: NodeJS.ErrnoException = new Error('File already exists');
+    error.code = 'EEXISTS';
+    (flows.saveFile as jest.Mock).mockRejectedValue(error);
+    const res = await request(app).post('/api/flows/file').send({ path: 'a.md' });
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ error: 'File already exists' });
+  });
+
+  test('PUT /properties rewrites the frontmatter', async () => {
+    (flows.saveProperties as jest.Mock).mockResolvedValue({ relativePath: 'a.md' });
+    await request(app).put('/api/flows/properties').send({ path: 'a.md', properties: { title: 'T' } });
+    expect(flows.saveProperties).toHaveBeenCalledWith({
+      relativePath: 'a.md', properties: { title: 'T' }
+    });
+  });
+
+  test('POST /rename moves a file', async () => {
+    (flows.rename as jest.Mock).mockResolvedValue({ relativePath: 'b.md' });
+    await request(app).post('/api/flows/rename').send({ from: 'a.md', to: 'b.md' });
+    expect(flows.rename).toHaveBeenCalledWith('a.md', 'b.md');
+  });
+
+  test('DELETE /file accepts the path in the body', async () => {
+    (flows.remove as jest.Mock).mockResolvedValue({ removed: true });
+    const res = await request(app).delete('/api/flows/file').send({ path: 'a.md' });
+    expect(res.body).toEqual({ success: true, removed: true });
+    expect(flows.remove).toHaveBeenCalledWith('a.md');
+  });
+
+  test('DELETE /file falls back to the query string', async () => {
+    (flows.remove as jest.Mock).mockResolvedValue({ removed: true });
+    await request(app).delete('/api/flows/file').query({ path: 'q.md' });
+    expect(flows.remove).toHaveBeenCalledWith('q.md');
+  });
+
+  test('a non-Error rejection still produces a message', async () => {
+    (flows.remove as jest.Mock).mockRejectedValue('plain string');
+    const res = await request(app).delete('/api/flows/file').send({ path: 'a.md' });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'plain string' });
+  });
+});
+
+describe('/api/views', () => {
+  test('GET returns the views document', async () => {
+    (bases.load as jest.Mock).mockResolvedValue({ views: [{ name: 'All' }] });
+    const res = await request(app).get('/api/views');
+    expect(res.status).toBe(200);
+    expect(res.body.views[0].name).toBe('All');
+  });
+
+  test('GET maps a read failure to 500', async () => {
+    (bases.load as jest.Mock).mockRejectedValue(new Error('bad yaml'));
+    expect((await request(app).get('/api/views')).status).toBe(500);
+  });
+
+  test('PUT saves and returns the normalized document', async () => {
+    (bases.save as jest.Mock).mockResolvedValue({ views: [] });
+    const res = await request(app).put('/api/views').send({ views: [] });
+    expect(res.status).toBe(200);
+    expect(bases.save).toHaveBeenCalledWith({ views: [] });
+  });
+
+  test('PUT maps a save failure to 400', async () => {
+    (bases.save as jest.Mock).mockRejectedValue(new Error('invalid'));
+    expect((await request(app).put('/api/views').send({})).status).toBe(400);
+  });
+
+  test('GET /query passes folder and view through', async () => {
+    (bases.query as jest.Mock).mockResolvedValue({ rows: [] });
+    await request(app).get('/api/views/query').query({ folder: 'payments', view: 'All' });
+    expect(bases.query).toHaveBeenCalledWith({ folder: 'payments', view: 'All' });
+  });
+
+  test('GET /query defaults folder to the whole tree and leaves view unset', async () => {
+    (bases.query as jest.Mock).mockResolvedValue({ rows: [] });
+    await request(app).get('/api/views/query');
+    expect(bases.query).toHaveBeenCalledWith({ folder: '', view: undefined });
+  });
+
+  test('GET /query maps an evaluation failure to 400', async () => {
+    (bases.query as jest.Mock).mockRejectedValue(new Error('bad formula'));
+    expect((await request(app).get('/api/views/query')).status).toBe(400);
+  });
+});
+
+describe('/api/jira/tests', () => {
+  test('splits, trims and drops empty keys', async () => {
+    (jira.getTests as jest.Mock).mockResolvedValue({});
+    await request(app).get('/api/jira/tests').query({ keys: 'BOP-1, BOP-2 ,,' });
+    expect(jira.getTests).toHaveBeenCalledWith(['BOP-1', 'BOP-2']);
+  });
+
+  test('no keys at all asks for an empty list', async () => {
+    (jira.getTests as jest.Mock).mockResolvedValue({});
+    await request(app).get('/api/jira/tests');
+    expect(jira.getTests).toHaveBeenCalledWith([]);
+  });
+
+  test('a Jira failure maps to 500', async () => {
+    (jira.getTests as jest.Mock).mockRejectedValue(new Error('unauthorized'));
+    const res = await request(app).get('/api/jira/tests').query({ keys: 'BOP-1' });
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'unauthorized' });
+  });
+});
+
+describe('/api/environment/all-possible', () => {
+  test('returns the environment names', async () => {
+    (apps.allPossibleEnvironments as jest.Mock).mockResolvedValue(['local', 'prod']);
+    const res = await request(app).get('/api/environment/all-possible');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(['local', 'prod']);
+  });
+
+  test('a failure maps to 500 with a generic message', async () => {
+    (apps.allPossibleEnvironments as jest.Mock).mockRejectedValue(new Error('boom'));
+    const res = await request(app).get('/api/environment/all-possible');
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'Failed to fetch environments' });
+  });
+});

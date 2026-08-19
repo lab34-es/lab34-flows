@@ -114,7 +114,16 @@ const body = (expected, actual) => {
   return errors;
 };
 
-export const test = async (flow, test, contents) => {
+/**
+ * The outcome of running a step's assertions: `hasErrors` plus one entry per
+ * aspect that was actually asserted on ('status', 'body', 'latentApplications'),
+ * each holding that aspect's errors.
+ */
+export interface TestReport extends Record<string, any> {
+  hasErrors: boolean;
+}
+
+export const test = async (flow, test, contents): Promise<TestReport> => {
   const cases: Record<string, any[]> = {};
 
   if (test.status) {
