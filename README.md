@@ -1,5 +1,10 @@
 # Flows
 
+[![CI](https://github.com/lab34-es/lab34-flows/actions/workflows/ci.yml/badge.svg)](https://github.com/lab34-es/lab34-flows/actions/workflows/ci.yml)
+[![Coverage](https://raw.githubusercontent.com/lab34-es/lab34-flows/master/.github/badges/coverage.svg)](https://github.com/lab34-es/lab34-flows/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@lab34/flows)](https://www.npmjs.com/package/@lab34/flows)
+[![license](https://img.shields.io/npm/l/@lab34/flows)](https://www.npmjs.com/package/@lab34/flows)
+
 Heavily opinionated tool to help you test E2E flows and behaviours.
 
 📖 **Documentation website:** [flows.lab34.es](https://flows.lab34.es/) — generated from the app's built-in Help section (source in [`website/`](website/)).
@@ -45,6 +50,7 @@ Features:
   - [Playwright](#playwright) (browser automation - experimental)
   - [Replacers](#replacers)
   - [Environment variables](#environment-variables)
+  - [Development](#development)
 
 ## General info
 
@@ -351,10 +357,10 @@ and open http://localhost:3001.
   - **Applications** — every application in your context directory. Click
     one to read its **README** and browse its **methods** (input parameters,
     output, memory usage and examples, from the JSDoc blocks of its
-    `index.js`), plus its environment files. Each row's actions rename the
+    `index.ts`), plus its environment files. Each row's actions rename the
     application, i.e. its folder. Like flows, applications have a
     **Document / Source** toggle: the Source view is a file explorer over the
-    application folder, where every file (`README.md`, `index.js`,
+    application folder, where every file (`README.md`, `index.ts`,
     `env/*.env` and anything else you add) can be edited, created, renamed
     and deleted.
 - **Notebook view** — a flow renders as a document; each ```` ```step ````
@@ -575,7 +581,7 @@ shows what it is doing in a modal while it runs. The pull happens on the
 server, so closing the modal does not stop it.
 
 Each document is a normal Markdown flow with **no `step` blocks yet**: Jira
-owns the title and the description, you write the steps.
+owns the title, the description and the Xray test details, you write the steps.
 
 ````markdown
 ---
@@ -584,6 +590,7 @@ xray:
   testKey: BOP-123
   status: To Do
   issueType: Test
+  testType: Manual
   feature: BOP-10
   userStory: BOP-42
   url: https://acme.atlassian.net/browse/BOP-123
@@ -594,7 +601,34 @@ xray:
 <!-- xray:description -->
 The description, as written in Jira.
 <!-- /xray:description -->
+
+<!-- xray:details -->
+## Test details
+
+**Test type:** Manual
+
+### Step 1
+
+Pay with a card that expired yesterday
+
+**Data**
+
+4111 1111 1111 1111
+
+**Expected result**
+
+The payment is refused
+<!-- /xray:details -->
 ````
+
+The **test details** block is the Test Details panel of Xray, as Markdown: the
+steps of a Manual test, the scenario of a Cucumber one (in a `gherkin` code
+block), the definition of a Generic one. Where they come from depends on the
+integration — Xray Cloud answers them with the tests themselves, Xray for
+Server/DC answers the steps through its own API and keeps the rest in Jira
+custom fields, and a plain **Jira Cloud API token** reaches only whatever Xray
+exposes as a Jira field. When a pull cannot read the details, it says so in the
+log and leaves the block a previous pull wrote untouched.
 
 How the folders are laid out depends on what the integration can see:
 
@@ -621,13 +655,25 @@ How the folders are laid out depends on what the integration can see:
 
 Pulling again is safe, and is the point:
 
-- Only the frontmatter and the block between the `xray:description` markers
-  are rewritten. Every step you added, and every property of your own, is kept.
+- Only the frontmatter and the blocks between the `xray:description` and
+  `xray:details` markers are rewritten. Every step you added, and every
+  property of your own, is kept.
 - A test that moved in Jira is **moved** on disk, not written twice, and the
   folders it left behind are removed.
 - A pull that finds nothing new leaves every file byte for byte as it was, so
   `git diff` after a pull shows what Jira changed and nothing else.
 - Tests deleted in Jira are never deleted here.
+
+**Overwrite tests already pulled** decides what a second pull does with the
+tests that are already there:
+
+- **On** (the default) — a flow whose `xray.testKey` is already in the `xray`
+  folder is rewritten with what Jira says now, as described above.
+- **Off** — that flow is left exactly as it is: not moved, not rewritten, not
+  even read, and nothing is downloaded for it. Only tests that were never
+  pulled are written, and the modal counts the rest as **skipped**. Turn it off
+  when the files in `xray` have become yours and Jira should no longer touch
+  them.
 
 ## Default examples
 
@@ -644,11 +690,38 @@ On first run, the tool seeds your context directory with example content:
 
 Examples are only copied when missing, so you can edit or delete them freely.
 
+## Applications are TypeScript
+
+An application is a TypeScript module: `applications/<name>/index.ts`, plus an
+optional `mimic.ts`. It imports the package that runs it, and the types it is
+written against come from there too:
+
+```ts
+import { applications, httpClient } from '@lab34/flows';
+import type { Context, Parameters, Flow } from '@lab34/flows';
+```
+
+Two things make that work outside any `node_modules` of this package:
+
+- **`tsconfig.json`**, written into your context directory and refreshed on
+  every start, points your editor at the type declarations of the installed
+  package. Delete the notice at the top of the file to take it over; it is then
+  never rewritten.
+- **The loader** (`helpers/appLoader`) transpiles the TypeScript in memory when
+  a flow runs, and resolves `@lab34/flows` to the running installation. There
+  is no build step, and applications are never type checked at run time — a
+  type error is for your editor to point out, not a reason a flow refuses to
+  start.
+
+Applications still written in JavaScript (`index.js`, `mimic.js`, `require()`,
+`module.exports`) keep working: the loader accepts either extension, and the
+documentation parser recognises both export styles.
+
 ## Application docs (JSDoc)
 
 Applications document themselves in their own code: there is no `docs.json`.
 The documentation is read from the JSDoc blocks of the application's
-`index.js`, and it is what the UI renders and what the model is given when it
+`index.ts`, and it is what the UI renders and what the model is given when it
 writes a flow for you — the better the JSDoc, the better the generated flows.
 
 - The block at the **top of the file** describes the application.
@@ -662,11 +735,12 @@ writes a flow for you — the better the JSDoc, the better the generated flows.
 | `@memory {write\|read} key - description` | Flow memory the method writes or reads |
 | `@example` | An example step, in YAML, ready to paste inside a ```` ```step ```` block |
 
-```js
+```ts
 /**
  * What this application is.
  */
-const { applications } = require('lab34-flows');
+import { applications } from '@lab34/flows';
+import type { Context, Parameters } from '@lab34/flows';
 
 /**
  * Adds two numbers (a + b).
@@ -686,8 +760,8 @@ const { applications } = require('lab34-flows');
  *     a: 2
  *     b: 40
  */
-module.exports.add = applications.handler([
-  async (ctx, parameters) => {
+export const add = applications.handler([
+  async (ctx: Context, parameters: Parameters) => {
     const { a, b } = parameters.body;
     return [{}, 200, { operation: 'add', result: a + b }, { lastResult: a + b }];
   }
@@ -1152,3 +1226,64 @@ PGDATABASE=production
 PGSSL_ENABLED=true
 PGSSL_CA=/path/to/custom-ca.pem
 ```
+
+
+## Development
+
+The package is written in TypeScript and published as CommonJS: `src/` compiles
+into `dist/`, which is what `npm publish` ships (together with the type
+declarations). Consumers keep using `require('@lab34/flows')` unchanged.
+
+Both the package (`src/`) and the web UI (`frontend/src/`) are TypeScript.
+
+```bash
+npm install              # root: the CLI, the API and the helpers
+npm run install:frontend # the web UI
+
+npm run dev              # API on :3001, restarted on change (tsx, no build step)
+npm run frontend         # web UI on :3000
+npm run dev:full         # both at once
+
+npm run build            # compile src/ -> dist/ and copy the bundled examples
+npm run typecheck        # tsc over src/ and tests/, no emit
+npm run lint             # eslint + typescript-eslint
+npm test                 # jest
+npm run test:coverage    # jest with the coverage gate
+npm run coverage:badge   # refresh .github/badges/coverage.svg
+npm run audit:ci         # fail if any critical advisory is present
+
+npm run lint      --prefix frontend  # the web UI has its own eslint config
+npm run typecheck --prefix frontend  # and its own tsconfig
+npm run build     --prefix frontend  # tsc -b, then vite build
+```
+
+### Quality gates
+
+Every pull request, and every push to `master`, runs
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml). A change cannot land
+unless all of it passes:
+
+| Gate | What it checks |
+| --- | --- |
+| Lint | `eslint` over `src/`, `tests/` and `frontend/src/`, clean |
+| Types | `tsc --noEmit` for the package and for the frontend, clean |
+| Coverage | statements, branches, functions and lines of `src/` all **above 80%** |
+| Audit | `npm audit` finds **no critical** advisory in the root, frontend or website tree |
+| Build | `dist/` compiles and `node dist/cli.js --help` runs; the frontend builds |
+
+The coverage threshold lives in
+[`jest.config.js`](jest.config.js) (`coverageThreshold`), so the number is
+defined once and the CI job simply runs `npm run test:coverage`. Coverage is
+collected from *all* of `src/`, not only the files a test happens to import —
+otherwise an untested module would silently not count.
+
+The same gates run again against the exact commit being released, in
+[`.github/workflows/npm-publish.yml`](.github/workflows/npm-publish.yml),
+before anything is published.
+
+### Dependency pinning
+
+Every dependency is recorded as an exact version, with no `^` or `~` range, in
+all three package trees. `.npmrc` sets `save-exact=true` so `npm install <pkg>`
+keeps it that way. Upgrades are deliberate, reviewable commits rather than
+something that drifts in on a fresh install.

@@ -1,19 +1,15 @@
-# Published to npm as the @lab34/flows CLI. This file mirrors .gitignore and
-# additionally excludes everything that is not part of the tool itself —
-# most importantly the documentation website, which has its own build.
+# The published contents are declared by the "files" allowlist in package.json
+# (dist/ plus the readme and licence), which takes precedence over this file.
+# Kept only as a backstop for anything an npm version might still consider.
 node_modules/**
-tester-darwin-arm64/**
-.c**
-flows-tester-darwin-arm64/**
-tester-win32-x64/**
-dist/**
-
-# Documentation website (deployed to GitHub Pages, never part of the CLI)
+src/**
+tests/**
 website/
-
-# Repo housekeeping
+frontend/
 .github/
 .vscode/
-tests/
-eslint.config.js
-nodemon.json
+.claude/
+coverage/
+tester-darwin-arm64/**
+flows-tester-darwin-arm64/**
+tester-win32-x64/**

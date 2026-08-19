@@ -1,0 +1,10 @@
+{
+  /* Solution file: `tsc -b` builds both projects. The app and the Vite config
+     run in different environments (browser vs node), so they get their own
+     compiler options rather than one set that suits neither. */
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}

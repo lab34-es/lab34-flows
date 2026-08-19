@@ -1,0 +1,48 @@
+{
+  /* Base configuration: what the editor, `npm run typecheck` and ts-jest use.
+     It covers sources *and* tests and emits nothing. tsconfig.build.json adds
+     the emit settings for the published package. */
+  "compilerOptions": {
+    /* Target the oldest Node we support (see "engines" in package.json). */
+    "target": "ES2022",
+    "lib": ["ES2023"],
+
+    /* The package is published as CommonJS: consumers `require('@lab34/flows')`
+       and the bin entry is loaded by Node directly. Authoring uses ESM syntax
+       and tsc emits CJS, which also keeps require() interop with the handful of
+       dependencies that are still CJS-only. */
+    "module": "CommonJS",
+    "moduleResolution": "Node10",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+
+    /* Type checking.
+
+       `strict` is on, which is where the bug-catching value lives:
+       strictNullChecks, strictFunctionTypes and strictBindCallApply all apply.
+
+       Two of its sub-flags are deliberately relaxed for now:
+
+       - noImplicitAny: the migration from JavaScript left ~660 untyped
+         parameters. Blanket-annotating them `any` would satisfy the compiler
+         while asserting nothing, so instead they stay implicitly `any` and get
+         real types as each module is touched. This is the next ratchet to turn
+         on, module by module.
+       - useUnknownInCatchVariables: the codebase reads `ex.message` in ~35
+         catch blocks; narrowing each one adds noise rather than safety. */
+    "strict": true,
+    "noImplicitAny": false,
+    "useUnknownInCatchVariables": false,
+
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+
+    "noEmit": true,
+    "types": ["node", "jest"]
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "exclude": ["node_modules", "dist", "frontend", "website", ".claude", "src/defaults"]
+}

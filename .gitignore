@@ -1,6 +1,16 @@
 node_modules/**
+
+# Build output
+dist/**
+
+# Test coverage reports
+coverage/**
+
+# Claude Code local state (was covered by the previous ".c**" pattern)
+.claude/
+
 tester-darwin-arm64/**
-.c**
 flows-tester-darwin-arm64/**
 tester-win32-x64/**
-dist/**
+
+.DS_Store

@@ -1,9 +1,7 @@
 {
-  "watch": [
-    "**.js",
-    "flows/**",
-    "applications/*/*.js"
-  ],
-  "exec": "node src/api.js",
+  "watch": ["src"],
+  "ext": "ts,json",
+  "ignore": ["src/defaults/**"],
+  "exec": "tsx src/api.ts",
   "args": []
 }

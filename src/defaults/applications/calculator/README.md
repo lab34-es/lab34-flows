@@ -34,5 +34,5 @@ It demonstrates three core concepts:
 | `multiply` | Multiplies two numbers (a * b) |
 | `divide` | Divides two numbers (a / b), 400 on division by zero |
 
-See the **Methods** section in the UI (or the JSDoc blocks of `index.js`) for
+See the **Methods** section in the UI (or the JSDoc blocks of `index.ts`) for
 the full input / output / memory reference of each method.

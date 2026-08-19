@@ -1,0 +1,338 @@
+jest.mock('yargs-parser', () => () => ({}));
+jest.mock('../../src/helpers/paths');
+jest.mock('../../src/helpers/mimicing');
+jest.mock('../../src/helpers/runner/tester');
+
+// run() builds its own reporter and assigns it onto the flow, so the recorder
+// has to come from the module rather than from the flow we pass in.
+jest.mock('../../src/helpers/reporter', () => {
+  const recorder = {
+    server: { emit: jest.fn() },
+    stepStart: jest.fn(),
+    stepUpdate: jest.fn(),
+    execution: jest.fn(),
+    diagram: jest.fn(),
+    response: jest.fn(),
+    test: jest.fn(),
+    mimicStart: jest.fn()
+  };
+  return { get: () => recorder, __recorder: recorder };
+});
+
+import fs from 'fs';
+
+import * as paths from '../../src/helpers/paths';
+import * as mimicing from '../../src/helpers/mimicing';
+import * as tester from '../../src/helpers/runner/tester';
+import * as apps from '../../src/helpers/applications';
+import * as reporterHelper from '../../src/helpers/reporter';
+import * as v1 from '../../src/helpers/runner/v1';
+
+const recorder = (reporterHelper as any).__recorder;
+
+let calculatorAdd: jest.Mock;
+
+/** The runner decorates the flow in place (execution, memory, per-step data). */
+const flowWith = (...steps: any[]): Record<string, any> => ({ steps });
+
+/** Run a flow through the CLI path, which awaits the processor. */
+const runCli = (flow: any, opts: any = {}) =>
+  v1.run(flow, { environment: 'local', cli: true, reporter: { server: null }, ...opts });
+
+beforeEach(() => {
+  jest.clearAllMocks();
+
+  calculatorAdd = jest.fn().mockResolvedValue([{ 'content-type': 'json' }, 200, { sum: 3 }, { last: 3 }]);
+  apps.applications.calculator = { add: calculatorAdd };
+
+  jest.spyOn(apps, 'allPossibleEnvironments').mockResolvedValue(['local', 'prod']);
+
+  (paths.contextDir as jest.Mock).mockImplementation(async (parts: string[]) => `/ctx/${parts.join('/')}`);
+  jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+  jest.spyOn(fs, 'readFileSync').mockReturnValue('BASE_URL=http://x\n' as any);
+
+  (mimicing.validate as jest.Mock).mockReturnValue(true);
+  (mimicing.load as jest.Mock).mockResolvedValue({});
+  (mimicing.startStep as jest.Mock).mockResolvedValue([]);
+  (tester.getReady as jest.Mock).mockResolvedValue(undefined);
+  (tester.test as jest.Mock).mockResolvedValue({ hasErrors: false });
+});
+
+afterEach(() => jest.restoreAllMocks());
+
+describe('v1.run - happy path', () => {
+  test('executes a step and records the response', async () => {
+    const flow = flowWith({ application: 'calculator', method: 'add', parameters: { body: { a: 1 } } });
+
+    const result: any = await runCli(flow);
+
+    expect(calculatorAdd).toHaveBeenCalled();
+    expect(result[0].response).toEqual({ headers: { 'content-type': 'json' }, status: 200, body: { sum: 3 } });
+    expect(flow.execution.status).toBe('passed');
+  });
+
+  test('gives every step an id and reports the diagram', async () => {
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+    await runCli(flow);
+
+    expect(flow.steps[0].id).toBe('calculator-add');
+    expect(recorder.diagram).toHaveBeenCalled();
+  });
+
+  test('a slug becomes the step id', async () => {
+    const flow = flowWith({ slug: 'the-sum', application: 'calculator', method: 'add' });
+    await runCli(flow);
+    expect(flow.steps[0].id).toBe('the-sum');
+  });
+
+  test('repeated steps get suffixed ids', async () => {
+    const flow = flowWith(
+      { application: 'calculator', method: 'add' },
+      { application: 'calculator', method: 'add' }
+    );
+    await runCli(flow);
+    expect(flow.steps.map((s: any) => s.id)).toEqual(['calculator-add-0', 'calculator-add-1']);
+  });
+
+  test('waitForTime is part of the id', async () => {
+    const flow = flowWith({ application: 'calculator', method: 'add', waitForTime: { time: 5 } });
+    await runCli(flow);
+    expect(flow.steps[0].id).toBe('calculator-add-waitForTime-5');
+  });
+
+  test('memory returned by a step is merged into the flow', async () => {
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+    await runCli(flow);
+    expect(flow.memory).toEqual({ last: 3 });
+  });
+
+  test('timings are recorded', async () => {
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+    await runCli(flow);
+    expect(flow.steps[0].execution.times.duration).toBeGreaterThanOrEqual(0);
+  });
+
+  test('mimicked applications are started for each step', async () => {
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+    await runCli(flow);
+    expect(mimicing.startStep).toHaveBeenCalled();
+  });
+});
+
+describe('v1.run - environment validation', () => {
+  test('an unknown environment fails the flow', async () => {
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+
+    await runCli(flow, { environment: 'staging' });
+
+    expect(flow.execution.status).toBe('error');
+    expect(flow.execution.error.name).toBe('InvalidEnvironment');
+  });
+
+  test('a missing env file fails the flow', async () => {
+    (fs.existsSync as jest.Mock).mockReturnValue(false);
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+
+    await runCli(flow);
+
+    expect(flow.execution.error.name).toBe('EnvironmentSetupError');
+    expect(flow.execution.error.message).toContain('Missing environment file');
+  });
+
+  test('an unreadable env file fails the flow', async () => {
+    (fs.readFileSync as jest.Mock).mockImplementation(() => { throw new Error('EACCES'); });
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+
+    await runCli(flow);
+
+    expect(flow.execution.error.name).toBe('EnvironmentSetupError');
+  });
+
+  test('the tester pseudo-application needs no env file', async () => {
+    const flow = flowWith({ application: 'tester', method: 'noop' });
+    await runCli(flow);
+    expect(flow.execution.error.name).not.toBe('EnvironmentSetupError');
+  });
+});
+
+describe('v1.run - failures', () => {
+  test('an unknown method fails the step', async () => {
+    const flow = flowWith({ application: 'calculator', method: 'divide' });
+
+    await runCli(flow);
+
+    expect(flow.steps[0].execution.status).toBe('error');
+    expect(flow.steps[0].execution.error.message).toContain('Method not found: divide');
+  });
+
+  test('an unknown application fails the step', async () => {
+    const flow = flowWith({ application: 'ghost', method: 'add' });
+    await runCli(flow);
+    expect(flow.steps[0].execution.status).toBe('error');
+  });
+
+  test('a throwing application method fails the step', async () => {
+    calculatorAdd.mockRejectedValue(new Error('boom'));
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+
+    await runCli(flow);
+
+    expect(flow.steps[0].execution.error.message).toContain('boom');
+  });
+});
+
+describe('v1.run - step retries', () => {
+  test('an empty response is retried up to the configured number of times', async () => {
+    calculatorAdd
+      .mockResolvedValueOnce([null, null, null])
+      .mockResolvedValueOnce([{}, 200, { sum: 3 }, {}]);
+
+    const flow = flowWith({
+      application: 'calculator', method: 'add', retry: { times: 2, delay: 0 }
+    });
+
+    await runCli(flow);
+
+    expect(calculatorAdd).toHaveBeenCalledTimes(2);
+    expect(flow.execution.status).toBe('passed');
+  });
+
+  test('running out of retries fails the step', async () => {
+    calculatorAdd.mockResolvedValue([null, null, null]);
+    const flow = flowWith({
+      application: 'calculator', method: 'add', retry: { times: 1, delay: 0 }
+    });
+
+    await runCli(flow);
+
+    expect(flow.steps[0].execution.error.message).toContain('max retries reached');
+  });
+
+  test('an empty response with no retry configuration simply passes through', async () => {
+    calculatorAdd.mockResolvedValue([null, null, null]);
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+
+    await runCli(flow);
+
+    expect(calculatorAdd).toHaveBeenCalledTimes(1);
+    expect(flow.execution.status).toBe('passed');
+  });
+});
+
+describe('v1.run - test assertions', () => {
+  test('a passing assertion marks the step passed', async () => {
+    const flow = flowWith({ application: 'calculator', method: 'add', test: { status: 200 } });
+
+    await runCli(flow);
+
+    expect(tester.test).toHaveBeenCalled();
+    expect(flow.steps[0].execution.status).toBe('passed');
+  });
+
+  test('a failing assertion fails the step', async () => {
+    (tester.test as jest.Mock).mockResolvedValue({ hasErrors: true, status: [{}] });
+    const flow = flowWith({ application: 'calculator', method: 'add', test: { status: 200 } });
+
+    await runCli(flow);
+
+    expect(flow.steps[0].execution.error.name).toBe('TestFailed');
+  });
+
+  test('a failing assertion is retried when the test asks for it', async () => {
+    (tester.test as jest.Mock)
+      .mockResolvedValueOnce({ hasErrors: true })
+      .mockResolvedValue({ hasErrors: false });
+
+    const flow = flowWith({
+      application: 'calculator', method: 'add',
+      test: { status: 200, retry: { times: 2, delay: 0 } }
+    });
+
+    await runCli(flow);
+
+    expect(tester.test).toHaveBeenCalledTimes(2);
+    expect(flow.execution.status).toBe('passed');
+  });
+
+  test('the retry delay defaults to a second', async () => {
+    (tester.test as jest.Mock).mockResolvedValue({ hasErrors: true });
+    const test = { status: 200, retry: { times: 1 } } as any;
+    const flow = flowWith({ application: 'calculator', method: 'add', test });
+
+    jest.useFakeTimers();
+    const pending = runCli(flow);
+    await jest.advanceTimersByTimeAsync(2000);
+    await pending;
+    jest.useRealTimers();
+
+    expect(test.retry.delay).toBe(1000);
+  });
+
+  test('a retry count that is not a positive number is rejected', async () => {
+    (tester.test as jest.Mock).mockResolvedValue({ hasErrors: true });
+    const flow = flowWith({
+      application: 'calculator', method: 'add',
+      test: { status: 200, retry: { times: 0 } }
+    });
+
+    await runCli(flow);
+
+    expect(flow.steps[0].execution.error.message).toContain('times must be a number');
+  });
+
+  test('a negative retry delay is rejected', async () => {
+    (tester.test as jest.Mock).mockResolvedValue({ hasErrors: true });
+    const flow = flowWith({
+      application: 'calculator', method: 'add',
+      test: { status: 200, retry: { times: 1, delay: -5 } }
+    });
+
+    await runCli(flow);
+
+    expect(flow.steps[0].execution.error.message).toContain('delay must be a number');
+  });
+});
+
+describe('v1.run - mimic validation', () => {
+  test('an invalid mimic configuration fails the flow', async () => {
+    (mimicing.validate as jest.Mock).mockReturnValue(false);
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+
+    await runCli(flow);
+
+    expect(flow.execution.error.name).toBe('InvalidMimic');
+  });
+});
+
+describe('v1.run - concurrency and API mode', () => {
+  test('the API path answers immediately with the execution handle', async () => {
+    const flow = flowWith({ application: 'calculator', method: 'add' });
+
+    const result: any = await v1.run(flow, {
+      environment: 'local', cli: false, reporter: { server: null }
+    });
+
+    expect(result).toEqual({ execution: expect.objectContaining({ id: expect.any(String), status: 'running' }) });
+  });
+
+  test('a second flow is refused while one is running', async () => {
+    const slow = jest.fn(() => new Promise(resolve => setTimeout(
+      () => resolve([{}, 200, {}, {}]), 50
+    )));
+    apps.applications.calculator = { add: slow };
+
+    const first = runCli(flowWith({ application: 'calculator', method: 'add' }));
+    const second = await runCli(flowWith({ application: 'calculator', method: 'add' }));
+
+    expect(second).toBeUndefined();
+    expect(console.error).toHaveBeenCalledWith('Already running');
+
+    await first;
+  });
+
+  test('the lock is released once a flow finishes', async () => {
+    await runCli(flowWith({ application: 'calculator', method: 'add' }));
+    const second: any = await runCli(flowWith({ application: 'calculator', method: 'add' }));
+    expect(second).toBeDefined();
+  });
+});
