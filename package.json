@@ -9,7 +9,7 @@
     "node": ">=20.19.0"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-assets.js",
     "build:watch": "tsc -p tsconfig.build.json --watch",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -32,6 +32,11 @@
   "author": "Jose Constela <jose@lab34.es>",
   "license": "MIT",
   "description": "UI/Cli tool for testing E2E flows",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "@anthropic-ai/sdk": "0.117.1",
     "@faker-js/faker": "9.5.0",

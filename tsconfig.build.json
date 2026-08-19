@@ -1,0 +1,19 @@
+{
+  /* Build configuration used by `npm run build` and, through prepublishOnly, by
+     `npm publish`. Compiles only the shipped sources into dist/; tests are
+     type-checked by tsconfig.json but never emitted. */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "removeComments": false,
+    "newLine": "lf",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "frontend", "website", ".claude", "tests", "src/defaults"]
+}
