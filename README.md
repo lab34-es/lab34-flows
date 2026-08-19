@@ -1206,6 +1206,8 @@ The package is written in TypeScript and published as CommonJS: `src/` compiles
 into `dist/`, which is what `npm publish` ships (together with the type
 declarations). Consumers keep using `require('@lab34/flows')` unchanged.
 
+Both the package (`src/`) and the web UI (`frontend/src/`) are TypeScript.
+
 ```bash
 npm install              # root: the CLI, the API and the helpers
 npm run install:frontend # the web UI
@@ -1221,6 +1223,10 @@ npm test                 # jest
 npm run test:coverage    # jest with the coverage gate
 npm run coverage:badge   # refresh .github/badges/coverage.svg
 npm run audit:ci         # fail if any critical advisory is present
+
+npm run lint      --prefix frontend  # the web UI has its own eslint config
+npm run typecheck --prefix frontend  # and its own tsconfig
+npm run build     --prefix frontend  # tsc -b, then vite build
 ```
 
 ### Quality gates
@@ -1231,8 +1237,8 @@ unless all of it passes:
 
 | Gate | What it checks |
 | --- | --- |
-| Lint | `eslint` over `src/` and `tests/`, clean |
-| Types | `tsc --noEmit`, clean |
+| Lint | `eslint` over `src/`, `tests/` and `frontend/src/`, clean |
+| Types | `tsc --noEmit` for the package and for the frontend, clean |
 | Coverage | statements, branches, functions and lines of `src/` all **above 80%** |
 | Audit | `npm audit` finds **no critical** advisory in the root, frontend or website tree |
 | Build | `dist/` compiles and `node dist/cli.js --help` runs; the frontend builds |
