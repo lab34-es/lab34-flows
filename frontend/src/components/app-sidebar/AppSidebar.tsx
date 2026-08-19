@@ -38,7 +38,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import FlowTree from '@/components/app-sidebar/FlowTree';
 import FlowDialogs from '@/components/app-sidebar/FlowDialogs';
 import ApplicationDialogs from '@/components/app-sidebar/ApplicationDialogs';
-import { useAppState } from '@/context/AppStateContext';
+import GitBadge from '@/components/shared/GitBadge';
+import { useAppState, useGitStatus } from '@/context/AppStateContext';
+import { decorationFor } from '@/lib/git';
+import { cn } from '@/lib/utils';
 import { flowsApi } from '@/services/api';
 import { folderUrl } from '@/lib/flows';
 
@@ -46,6 +49,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { tree, treeLoading, refreshTree, applications, applicationsLoading } = useAppState();
+  const applicationGit = useGitStatus('applications');
 
   const [action, setAction] = useState<any>(null);
   const [applicationAction, setApplicationAction] = useState<any>(null);
@@ -186,20 +190,27 @@ export function AppSidebar() {
                     to get started.
                   </div>
                 )}
-                {applications.map((app) => (
+                {applications.map((app) => {
+                  // An application is a folder of its own: it carries the
+                  // status of whichever of its files changed
+                  const gitStatus = applicationGit.folder(app.slug);
+                  const gitClass = decorationFor(gitStatus)?.className;
+
+                  return (
                   <SidebarMenuItem key={app.slug}>
                     <SidebarMenuButton
                       isActive={location.pathname === `/applications/${app.slug}`}
                       onClick={() => navigate(`/applications/${app.slug}`)}
                       title={app.description || app.name}
                     >
-                      <AppWindow className="text-muted-foreground" />
-                      <span>{app.name}</span>
+                      <AppWindow className={cn('text-muted-foreground', gitClass)} />
+                      <span className={gitClass}>{app.name}</span>
                     </SidebarMenuButton>
 
                     {/* The badge and the actions button share the same corner:
                         hide the count while the row is being acted on */}
-                    <SidebarMenuBadge className="group-hover/menu-item:hidden group-focus-within/menu-item:hidden group-has-data-[state=open]/menu-item:hidden">
+                    <SidebarMenuBadge className="gap-1 group-hover/menu-item:hidden group-focus-within/menu-item:hidden group-has-data-[state=open]/menu-item:hidden">
+                      <GitBadge status={gitStatus} />
                       {app.methods?.length || 0}
                     </SidebarMenuBadge>
 
@@ -218,7 +229,8 @@ export function AppSidebar() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </SidebarMenuItem>
-                ))}
+                  );
+                })}
               </SidebarMenu>
             )}
           </SidebarGroupContent>

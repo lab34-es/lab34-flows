@@ -4,6 +4,7 @@ import environment from './environment';
 import settings from './settings';
 import jira from './jira';
 import views from './views';
+import contextRoutes from './context';
 
 export default (app) => {
   // express 5 leaves req.body undefined when a request carries no body, where
@@ -21,4 +22,5 @@ export default (app) => {
   app.use('/api/environment', environment);
   app.use('/api/settings', settings);
   app.use('/api/jira', jira);
+  app.use('/api/context', contextRoutes);
 };

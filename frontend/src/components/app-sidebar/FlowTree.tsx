@@ -34,19 +34,34 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import StatusDot from '@/components/shared/StatusDot';
+import GitBadge from '@/components/shared/GitBadge';
 import { useExecutions } from '@/context/ExecutionContext';
+import { useGitStatus } from '@/context/AppStateContext';
+import { decorationFor } from '@/lib/git';
 import { flowUrl, folderUrl } from '@/lib/flows';
 import { cn } from '@/lib/utils';
+
+/* The letter sits where the row's actions appear on hover, so it steps aside
+   for them. Unlike the application badges it cannot also key off
+   data-state=open: in this tree that attribute belongs to the collapsible, so
+   every expanded folder -- and everything under it -- would lose its letter. */
+const BADGE_CLASSES =
+  'ml-auto group-hover/menu-item:hidden group-focus-within/menu-item:hidden';
 
 function FolderNode({ node, onAction, children }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const git = useGitStatus('flows');
   // folders start collapsed: the tree opens as a short list of top-level
   // folders instead of every flow in the repository at once
   const [open, setOpen] = React.useState(false);
 
   const isActive = location.pathname === '/flows/folder' &&
     new URLSearchParams(location.search).get('path') === node.relativePath;
+
+  // A folder wears the status of whatever changed inside it, however deep
+  const gitStatus = git.folder(node.relativePath);
+  const gitClass = decorationFor(gitStatus)?.className;
 
   return (
     <SidebarMenuItem>
@@ -69,8 +84,9 @@ function FolderNode({ node, onAction, children }) {
             onClick={() => navigate(folderUrl(node.relativePath))}
             title={`Open ${node.relativePath} as a table`}
           >
-            <Folder className="text-muted-foreground" />
-            <span>{node.name}</span>
+            <Folder className={cn('text-muted-foreground', gitClass)} />
+            <span className={gitClass}>{node.name}</span>
+            <GitBadge status={gitStatus} className={BADGE_CLASSES} />
           </SidebarMenuButton>
         </div>
 
@@ -119,6 +135,7 @@ function FlowNode({ node, onAction }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { statusFor } = useExecutions();
+  const git = useGitStatus('flows');
 
   const url = flowUrl(node);
   const isActive = location.pathname === '/flows/view' &&
@@ -126,6 +143,9 @@ function FlowNode({ node, onAction }) {
 
   const status = statusFor(node.path);
   const Icon = node.format === 'markdown' ? FileText : FileCode2;
+
+  const gitStatus = git.file(node.relativePath);
+  const gitClass = decorationFor(gitStatus)?.className;
 
   return (
     <SidebarMenuItem>
@@ -135,8 +155,9 @@ function FlowNode({ node, onAction }) {
         title={node.relativePath}
       >
         <StatusDot status={status} />
-        <Icon className="text-muted-foreground" />
-        <span>{node.title || node.name}</span>
+        <Icon className={cn('text-muted-foreground', gitClass)} />
+        <span className={gitClass}>{node.title || node.name}</span>
+        <GitBadge status={gitStatus} className={BADGE_CLASSES} />
       </SidebarMenuButton>
 
       <DropdownMenu>

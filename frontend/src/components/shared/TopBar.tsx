@@ -12,11 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import ContextIndicator from '@/components/shared/ContextIndicator';
 import { useAppState } from '@/context/AppStateContext';
 
-/* The bar over every page. On the left, what you are looking at; on the right,
-   the three controls that belong to the whole app rather than to any one page:
-   which environment the flows run against, the help, and the settings. */
+/* The bar over every page. On the left, which folder the app is working in
+   and its git state; on the right, the three controls that belong to the whole
+   app rather than to any one page: which environment the flows run against,
+   the help, and the settings. */
 export function TopBar() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -29,7 +31,7 @@ export function TopBar() {
     <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
       <SidebarTrigger className="-ml-1" />
       <Separator orientation="vertical" className="mr-2 h-4" />
-      <span className="text-muted-foreground text-sm">Lab34 Flows</span>
+      <ContextIndicator />
 
       {/* ml-auto is what pushes the group to the right edge of the bar */}
       <div className="ml-auto flex items-center gap-2">

@@ -103,6 +103,10 @@ are executed. Everything else is documentation, and is rendered as such.
   Click one to read its README and browse its methods: input parameters,
   output, memory usage and examples, plus its environment files.
 - **Sidebar footer › Environment** — the environment used for every run.
+- **Top bar › Context folder** — the folder everything is read from and written
+  to, with its git branch next to it and a *sync* button (see *The context
+  folder and git*). Changed files are coloured in the sidebar, the way an
+  editor's explorer does it.
 - **Notebook view** — a flow rendered as a document, with each step block as a
   cell. Press *Run* and the details stream in below each block.
 - **Document / Source toggle** — *Source* opens the raw Markdown in an editor
@@ -112,6 +116,45 @@ are executed. Everything else is documentation, and is rendered as such.
   the document (see *Writing flows with AI*).
 - **Click a folder** and its flows — subfolders included — are listed as a
   table you can search, sort and filter (see *Properties* and *Folder views*).
+`,
+  },
+  {
+    id: 'context-and-git',
+    category: 'basics',
+    icon: 'folder',
+    title: 'The context folder and git',
+    summary: 'Where your flows live, which branch they are on, and how to sync.',
+    keywords: ['context', 'folder', 'directory', 'git', 'branch', 'commit', 'push',
+      'pull', 'sync', 'repository', 'github', 'bitbucket', 'gitlab', 'changes'],
+    body: `
+Everything the tool reads and writes lives in one folder: your **context
+directory**. By default that is \`lab34-flows\` in your home folder; pass
+\`--context /path/to/folder\` to work somewhere else — one folder per project,
+if you like.
+
+Its name is always on screen, at the left of the top bar, with the full path in
+its tooltip.
+
+### Git
+
+A context folder is usually a git repository shared with your team, so the tool
+treats it as one.
+
+- The **branch** is shown next to the folder name, with arrows counting the
+  commits you have to pull (↓) and to push (↑).
+- **Changed files are coloured** in the sidebar, with a letter at the end of the
+  row: *M* modified, *U* untracked, *A* added, *D* deleted, *R* renamed. A
+  folder takes the colour of whatever changed inside it, however deep — so a
+  collapsed folder still tells you something moved.
+- The **sync button** next to the folder name opens a panel with the branch, the
+  list of changed files, a link to the repository online, and the three buttons
+  that matter: **Pull** (rebasing your commits on top), **Commit** and **Push**.
+
+Tick the files you want in a commit, or leave everything unticked to commit the
+lot. A branch with no upstream gets one on its first push.
+
+If the folder is not a repository, the panel says so: run \`git init\` in it and
+your flows travel with the rest of your code.
 `,
   },
   {

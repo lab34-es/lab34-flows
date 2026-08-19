@@ -9,6 +9,7 @@ jest.mock('../../src/helpers/inputs');
 jest.mock('../../src/helpers/bases');
 jest.mock('../../src/helpers/jira');
 jest.mock('../../src/helpers/applications');
+jest.mock('../../src/helpers/context');
 
 import express from 'express';
 import request from 'supertest';
@@ -18,6 +19,7 @@ import * as inputs from '../../src/helpers/inputs';
 import * as bases from '../../src/helpers/bases';
 import * as jira from '../../src/helpers/jira';
 import * as apps from '../../src/helpers/applications';
+import * as contextHelper from '../../src/helpers/context';
 
 import defineRoutes from '../../src/api/routes';
 
@@ -316,5 +318,72 @@ describe('/api/environment/all-possible', () => {
     const res = await request(app).get('/api/environment/all-possible');
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: 'Failed to fetch environments' });
+  });
+});
+
+describe('/api/context', () => {
+  test('returns the directory and its git state', async () => {
+    (contextHelper.info as jest.Mock).mockResolvedValue({
+      path: '/home/someone/lab34-flows',
+      name: 'lab34-flows',
+      custom: false,
+      git: { branch: 'main', changes: [] }
+    });
+
+    const res = await request(app).get('/api/context');
+
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('lab34-flows');
+    expect(res.body.git.branch).toBe('main');
+  });
+
+  test('a failure maps to 500', async () => {
+    (contextHelper.info as jest.Mock).mockRejectedValue(new Error('no such directory'));
+    const res = await request(app).get('/api/context');
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'no such directory' });
+  });
+});
+
+describe('/api/context/git', () => {
+  test('pull answers with what git printed', async () => {
+    (contextHelper.pull as jest.Mock).mockResolvedValue({ output: 'Already up to date.' });
+    const res = await request(app).post('/api/context/git/pull');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, output: 'Already up to date.' });
+  });
+
+  test('commit passes the message and the selected paths through', async () => {
+    (contextHelper.commit as jest.Mock).mockResolvedValue({ output: '1 file changed' });
+
+    const res = await request(app)
+      .post('/api/context/git/commit')
+      .send({ message: 'update the login flow', paths: ['flows/login.md'] });
+
+    expect(res.status).toBe(200);
+    expect(contextHelper.commit).toHaveBeenCalledWith({
+      message: 'update the login flow',
+      paths: ['flows/login.md']
+    });
+  });
+
+  test('a git failure is a 400 carrying its message', async () => {
+    (contextHelper.commit as jest.Mock).mockRejectedValue(new Error('Nothing staged to commit'));
+    const res = await request(app).post('/api/context/git/commit').send({ message: 'x' });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'Nothing staged to commit' });
+  });
+
+  test('push answers the same way', async () => {
+    (contextHelper.push as jest.Mock).mockResolvedValue({ output: 'To github.com' });
+    const res = await request(app).post('/api/context/git/push');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  test('a push with no remote is a 400', async () => {
+    (contextHelper.push as jest.Mock).mockRejectedValue(new Error('This repository has no remote to push to'));
+    const res = await request(app).post('/api/context/git/push');
+    expect(res.status).toBe(400);
   });
 });
