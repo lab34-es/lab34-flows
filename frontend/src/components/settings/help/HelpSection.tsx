@@ -58,7 +58,7 @@ const ICONS = {
   wand: Wand2,
 };
 
-const REPOSITORY = 'https://github.com/lab34-es/lab34-flows';
+const REPOSITORY = 'https://github.com/lab34-es/flows';
 
 // Everything an article can be found by, lowercased once per topic.
 const HAYSTACKS = new Map(

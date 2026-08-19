@@ -1,6 +1,6 @@
 # lab34/flows website
 
-The documentation website for [lab34-flows](https://github.com/lab34-es/lab34-flows),
+The documentation website for [lab34-flows](https://github.com/lab34-es/flows),
 published at **https://flows.lab34.es/**.
 
 - Built with [Astro](https://astro.build). The look is the editorial
