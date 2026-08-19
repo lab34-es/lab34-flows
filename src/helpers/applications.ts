@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import * as paths from './paths';
 import * as appDocs from './appDocs';
 
-const applications = {};
+const applications: Record<string, any> = {};
 
 export { applications };
 
