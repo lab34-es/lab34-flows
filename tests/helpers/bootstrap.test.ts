@@ -91,8 +91,15 @@ describe('bootstrap.ensureTypeScriptConfig', () => {
     const written = read();
     const config = JSON.parse(written.slice(written.indexOf('{')));
 
+    // Resolved from the package root rather than matched against a folder
+    // name: a checkout is not always named after the package, so asserting on
+    // the name only ever tested what the clone directory happened to be called.
+    const packageRoot = path.resolve(__dirname, '..', '..');
+    const built = path.join(packageRoot, 'dist', 'index.d.ts');
+    const expected = fs.existsSync(built) ? built : path.join(packageRoot, 'src', 'index.ts');
+
     expect(config.include).toEqual(['applications/**/*.ts']);
-    expect(config.compilerOptions.paths['@lab34/flows'][0]).toMatch(/lab34-flows\/(dist|src)\//);
+    expect(config.compilerOptions.paths['@lab34/flows'][0]).toBe(expected);
     expect(config.compilerOptions.paths['lab34-flows']).toEqual(
       config.compilerOptions.paths['@lab34/flows']
     );
