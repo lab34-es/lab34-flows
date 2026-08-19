@@ -6,6 +6,11 @@
 #
 # One-time setup: in the repository settings, under Pages, set
 # "Build and deployment > Source" to "GitHub Actions".
+#
+# Every job takes its Node version from .nvmrc, so the pipelines, the website
+# build and a local `nvm use` all run the same release. Keep .nvmrc on a Node
+# LTS line that satisfies "engines" in package.json; .npmrc sets engine-strict,
+# so an end-of-life or too-old release fails `npm ci` outright.
 
 name: Deploy website
 
@@ -34,7 +39,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: website/package-lock.json
       - name: Install dependencies

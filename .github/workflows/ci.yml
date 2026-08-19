@@ -10,6 +10,11 @@
 #   - npm audit reports no critical vulnerability, in any of the three
 #     package trees
 #   - the package and the frontend both build
+#
+# Every job takes its Node version from .nvmrc, so the pipelines, the website
+# build and a local `nvm use` all run the same release. Keep .nvmrc on a Node
+# LTS line that satisfies "engines" in package.json; .npmrc sets engine-strict,
+# so an end-of-life or too-old release fails `npm ci` outright.
 
 name: CI
 
@@ -26,11 +31,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  # Matches "engines" in package.json; .npmrc sets engine-strict, so this has
-  # to satisfy it.
-  NODE_VERSION: '22'
-
 jobs:
   quality:
     name: Lint, types and tests
@@ -40,7 +40,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
@@ -92,7 +92,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -113,7 +113,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
 
       # --audit-level=critical makes npm exit non-zero only when a critical
       # advisory is present, which is what blocks the merge. High and below are
@@ -157,7 +157,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
@@ -187,7 +187,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
