@@ -14,7 +14,7 @@
 const entries = new Map();
 
 /**
- * Keys look like "BOP-1234". Anything else is rejected before it can reach a
+ * Keys look like "ABC-1234". Anything else is rejected before it can reach a
  * JQL query.
  */
 const KEY_PATTERN = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*-\d+$/;

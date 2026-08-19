@@ -8,7 +8,7 @@ const sendError = (res, error, status = 400) => {
   res.status(status).send({ error: message });
 };
 
-// Xray data for the tests a flow points at: /api/jira/tests?keys=BOP-1,BOP-2
+// Xray data for the tests a flow points at: /api/jira/tests?keys=ABC-1,ABC-2
 // Called by the UI once a flow has been rendered — never during a run.
 router.get('/tests', (req, res) => {
   const keys = String(req.query.keys || '')

@@ -7,7 +7,7 @@
  *   ---
  *   title: Fraud detection
  *   xray:
- *     testKey: BOP-1234
+ *     testKey: ABC-1234
  *   ---
  *
  * The settings live in the context folder, at config/jira.json:
@@ -15,7 +15,7 @@
  *   {
  *     "kind": "cloud",
  *     "jiraBaseUrl": "https://acme.atlassian.net",
- *     "projectKey": "BOP",
+ *     "projectKeys": ["ABC", "ACME"],
  *     "cloud":  { "xrayBaseUrl": "https://xray.cloud.getxray.app",
  *                 "clientId": "...", "clientSecret": "..." },
  *     "basic":  { "email": "me@acme.com", "apiToken": "..." },
@@ -31,6 +31,7 @@
 import * as configHelper from '../config';
 import * as client from './client';
 import * as cache from './cache';
+import * as projects from './projects';
 import * as pull from './pull';
 
 const CONFIG_NAME = 'jira';
@@ -67,7 +68,7 @@ const cleanUrl = (value) => String(value || '').trim().replace(/\/+$/, '');
 /**
  * Normalize a raw config file into the current shape.
  * @param {Object} raw - Contents of config/jira.json
- * @returns {Object} { kind, jiraBaseUrl, projectKey, cloud, server, pull }
+ * @returns {Object} { kind, jiraBaseUrl, projectKeys, cloud, server, pull }
  */
 const normalize = (raw) => {
   const source = (raw && typeof raw === 'object') ? raw : {};
@@ -79,7 +80,7 @@ const normalize = (raw) => {
   return {
     kind: KIND_IDS.includes(source.kind) ? source.kind : KIND_IDS[0],
     jiraBaseUrl: cleanUrl(source.jiraBaseUrl),
-    projectKey: String(source.projectKey || '').trim(),
+    projectKeys: projects.parseKeys(source.projectKeys === undefined ? source.projectKey : source.projectKeys),
     cloud: {
       xrayBaseUrl: cleanUrl(cloud.xrayBaseUrl) || DEFAULT_XRAY_BASE_URL,
       clientId: String(cloud.clientId || '').trim(),
@@ -135,7 +136,7 @@ const getSettings = async () => {
   return {
     kind: settings.kind,
     jiraBaseUrl: settings.jiraBaseUrl,
-    projectKey: settings.projectKey,
+    projectKeys: settings.projectKeys,
     cloud: {
       xrayBaseUrl: settings.cloud.xrayBaseUrl,
       clientId: settings.cloud.clientId,
@@ -173,7 +174,7 @@ const nextSecret = (incoming, stored) => {
 /**
  * Update the settings.
  *
- * @param {Object} body - { kind, jiraBaseUrl, projectKey,
+ * @param {Object} body - { kind, jiraBaseUrl, projectKeys,
  *                          cloud: { xrayBaseUrl, clientId, clientSecret },
  *                          basic: { email, apiToken },
  *                          server: { personalAccessToken },
@@ -196,9 +197,10 @@ const saveSettings = async (body) => {
   const next = {
     kind: input.kind || current.kind,
     jiraBaseUrl: input.jiraBaseUrl === undefined ? current.jiraBaseUrl : cleanUrl(input.jiraBaseUrl),
-    projectKey: input.projectKey === undefined
-      ? current.projectKey
-      : String(input.projectKey || '').trim(),
+    // "projectKey" is what older settings — and older clients — call it
+    projectKeys: (input.projectKeys === undefined && input.projectKey === undefined)
+      ? current.projectKeys
+      : projects.parseKeys(input.projectKeys === undefined ? input.projectKey : input.projectKeys),
     cloud: {
       xrayBaseUrl: inputCloud.xrayBaseUrl === undefined
         ? current.cloud.xrayBaseUrl
@@ -230,6 +232,12 @@ const saveSettings = async (body) => {
 
   if (next.cloud.xrayBaseUrl && !/^https?:\/\//i.test(next.cloud.xrayBaseUrl)) {
     throw new Error('The Xray URL must start with http:// or https://');
+  }
+
+  const wrong = projects.firstInvalid(next.projectKeys);
+
+  if (wrong) {
+    throw new Error(`"${wrong}" is not a Jira project key. Separate several of them with commas.`);
   }
 
   await configHelper.save(CONFIG_NAME, next);
@@ -267,7 +275,7 @@ const test = async () => {
  * downloaded and the caller gets an empty answer, so the UI shows no Xray
  * information at all.
  *
- * @param {Array<string>} keys - Jira issue keys, e.g. ['BOP-1', 'BOP-2']
+ * @param {Array<string>} keys - Jira issue keys, e.g. ['ABC-1', 'ABC-2']
  * @returns {Promise<Object>} { configured, jiraBaseUrl, tests }
  */
 const getTests = async (keys) => {
@@ -289,8 +297,8 @@ const getTests = async (keys) => {
 };
 
 /**
- * Download every test of the configured project into the flows folder. See
- * ./pull for what lands where.
+ * Download every test of the configured projects into the flows folder, one
+ * folder per project key. See ./pull for what lands where.
  *
  * @param {Object} [options] - { io } - the socket.io server, when there is one
  * @returns {Promise<Object>} The progress, as it stands at the first tick

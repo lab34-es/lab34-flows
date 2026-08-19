@@ -33,12 +33,12 @@ const LAYOUTS = {
   cloud: {
     label: 'Xray Test Repository',
     detail: 'The folders on disk are the folders of the Test Repository in Xray.',
-    example: 'xray/Authentication/Login/BOP-123_login-with-valid-credentials.md',
+    example: 'xray/ABC/Authentication/Login/ABC-123_login-with-valid-credentials.md',
   },
   server: {
     label: 'Xray Test Repository',
     detail: 'The folders on disk are the folders of the Test Repository in Xray.',
-    example: 'xray/Authentication/Login/BOP-123_login-with-valid-credentials.md',
+    example: 'xray/ABC/Authentication/Login/ABC-123_login-with-valid-credentials.md',
   },
   basic: {
     label: 'Jira hierarchy',
@@ -46,7 +46,7 @@ const LAYOUTS = {
       'Without an Xray API key there is no Test Repository to read, so the folders are '
       + 'rebuilt from Jira: the feature and the user story of every test, taken from its '
       + 'parent when it has one and from its related work when it does not.',
-    example: 'xray/BOP-10_checkout/BOP-42_pay-with-a-card/BOP-123_pay-with-an-expired-card.md',
+    example: 'xray/ABC/ABC-10_checkout/ABC-42_pay-with-a-card/ABC-123_pay-with-an-expired-card.md',
   },
 };
 
@@ -219,7 +219,8 @@ export function XrayPull() {
   }
 
   const layout = LAYOUTS[settings?.kind] || LAYOUTS.cloud;
-  const ready = Boolean(settings?.configured && settings?.projectKey);
+  const projectKeys = settings?.projectKeys || [];
+  const ready = Boolean(settings?.configured && projectKeys.length);
   const running = Boolean(progress?.running);
   const percent = progress?.total
     ? Math.min(100, Math.round((progress.processed / progress.total) * 100))
@@ -233,10 +234,10 @@ export function XrayPull() {
             <DownloadCloud className="size-4" /> Pull tests
           </CardTitle>
           <CardDescription>
-            Download every Xray test of the project into the <span className="font-mono">xray</span>{' '}
-            folder of your flows, one Markdown file per test, with the Jira description and the
-            Xray test details as its content. Pulling again updates what Jira owns and keeps the
-            steps you wrote.
+            Download every Xray test of the projects above into the{' '}
+            <span className="font-mono">xray</span> folder of your flows — one folder per project
+            key, one Markdown file per test, with the Jira description and the Xray test details as
+            its content. Pulling again updates what Jira owns and keeps the steps you wrote.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
@@ -245,9 +246,9 @@ export function XrayPull() {
               <Badge variant="outline" className="gap-1">
                 <FolderTree className="size-3" /> {layout.label}
               </Badge>
-              {settings?.projectKey ? (
-                <Badge variant="outline" className="font-mono">{settings.projectKey}</Badge>
-              ) : null}
+              {projectKeys.map((key) => (
+                <Badge key={key} variant="outline" className="font-mono">{key}</Badge>
+              ))}
             </div>
             <p className="text-muted-foreground text-xs">{layout.detail}</p>
             <p className="text-muted-foreground font-mono text-xs break-all">{layout.example}</p>
@@ -286,12 +287,13 @@ export function XrayPull() {
             </Alert>
           )}
 
-          {settings?.configured && !settings?.projectKey && (
+          {settings?.configured && !projectKeys.length && (
             <Alert>
               <AlertCircle />
               <AlertTitle>No project key</AlertTitle>
               <AlertDescription>
-                A pull downloads the tests of one Jira project: set the project key above.
+                A pull downloads the tests of the Jira projects it is given: set the project keys
+                above, separated by commas.
               </AlertDescription>
             </Alert>
           )}
@@ -313,8 +315,9 @@ export function XrayPull() {
               Pulling tests from Xray
             </DialogTitle>
             <DialogDescription>
-              {progress?.projectKey
-                ? `Project ${progress.projectKey}, into the "${progress.folder}" folder.`
+              {progress?.projectKeys?.length
+                ? `Project${progress.projectKeys.length > 1 ? 's' : ''} `
+                  + `${progress.projectKeys.join(', ')}, into the "${progress.folder}" folder.`
                 : 'Starting…'}
             </DialogDescription>
           </DialogHeader>

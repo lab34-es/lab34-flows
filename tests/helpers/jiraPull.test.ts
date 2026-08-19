@@ -46,14 +46,14 @@ const xrayDir = path.join(CONTEXT, 'flows', 'xray');
 const BASIC_SETTINGS = {
   kind: 'basic',
   jiraBaseUrl: 'https://acme.atlassian.net',
-  projectKey: 'BOP',
+  projectKey: 'ABC',
   basic: { email: 'jane@acme.com', apiToken: 'api-token' }
 };
 
 const CLOUD_SETTINGS = {
   kind: 'cloud',
   jiraBaseUrl: 'https://acme.atlassian.net',
-  projectKey: 'BOP',
+  projectKey: 'ABC',
   cloud: {
     xrayBaseUrl: 'https://xray.cloud.getxray.app',
     clientId: 'client-id',
@@ -173,13 +173,13 @@ describe('jira.startPull', () => {
   });
 
   test('refuses to run when the integration is not configured', async () => {
-    (configHelper as any).__set({ kind: 'basic', jiraBaseUrl: '', projectKey: 'BOP', basic: {} });
+    (configHelper as any).__set({ kind: 'basic', jiraBaseUrl: '', projectKey: 'ABC', basic: {} });
 
     await expect(jira.startPull({})).rejects.toThrow(/Configure/i);
   });
 
   test('rejects a project key that is not one', async () => {
-    (configHelper as any).__set({ ...BASIC_SETTINGS, projectKey: 'BOP OR 1=1' });
+    (configHelper as any).__set({ ...BASIC_SETTINGS, projectKey: 'ABC OR 1=1' });
 
     await expect(jira.startPull({})).rejects.toThrow(/not a Jira project key/i);
   });
@@ -192,13 +192,13 @@ describe('the Jira hierarchy layout (Jira Cloud with an API token)', () => {
 
   test('files a test under the feature and the story it hangs from', async () => {
     mockJira({
-      tests: [issue('BOP-123', 'Pay with an expired card', 'Test', {
+      tests: [issue('ABC-123', 'Pay with an expired card', 'Test', {
         description: 'h2. Setup\nA card that expired *yesterday*.',
-        parent: linked('BOP-42', 'Pay with a card', 'Story')
+        parent: linked('ABC-42', 'Pay with a card', 'Story')
       })],
       byKey: {
-        'BOP-42': issue('BOP-42', 'Pay with a card', 'Story', {
-          parent: linked('BOP-10', 'Checkout', 'Epic')
+        'ABC-42': issue('ABC-42', 'Pay with a card', 'Story', {
+          parent: linked('ABC-10', 'Checkout', 'Epic')
         })
       }
     });
@@ -208,15 +208,15 @@ describe('the Jira hierarchy layout (Jira Cloud with an API token)', () => {
     expect(status.phase).toBe('done');
     expect(status.created).toBe(1);
     expect(written()).toEqual([
-      'BOP-10_checkout/BOP-42_pay-with-a-card/BOP-123_pay-with-an-expired-card.md'
+      'ABC/ABC-10_checkout/ABC-42_pay-with-a-card/ABC-123_pay-with-an-expired-card.md'
     ]);
 
-    const document = read('BOP-10_checkout/BOP-42_pay-with-a-card/BOP-123_pay-with-an-expired-card.md');
+    const document = read('ABC/ABC-10_checkout/ABC-42_pay-with-a-card/ABC-123_pay-with-an-expired-card.md');
 
-    expect(document).toContain('testKey: BOP-123');
-    expect(document).toContain('feature: BOP-10');
-    expect(document).toContain('userStory: BOP-42');
-    expect(document).toContain('url: https://acme.atlassian.net/browse/BOP-123');
+    expect(document).toContain('testKey: ABC-123');
+    expect(document).toContain('feature: ABC-10');
+    expect(document).toContain('userStory: ABC-42');
+    expect(document).toContain('url: https://acme.atlassian.net/browse/ABC-123');
     // The Jira description is the content of the document, not a property
     expect(document).toContain('## Setup');
     expect(document).toContain('A card that expired **yesterday**.');
@@ -224,15 +224,15 @@ describe('the Jira hierarchy layout (Jira Cloud with an API token)', () => {
 
   test('falls back to the related work when the test has no parent', async () => {
     mockJira({
-      tests: [issue('BOP-124', 'Reject an unknown card', 'Test', {
+      tests: [issue('ABC-124', 'Reject an unknown card', 'Test', {
         issuelinks: [
-          { type: { name: 'Relates' }, outwardIssue: linked('BOP-99', 'Some bug', 'Bug') },
-          { type: { name: 'Test' }, outwardIssue: linked('BOP-42', 'Pay with a card', 'Story') }
+          { type: { name: 'Relates' }, outwardIssue: linked('ABC-99', 'Some bug', 'Bug') },
+          { type: { name: 'Test' }, outwardIssue: linked('ABC-42', 'Pay with a card', 'Story') }
         ]
       })],
       byKey: {
-        'BOP-42': issue('BOP-42', 'Pay with a card', 'Story', {
-          issuelinks: [{ type: { name: 'Relates' }, inwardIssue: linked('BOP-10', 'Checkout', 'Epic') }]
+        'ABC-42': issue('ABC-42', 'Pay with a card', 'Story', {
+          issuelinks: [{ type: { name: 'Relates' }, inwardIssue: linked('ABC-10', 'Checkout', 'Epic') }]
         })
       }
     });
@@ -240,28 +240,28 @@ describe('the Jira hierarchy layout (Jira Cloud with an API token)', () => {
     await runPull();
 
     expect(written()).toEqual([
-      'BOP-10_checkout/BOP-42_pay-with-a-card/BOP-124_reject-an-unknown-card.md'
+      'ABC/ABC-10_checkout/ABC-42_pay-with-a-card/ABC-124_reject-an-unknown-card.md'
     ]);
   });
 
   test('keeps a test with no hierarchy at all rather than dropping it', async () => {
-    mockJira({ tests: [issue('BOP-125', 'Orphan test', 'Test')] });
+    mockJira({ tests: [issue('ABC-125', 'Orphan test', 'Test')] });
 
     await runPull();
 
     expect(written()).toEqual([
-      `${pull.NO_FEATURE}/${pull.NO_STORY}/BOP-125_orphan-test.md`
+      `ABC/${pull.NO_FEATURE}/${pull.NO_STORY}/ABC-125_orphan-test.md`
     ]);
   });
 
   test('moves a test that changed story instead of writing it twice', async () => {
     mockJira({
-      tests: [issue('BOP-123', 'Pay with an expired card', 'Test', {
-        parent: linked('BOP-42', 'Pay with a card', 'Story')
+      tests: [issue('ABC-123', 'Pay with an expired card', 'Test', {
+        parent: linked('ABC-42', 'Pay with a card', 'Story')
       })],
       byKey: {
-        'BOP-42': issue('BOP-42', 'Pay with a card', 'Story', {
-          parent: linked('BOP-10', 'Checkout', 'Epic')
+        'ABC-42': issue('ABC-42', 'Pay with a card', 'Story', {
+          parent: linked('ABC-10', 'Checkout', 'Epic')
         })
       }
     });
@@ -269,16 +269,16 @@ describe('the Jira hierarchy layout (Jira Cloud with an API token)', () => {
     await runPull();
 
     // The steps the user wrote after the first pull must survive the second
-    const first = 'BOP-10_checkout/BOP-42_pay-with-a-card/BOP-123_pay-with-an-expired-card.md';
+    const first = 'ABC/ABC-10_checkout/ABC-42_pay-with-a-card/ABC-123_pay-with-an-expired-card.md';
     fs.appendFileSync(path.join(xrayDir, first), '\n```step\napplication: calculator\n```\n');
 
     mockJira({
-      tests: [issue('BOP-123', 'Pay with an expired card', 'Test', {
-        parent: linked('BOP-43', 'Pay with a wallet', 'Story')
+      tests: [issue('ABC-123', 'Pay with an expired card', 'Test', {
+        parent: linked('ABC-43', 'Pay with a wallet', 'Story')
       })],
       byKey: {
-        'BOP-43': issue('BOP-43', 'Pay with a wallet', 'Story', {
-          parent: linked('BOP-10', 'Checkout', 'Epic')
+        'ABC-43': issue('ABC-43', 'Pay with a wallet', 'Story', {
+          parent: linked('ABC-10', 'Checkout', 'Epic')
         })
       }
     });
@@ -288,16 +288,16 @@ describe('the Jira hierarchy layout (Jira Cloud with an API token)', () => {
     expect(status.moved).toBe(1);
     expect(status.created).toBe(0);
     expect(written()).toEqual([
-      'BOP-10_checkout/BOP-43_pay-with-a-wallet/BOP-123_pay-with-an-expired-card.md'
+      'ABC/ABC-10_checkout/ABC-43_pay-with-a-wallet/ABC-123_pay-with-an-expired-card.md'
     ]);
 
-    const document = read('BOP-10_checkout/BOP-43_pay-with-a-wallet/BOP-123_pay-with-an-expired-card.md');
+    const document = read('ABC/ABC-10_checkout/ABC-43_pay-with-a-wallet/ABC-123_pay-with-an-expired-card.md');
     expect(document).toContain('```step');
-    expect(document).toContain('userStory: BOP-43');
+    expect(document).toContain('userStory: ABC-43');
   });
 
   test('a second pull that changes nothing rewrites nothing', async () => {
-    mockJira({ tests: [issue('BOP-125', 'Orphan test', 'Test')] });
+    mockJira({ tests: [issue('ABC-125', 'Orphan test', 'Test')] });
 
     await runPull();
     const status = await runPull();
@@ -308,17 +308,17 @@ describe('the Jira hierarchy layout (Jira Cloud with an API token)', () => {
   });
 
   test('leaves a test that is already in "xray" alone when overwrite is off', async () => {
-    mockJira({ tests: [issue('BOP-125', 'Orphan test', 'Test', { summary: 'Orphan test' })] });
+    mockJira({ tests: [issue('ABC-125', 'Orphan test', 'Test', { summary: 'Orphan test' })] });
 
     await runPull();
 
-    const file = `${pull.NO_FEATURE}/${pull.NO_STORY}/BOP-125_orphan-test.md`;
+    const file = `ABC/${pull.NO_FEATURE}/${pull.NO_STORY}/ABC-125_orphan-test.md`;
     const before = read(file);
 
     (configHelper as any).__set({ ...BASIC_SETTINGS, pull: { overwrite: false } });
 
     // Jira renamed the test: with overwrite off, the file must not notice
-    mockJira({ tests: [issue('BOP-125', 'Renamed in Jira', 'Test')] });
+    mockJira({ tests: [issue('ABC-125', 'Renamed in Jira', 'Test')] });
 
     const status = await runPull();
 
@@ -334,13 +334,13 @@ describe('the Jira hierarchy layout (Jira Cloud with an API token)', () => {
   test('still writes a test that was never pulled when overwrite is off', async () => {
     (configHelper as any).__set({ ...BASIC_SETTINGS, pull: { overwrite: false } });
 
-    mockJira({ tests: [issue('BOP-125', 'Orphan test', 'Test')] });
+    mockJira({ tests: [issue('ABC-125', 'Orphan test', 'Test')] });
 
     const status = await runPull();
 
     expect(status.created).toBe(1);
     expect(status.skipped).toBe(0);
-    expect(written()).toEqual([`${pull.NO_FEATURE}/${pull.NO_STORY}/BOP-125_orphan-test.md`]);
+    expect(written()).toEqual([`ABC/${pull.NO_FEATURE}/${pull.NO_STORY}/ABC-125_orphan-test.md`]);
   });
 });
 
@@ -369,7 +369,7 @@ describe('the Xray Test Repository layout (Xray Cloud)', () => {
                   testType: { name: 'Manual' },
                   folder: { path: '/Authentication/Login' },
                   jira: {
-                    key: 'BOP-200',
+                    key: 'ABC-200',
                     summary: 'Login with valid credentials',
                     status: { name: 'To Do' },
                     issuetype: { name: 'Test' },
@@ -416,7 +416,7 @@ describe('the Xray Test Repository layout (Xray Cloud)', () => {
                   gherkin: null,
                   unstructured: null,
                   jira: {
-                    key: 'BOP-200',
+                    key: 'ABC-200',
                     summary: 'Login with valid credentials',
                     status: { name: 'To Do' },
                     issuetype: { name: 'Test' },
@@ -434,7 +434,7 @@ describe('the Xray Test Repository layout (Xray Cloud)', () => {
 
     await runPull();
 
-    const document = read('Authentication/Login/BOP-200_login-with-valid-credentials.md');
+    const document = read('ABC/Authentication/Login/ABC-200_login-with-valid-credentials.md');
 
     expect(document).toContain('## Test details');
     expect(document).toContain('**Test type:** Manual');
@@ -468,7 +468,7 @@ describe('the Xray Test Repository layout (Xray Cloud)', () => {
                 gherkin: 'Given a registered user\nWhen they sign in\nThen the dashboard shows',
                 unstructured: null,
                 jira: {
-                  key: 'BOP-201',
+                  key: 'ABC-201',
                   summary: 'Sign in',
                   status: { name: 'To Do' },
                   issuetype: { name: 'Test' },
@@ -483,7 +483,7 @@ describe('the Xray Test Repository layout (Xray Cloud)', () => {
 
     await runPull();
 
-    const document = read('BOP-201_sign-in.md');
+    const document = read('ABC/ABC-201_sign-in.md');
 
     expect(document).toContain('```gherkin');
     expect(document).toContain('Given a registered user');
@@ -516,7 +516,7 @@ describe('the Xray Test Repository layout (Xray Cloud)', () => {
                 testType: { name: 'Manual' },
                 folder: { path: '/' },
                 jira: {
-                  key: 'BOP-202',
+                  key: 'ABC-202',
                   summary: 'No details here',
                   status: { name: 'To Do' },
                   issuetype: { name: 'Test' },
@@ -535,9 +535,9 @@ describe('the Xray Test Repository layout (Xray Cloud)', () => {
     expect(status.created).toBe(1);
     expect(status.log.some(line => line.level === 'warn' && /test details/i.test(line.message))).toBe(true);
 
-    const document = read('BOP-202_no-details-here.md');
+    const document = read('ABC/ABC-202_no-details-here.md');
 
-    expect(document).toContain('testKey: BOP-202');
+    expect(document).toContain('testKey: ABC-202');
     expect(document).not.toContain('## Test details');
   });
 
@@ -546,11 +546,11 @@ describe('the Xray Test Repository layout (Xray Cloud)', () => {
 
     expect(status.phase).toBe('done');
     expect(status.strategy).toBe('xray-repository');
-    expect(written()).toEqual(['Authentication/Login/BOP-200_login-with-valid-credentials.md']);
+    expect(written()).toEqual(['ABC/Authentication/Login/ABC-200_login-with-valid-credentials.md']);
 
-    const document = read('Authentication/Login/BOP-200_login-with-valid-credentials.md');
+    const document = read('ABC/Authentication/Login/ABC-200_login-with-valid-credentials.md');
 
-    expect(document).toContain('testKey: BOP-200');
+    expect(document).toContain('testKey: ABC-200');
     expect(document).toContain('folder: /Authentication/Login');
     expect(document).toContain('testType: Manual');
     expect(document).toContain('Sign in and land on the dashboard.');
@@ -561,7 +561,7 @@ describe('the Xray Test Repository layout (Xray Server/DC)', () => {
   const SERVER_SETTINGS = {
     kind: 'server',
     jiraBaseUrl: 'https://jira.acme.com',
-    projectKey: 'BOP',
+    projectKey: 'ABC',
     server: { personalAccessToken: 'personal-access-token' }
   };
 
@@ -569,17 +569,17 @@ describe('the Xray Test Repository layout (Xray Server/DC)', () => {
     (configHelper as any).__set(SERVER_SETTINGS);
 
     (axios.get as jest.Mock).mockImplementation((url) => {
-      if (url.endsWith('/rest/raven/1.0/api/testrepository/BOP/folders')) {
+      if (url.endsWith('/rest/raven/1.0/api/testrepository/ABC/folders')) {
         return Promise.resolve({
           data: { id: -1, name: '', folders: [{ id: 1, name: 'Login', folders: [] }] }
         });
       }
 
-      if (url.endsWith('/rest/raven/1.0/api/testrepository/BOP/folders/1/tests')) {
-        return Promise.resolve({ data: { tests: [{ key: 'BOP-300' }] } });
+      if (url.endsWith('/rest/raven/1.0/api/testrepository/ABC/folders/1/tests')) {
+        return Promise.resolve({ data: { tests: [{ key: 'ABC-300' }] } });
       }
 
-      if (url.endsWith('/rest/raven/1.0/api/test/BOP-300/step')) {
+      if (url.endsWith('/rest/raven/1.0/api/test/ABC-300/step')) {
         return Promise.resolve({
           data: [{
             id: 1,
@@ -603,7 +603,7 @@ describe('the Xray Test Repository layout (Xray Server/DC)', () => {
       if (url.endsWith('/rest/api/2/search/jql')) {
         return Promise.resolve({
           data: {
-            issues: [issue('BOP-300', 'Sign in', 'Test', {
+            issues: [issue('ABC-300', 'Sign in', 'Test', {
               customfield_20001: { value: 'Manual' }
             })],
             nextPageToken: null
@@ -627,9 +627,9 @@ describe('the Xray Test Repository layout (Xray Server/DC)', () => {
     const status = await runPull();
 
     expect(status.phase).toBe('done');
-    expect(written()).toEqual(['Login/BOP-300_sign-in.md']);
+    expect(written()).toEqual(['ABC/Login/ABC-300_sign-in.md']);
 
-    const document = read('Login/BOP-300_sign-in.md');
+    const document = read('ABC/Login/ABC-300_sign-in.md');
 
     expect(document).toContain('folder: /Login');
     expect(document).toContain('testType: Manual');
@@ -648,7 +648,124 @@ describe('the Xray Test Repository layout (Xray Server/DC)', () => {
     const status = await runPull();
 
     expect(status.skipped).toBe(1);
-    expect((axios.get as jest.Mock).mock.calls.some(([url]) => url.includes('/api/test/BOP-300/step'))).toBe(false);
+    expect((axios.get as jest.Mock).mock.calls.some(([url]) => url.includes('/api/test/ABC-300/step'))).toBe(false);
+  });
+});
+
+describe('several projects', () => {
+  /**
+   * Answer the requests of a pull that walks several projects: one set of
+   * tests per project key, and the projects that are meant to be unreachable.
+   *
+   * @param {Object} byProject - Tests, keyed by project key
+   * @param {Array<string>} unreachable - Project keys Jira refuses to answer
+   */
+  const mockProjects = (byProject, unreachable: string[] = []) => {
+    const projectOf = (jql) => (String(jql).match(/project = "([^"]+)"/) || [])[1];
+    const testsOf = (jql) => byProject[projectOf(jql)] || [];
+
+    (axios.get as jest.Mock).mockImplementation((url, config: any = {}) => {
+      const params = config.params || {};
+
+      if (url.endsWith('/rest/api/2/field')) {
+        return Promise.resolve({ data: [] });
+      }
+
+      if (url.endsWith('/rest/api/2/search/jql')) {
+        const project = projectOf(params.jql);
+
+        if (unreachable.includes(project)) {
+          return Promise.reject(new Error(`No permission to read ${project}`));
+        }
+
+        return Promise.resolve({ data: { issues: testsOf(params.jql), nextPageToken: null } });
+      }
+
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    (axios.post as jest.Mock).mockImplementation((url, body: any = {}) => {
+      if (url.endsWith('/rest/api/2/search/approximate-count')) {
+        return Promise.resolve({ data: { count: testsOf(body.jql).length } });
+      }
+
+      return Promise.reject(new Error(`Unexpected POST ${url}`));
+    });
+  };
+
+  test('writes every project into a folder of its own', async () => {
+    (configHelper as any).__set({ ...BASIC_SETTINGS, projectKey: 'ABC, ACME' });
+
+    mockProjects({
+      ABC: [issue('ABC-125', 'Orphan test', 'Test')],
+      ACME: [issue('ACME-7', 'Another test', 'Test')]
+    });
+
+    const status = await runPull();
+
+    expect(status.phase).toBe('done');
+    expect(status.projectKeys).toEqual(['ABC', 'ACME']);
+    expect(status.created).toBe(2);
+    // The progress bar spans the whole pull, not the project being read
+    expect(status.total).toBe(2);
+    expect(written()).toEqual([
+      `ACME/${pull.NO_FEATURE}/${pull.NO_STORY}/ACME-7_another-test.md`,
+      `ABC/${pull.NO_FEATURE}/${pull.NO_STORY}/ABC-125_orphan-test.md`
+    ]);
+  });
+
+  test('moves a test pulled before there were project folders into its own', async () => {
+    (configHelper as any).__set(BASIC_SETTINGS);
+    mockProjects({ ABC: [issue('ABC-125', 'Orphan test', 'Test')] });
+
+    await runPull();
+
+    // What a version of the tool without project folders left on disk
+    const legacy = path.join(xrayDir, pull.NO_FEATURE, pull.NO_STORY);
+    const pulled = path.join(xrayDir, 'ABC', pull.NO_FEATURE, pull.NO_STORY);
+
+    fs.mkdirSync(legacy, { recursive: true });
+    fs.renameSync(
+      path.join(pulled, 'ABC-125_orphan-test.md'),
+      path.join(legacy, 'ABC-125_orphan-test.md')
+    );
+    fs.rmSync(path.join(xrayDir, 'ABC'), { recursive: true, force: true });
+
+    const status = await runPull();
+
+    expect(status.moved).toBe(1);
+    expect(status.created).toBe(0);
+    expect(written()).toEqual([`ABC/${pull.NO_FEATURE}/${pull.NO_STORY}/ABC-125_orphan-test.md`]);
+  });
+
+  test('carries on with the next project when one cannot be read', async () => {
+    (configHelper as any).__set({ ...BASIC_SETTINGS, projectKey: 'NOPE, ABC' });
+
+    mockProjects({ ABC: [issue('ABC-125', 'Orphan test', 'Test')] }, ['NOPE']);
+
+    const status = await runPull();
+
+    expect(status.phase).toBe('done');
+    expect(status.created).toBe(1);
+    expect(status.errors).toEqual([{ key: 'NOPE', message: expect.stringMatching(/No permission/) }]);
+    expect(written()).toEqual([`ABC/${pull.NO_FEATURE}/${pull.NO_STORY}/ABC-125_orphan-test.md`]);
+  });
+
+  test('fails when no project at all could be read', async () => {
+    (configHelper as any).__set({ ...BASIC_SETTINGS, projectKey: 'NOPE, ALSO_NOPE' });
+
+    mockProjects({}, ['NOPE', 'ALSO_NOPE']);
+
+    const status = await runPull();
+
+    expect(status.phase).toBe('error');
+    expect(status.error).toMatch(/No permission/);
+  });
+
+  test('rejects a project key that is not one, whichever it is', async () => {
+    (configHelper as any).__set({ ...BASIC_SETTINGS, projectKey: 'ABC, 1=1' });
+
+    await expect(jira.startPull({})).rejects.toThrow(/"1=1" is not a Jira project key/);
   });
 });
 
@@ -663,15 +780,15 @@ describe('pull.folderSegments', () => {
 
 describe('testDoc', () => {
   test('names a file after its key and its summary', () => {
-    expect(testDoc.keyedName('BOP-1', 'Pay with a card')).toBe('BOP-1_pay-with-a-card');
-    expect(testDoc.keyedName('BOP-2', 'Añadir código')).toBe('BOP-2_anadir-codigo');
-    expect(testDoc.keyedName('BOP-3', '   ')).toBe('BOP-3_untitled');
+    expect(testDoc.keyedName('ABC-1', 'Pay with a card')).toBe('ABC-1_pay-with-a-card');
+    expect(testDoc.keyedName('ABC-2', 'Añadir código')).toBe('ABC-2_anadir-codigo');
+    expect(testDoc.keyedName('ABC-3', '   ')).toBe('ABC-3_untitled');
   });
 
   test('rewrites only the description on a second pull', () => {
-    const first = testDoc.build(null, { key: 'BOP-1', summary: 'Login', description: 'Before' });
+    const first = testDoc.build(null, { key: 'ABC-1', summary: 'Login', description: 'Before' });
     const edited = `${first}\n\`\`\`step\napplication: calculator\n\`\`\`\n`;
-    const second = testDoc.build(edited, { key: 'BOP-1', summary: 'Login', description: 'After' });
+    const second = testDoc.build(edited, { key: 'ABC-1', summary: 'Login', description: 'After' });
 
     expect(second).toContain('After');
     expect(second).not.toContain('Before');
@@ -679,18 +796,18 @@ describe('testDoc', () => {
   });
 
   test('keeps the properties the user added to the file', () => {
-    const first = testDoc.build(null, { key: 'BOP-1', summary: 'Login', description: 'Text' });
+    const first = testDoc.build(null, { key: 'ABC-1', summary: 'Login', description: 'Text' });
     const withOwn = first.replace('---\n\n', '---\n');
     const edited = withOwn.replace('xray:', 'owner: jane\nxray:');
 
-    const second = testDoc.build(edited, { key: 'BOP-1', summary: 'Login', description: 'Text' });
+    const second = testDoc.build(edited, { key: 'ABC-1', summary: 'Login', description: 'Text' });
 
     expect(second).toContain('owner: jane');
   });
 
   test('rewrites the test details on a second pull, keeping the steps written by hand', () => {
     const first = testDoc.build(null, {
-      key: 'BOP-1',
+      key: 'ABC-1',
       summary: 'Login',
       description: 'Sign in.',
       details: { testType: 'Manual', steps: [{ action: 'Open the app', result: 'It opens' }] }
@@ -702,7 +819,7 @@ describe('testDoc', () => {
     const edited = `${first}\n\`\`\`step\napplication: calculator\n\`\`\`\n`;
 
     const second = testDoc.build(edited, {
-      key: 'BOP-1',
+      key: 'ABC-1',
       summary: 'Login',
       description: 'Sign in.',
       details: { testType: 'Manual', steps: [{ action: 'Open the app twice', result: 'It opens' }] }
@@ -717,13 +834,13 @@ describe('testDoc', () => {
 
   test('leaves the details alone when the pull could not read them', () => {
     const first = testDoc.build(null, {
-      key: 'BOP-1',
+      key: 'ABC-1',
       summary: 'Login',
       description: 'Sign in.',
       details: { testType: 'Manual', steps: [{ action: 'Open the app' }] }
     });
 
-    const second = testDoc.build(first, { key: 'BOP-1', summary: 'Login', description: 'Sign in.' });
+    const second = testDoc.build(first, { key: 'ABC-1', summary: 'Login', description: 'Sign in.' });
 
     expect(second).toContain('Open the app');
     expect(second).toBe(first);
@@ -731,7 +848,7 @@ describe('testDoc', () => {
 
   test('says so when a test has no details in Xray', () => {
     const document = testDoc.build(null, {
-      key: 'BOP-1',
+      key: 'ABC-1',
       summary: 'Login',
       description: 'Sign in.',
       details: { testType: 'Manual', steps: [] }
@@ -741,7 +858,7 @@ describe('testDoc', () => {
   });
 
   test('says so when Jira has no description', () => {
-    expect(testDoc.build(null, { key: 'BOP-1', summary: 'Login' })).toContain('_No description in Jira._');
+    expect(testDoc.build(null, { key: 'ABC-1', summary: 'Login' })).toContain('_No description in Jira._');
   });
 });
 

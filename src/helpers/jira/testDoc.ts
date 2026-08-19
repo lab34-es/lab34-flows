@@ -10,7 +10,7 @@
  *   ---
  *   title: Login with valid credentials
  *   xray:
- *     testKey: BOP-123
+ *     testKey: ABC-123
  *     ...
  *   ---
  *

@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
  * the integration is not configured — the flow reads exactly as before.
  *
  * @param {Object} props
- * @param {string} props.testKey - Jira issue key, e.g. "BOP-1234"
+ * @param {string} props.testKey - Jira issue key, e.g. "ABC-1234"
  * @param {Object} [props.test] - Record from /api/jira/tests, when it arrived
  * @param {string} [props.jiraBaseUrl] - To link the key to its issue
  * @param {boolean} [props.compact] - Discreet variant, used inside a step

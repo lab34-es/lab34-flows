@@ -36,7 +36,7 @@ export function JiraSettings() {
   // Drafts, so nothing is written until Save is pressed
   const [kind, setKind] = useState('cloud');
   const [jiraBaseUrl, setJiraBaseUrl] = useState('');
-  const [projectKey, setProjectKey] = useState('');
+  const [projectKeys, setProjectKeys] = useState('');
   const [xrayBaseUrl, setXrayBaseUrl] = useState('');
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
@@ -55,7 +55,7 @@ export function JiraSettings() {
     setSettings(data);
     setKind(data.kind);
     setJiraBaseUrl(data.jiraBaseUrl || '');
-    setProjectKey(data.projectKey || '');
+    setProjectKeys((data.projectKeys || []).join(', '));
     setXrayBaseUrl(data.cloud.xrayBaseUrl || '');
     setClientId(data.cloud.clientId || '');
     setClientSecret('');
@@ -88,7 +88,7 @@ export function JiraSettings() {
       const payload: Record<string, any> = {
         kind,
         jiraBaseUrl,
-        projectKey,
+        projectKeys,
         cloud: { xrayBaseUrl, clientId },
         basic: { email },
         server: {},
@@ -137,7 +137,7 @@ export function JiraSettings() {
 
   const dirty = kind !== settings.kind
     || jiraBaseUrl !== (settings.jiraBaseUrl || '')
-    || projectKey !== (settings.projectKey || '')
+    || projectKeys !== (settings.projectKeys || []).join(', ')
     || xrayBaseUrl !== (settings.cloud.xrayBaseUrl || '')
     || clientId !== (settings.cloud.clientId || '')
     || email !== (settings.basic?.email || '')
@@ -283,14 +283,18 @@ export function JiraSettings() {
         )}
 
         <div className="grid gap-2">
-          <Label htmlFor="jira-project">Project key</Label>
+          <Label htmlFor="jira-project">Project keys</Label>
           <Input
             id="jira-project"
-            value={projectKey}
-            placeholder="BOP"
-            onChange={(event) => setProjectKey(event.target.value)}
+            value={projectKeys}
+            placeholder="ABC, ACME"
+            onChange={(event) => setProjectKeys(event.target.value)}
           />
-          <p className="text-muted-foreground text-xs">Optional, for reference only.</p>
+          <p className="text-muted-foreground text-xs">
+            The Jira projects a pull downloads, separated by commas. Each one is pulled into its
+            own folder: <span className="font-mono">xray/ABC</span>,{' '}
+            <span className="font-mono">xray/ACME</span>.
+          </p>
         </div>
 
         <p className="text-muted-foreground text-xs">{CREDENTIAL_HINTS[kind]}</p>

@@ -285,8 +285,8 @@ describe('/api/views', () => {
 describe('/api/jira/tests', () => {
   test('splits, trims and drops empty keys', async () => {
     (jira.getTests as jest.Mock).mockResolvedValue({});
-    await request(app).get('/api/jira/tests').query({ keys: 'BOP-1, BOP-2 ,,' });
-    expect(jira.getTests).toHaveBeenCalledWith(['BOP-1', 'BOP-2']);
+    await request(app).get('/api/jira/tests').query({ keys: 'ABC-1, ABC-2 ,,' });
+    expect(jira.getTests).toHaveBeenCalledWith(['ABC-1', 'ABC-2']);
   });
 
   test('no keys at all asks for an empty list', async () => {
@@ -297,7 +297,7 @@ describe('/api/jira/tests', () => {
 
   test('a Jira failure maps to 500', async () => {
     (jira.getTests as jest.Mock).mockRejectedValue(new Error('unauthorized'));
-    const res = await request(app).get('/api/jira/tests').query({ keys: 'BOP-1' });
+    const res = await request(app).get('/api/jira/tests').query({ keys: 'ABC-1' });
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: 'unauthorized' });
   });
