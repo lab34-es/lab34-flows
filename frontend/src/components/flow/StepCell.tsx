@@ -18,8 +18,22 @@ const STATUS_BORDERS = {
 /**
  * A notebook cell for a ```step block: the step definition (YAML) with its
  * live execution output right below, like In[]/Out[] in a Python notebook.
+ *
+ * In the Document view the YAML is editable: `sourceEditor` replaces the
+ * highlighted block with the textarea holding the step's own source, and
+ * `onSourceClick` is what asks for it.
  */
-export function StepCell({ segment, step, stepData, xrayTest, jiraBaseUrl, inputRequest = null, onAnswerInput = null }) {
+export function StepCell({
+  segment,
+  step,
+  stepData,
+  xrayTest,
+  jiraBaseUrl,
+  inputRequest = null,
+  onAnswerInput = null,
+  sourceEditor = null,
+  onSourceClick = null,
+}: any) {
   const application = step?.application;
   const method = step?.method;
   const executionStatus = stepData?.execution?.status;
@@ -70,8 +84,14 @@ export function StepCell({ segment, step, stepData, xrayTest, jiraBaseUrl, input
         )}
       </div>
 
-      {/* Step definition (YAML) */}
-      <CodeBlock code={segment.content} language="yaml" className="rounded-none border-0" />
+      {/* Step definition (YAML) — highlighted, or its own source while edited */}
+      {sourceEditor ? (
+        <div className="bg-muted/30 px-4 py-3">{sourceEditor}</div>
+      ) : (
+        <div onClick={onSourceClick || undefined} className={onSourceClick ? 'cursor-text' : undefined}>
+          <CodeBlock code={segment.content} language="yaml" className="rounded-none border-0" />
+        </div>
+      )}
 
       {/* Invalid step YAML */}
       {segment.error && (

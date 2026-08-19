@@ -230,6 +230,68 @@
 }
 
 /* ------------------------------------------------------------------ */
+/* The editable Document view: rendered Markdown you can type into      */
+/* ------------------------------------------------------------------ */
+
+.flow-blocks {
+  @apply flex flex-col;
+}
+/* Blocks bleed one step into the gutter so the hover and the selection
+   ring read as bands of the page rather than as boxes around the text */
+.flow-block {
+  @apply -mx-2 rounded-md px-2 py-0.5;
+}
+.flow-block:not(.flow-block-editing):hover {
+  @apply bg-muted/40;
+}
+.flow-block:focus {
+  @apply outline-none;
+}
+.flow-block-selected {
+  @apply ring-ring bg-accent/40 ring-2;
+}
+.flow-block-editing {
+  @apply bg-muted/30;
+}
+.flow-block-rendered {
+  @apply cursor-text py-1;
+}
+.flow-block-source {
+  @apply block w-full resize-none overflow-hidden border-0 bg-transparent p-0 py-1 text-sm leading-relaxed text-foreground outline-none;
+  field-sizing: content;
+}
+.flow-block-source:focus {
+  @apply outline-none ring-0;
+}
+.flow-block-source-mono {
+  @apply font-mono text-[0.8rem];
+}
+/* The line between two blocks. Two steps in a row leave nothing to click on
+   between them, so the gutter itself becomes the place to write: it takes no
+   room of its own, and shows a rule and a "+" when the pointer is over it */
+.flow-block-gap {
+  @apply relative h-0;
+}
+.flow-block-gap::before {
+  @apply absolute inset-x-0 -inset-y-1 cursor-text content-[''];
+}
+.flow-block-gap::after {
+  @apply bg-primary/50 pointer-events-none absolute inset-x-0 top-0 h-px opacity-0 transition-opacity content-[''];
+}
+.flow-block-gap-hint {
+  @apply text-primary pointer-events-none absolute top-0 -left-6 size-3.5 -translate-y-1/2 opacity-0 transition-opacity;
+}
+.flow-block-gap:hover::after,
+.flow-block-gap:hover .flow-block-gap-hint {
+  @apply opacity-100;
+}
+/* Somewhere to click under the last block, so a document always has an end
+   to keep writing at */
+.flow-block-tail {
+  @apply min-h-32 cursor-text pt-2;
+}
+
+/* ------------------------------------------------------------------ */
 /* Prism syntax highlighting, themed via CSS variables                 */
 /* ------------------------------------------------------------------ */
 
