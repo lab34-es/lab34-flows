@@ -7,6 +7,9 @@ import TopBar from '@/components/shared/TopBar';
 import HomePage from '@/pages/HomePage';
 import FlowPage from '@/pages/FlowPage';
 import FolderPage from '@/pages/FolderPage';
+import TestRunsPage from '@/pages/TestRunsPage';
+import TestRunPage from '@/pages/TestRunPage';
+import TestRunFlowPage from '@/pages/TestRunFlowPage';
 import ApplicationPage from '@/pages/ApplicationPage';
 import SettingsPage from '@/pages/SettingsPage';
 import AiSettings from '@/components/settings/AiSettings';
@@ -28,6 +31,9 @@ function Shell() {
             <Route path="/" element={<HomePage />} />
             <Route path="/flows/view" element={<FlowPage />} />
             <Route path="/flows/folder" element={<FolderPage />} />
+            <Route path="/test-runs" element={<TestRunsPage />} />
+            <Route path="/test-runs/:id" element={<TestRunPage />} />
+            <Route path="/test-runs/:id/flow" element={<TestRunFlowPage />} />
             <Route path="/applications/:slug" element={<ApplicationPage />} />
             <Route path="/settings" element={<SettingsPage />}>
               <Route index element={<Navigate to="/settings/ai" replace />} />

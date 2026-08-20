@@ -86,6 +86,10 @@ export interface ParseError {
 // Both ```step and ```yaml step (any order) are accepted.
 const STEP_TOKENS = ['step', 'flow-step'];
 
+// Fence info tokens that mark a code block as the stored execution result of
+// the step block right above it. Written by test runs, never by hand.
+const RESULT_TOKENS = ['step-result'];
+
 /**
  * Normalize line endings (CRLF / lone CR) so the fence regexes work on
  * documents written on any platform.
@@ -176,6 +180,16 @@ const withFrontmatter = (content, meta) => {
 const isStepInfo = (info) => {
   const tokens = (info || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
   return tokens.some(token => STEP_TOKENS.includes(token));
+};
+
+/**
+ * Check whether a fence info string marks a stored step result block.
+ * @param {string} info - The text after the opening fence
+ * @returns {boolean}
+ */
+const isResultInfo = (info) => {
+  const tokens = (info || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return tokens.some(token => RESULT_TOKENS.includes(token));
 };
 
 /**
@@ -399,11 +413,187 @@ const toFlow = (content): Record<string, any> => {
   };
 };
 
+/* --------------------------------------------------- stored step results */
+
+/**
+ * A fenced block found while scanning a body for steps and results.
+ * `end` is the index of the closing fence line, or the last line of the
+ * document when the fence was never closed.
+ */
+interface ScannedBlock {
+  start: number;
+  end: number;
+  isStep: boolean;
+  isResult: boolean;
+  stepIndex: number;
+}
+
+const FENCE_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+
+/**
+ * Locate every fenced block of a body, telling steps and result blocks
+ * apart. Follows the same CommonMark rules as splitSegments, so both walks
+ * see the same document.
+ *
+ * @param {Array<string>} lines - Body lines (no frontmatter)
+ * @returns {Array<ScannedBlock>}
+ */
+const scanBlocks = (lines): ScannedBlock[] => {
+  const blocks: ScannedBlock[] = [];
+  let stepIndex = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(FENCE_RE);
+    if (!match) { continue; }
+
+    const [, fence, info] = match;
+
+    // Info strings of backtick fences cannot contain backticks (CommonMark)
+    if (fence[0] === '`' && info.includes('`')) { continue; }
+
+    const closeRe = new RegExp(`^ {0,3}${fence[0]}{${fence.length},}\\s*$`);
+    let closeIdx = -1;
+    for (let j = i + 1; j < lines.length; j++) {
+      if (closeRe.test(lines[j])) {
+        closeIdx = j;
+        break;
+      }
+    }
+
+    const isStep = isStepInfo(info);
+    const isResult = !isStep && isResultInfo(info);
+    if (isStep) { stepIndex += 1; }
+
+    blocks.push({
+      start: i,
+      end: closeIdx === -1 ? lines.length - 1 : closeIdx,
+      isStep,
+      isResult,
+      // A result block belongs to the step right above it
+      stepIndex
+    });
+
+    i = closeIdx === -1 ? lines.length : closeIdx;
+  }
+
+  return blocks;
+};
+
+/**
+ * A fence long enough that nothing inside the block can close it early:
+ * one backtick more than the longest backtick run of the content.
+ * @param {string} content
+ * @returns {string}
+ */
+const fenceFor = (content) => {
+  const longest = Math.max(2, ...(String(content).match(/`+/g) || []).map(run => run.length));
+  return '`'.repeat(Math.max(3, longest + 1));
+};
+
+/**
+ * Drop every ```step-result block of a body, along with the single blank
+ * line before each one, so writing results is idempotent.
+ * @param {Array<string>} lines - Body lines
+ * @returns {Array<string>}
+ */
+const stripResultBlocks = (lines) => {
+  const drop = new Set<number>();
+
+  scanBlocks(lines).forEach(block => {
+    if (!block.isResult) { return; }
+    for (let i = block.start; i <= block.end; i++) { drop.add(i); }
+    if (block.start > 0 && lines[block.start - 1].trim() === '') {
+      drop.add(block.start - 1);
+    }
+  });
+
+  return lines.filter((_, index) => !drop.has(index));
+};
+
+/**
+ * Write a copy of a flow document that carries its execution results: every
+ * ```step block is followed by a ```step-result block holding what the run
+ * did with it, as YAML. Existing result blocks are replaced, so applying
+ * this twice does not stack.
+ *
+ * @param {string} content - Full markdown document
+ * @param {Array<Object>} results - Result object per step, indexed like the
+ *   step blocks appear in the document. Holes get no result block.
+ * @returns {string}
+ */
+const withResults = (content, results) => {
+  const normalized = normalize(content || '');
+  const lines = normalized.split('\n');
+  const { bodyStartLine } = parseFrontmatter(normalized);
+
+  const head = lines.slice(0, bodyStartLine);
+  const body = stripResultBlocks(lines.slice(bodyStartLine));
+
+  const out: string[] = [];
+  const blocks = scanBlocks(body);
+  const closeOf = new Map(blocks.filter(block => block.isStep).map(block => [block.end, block.stepIndex]));
+
+  body.forEach((line, index) => {
+    out.push(line);
+
+    const stepIndex = closeOf.get(index);
+    if (stepIndex === undefined) { return; }
+
+    const result = (results || [])[stepIndex];
+    if (result === undefined || result === null) { return; }
+
+    const yaml = YAML.stringify(result).replace(/\n$/, '');
+    const fence = fenceFor(yaml);
+    out.push('', `${fence}step-result`, ...yaml.split('\n'), fence);
+  });
+
+  return [...head, ...out].join('\n');
+};
+
+/**
+ * Read the stored results back out of a document written by withResults.
+ *
+ * @param {string} content - Full markdown document
+ * @returns {{content: string, results: Object}} The document without its
+ *   result blocks (so it parses exactly like the original flow), and the
+ *   parsed result of each step, keyed by step index. A result block whose
+ *   YAML cannot be parsed is dropped rather than failing the read.
+ */
+const extractResults = (content) => {
+  const normalized = normalize(content || '');
+  const lines = normalized.split('\n');
+  const { bodyStartLine } = parseFrontmatter(normalized);
+
+  const head = lines.slice(0, bodyStartLine);
+  const body = lines.slice(bodyStartLine);
+
+  const results: Record<number, any> = {};
+  scanBlocks(body).forEach(block => {
+    if (!block.isResult || block.stepIndex < 0) { return; }
+    const raw = body.slice(block.start + 1, block.end).join('\n');
+    try {
+      const parsed = YAML.parse(raw);
+      if (parsed && typeof parsed === 'object') { results[block.stepIndex] = parsed; }
+    }
+    catch {
+      // A hand-edited result block must not take the whole run view down
+    }
+  });
+
+  return {
+    content: [...head, ...stripResultBlocks(body)].join('\n'),
+    results
+  };
+};
+
 export {
   parse,
   parseFrontmatter,
   withFrontmatter,
   splitSegments,
   isStepInfo,
+  isResultInfo,
+  withResults,
+  extractResults,
   toFlow
 };

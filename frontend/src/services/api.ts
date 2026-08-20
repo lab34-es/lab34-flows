@@ -53,6 +53,22 @@ export const viewsApi = {
     api.get('/api/views/query', { params: { folder: folder || '', view: view || undefined } }),
 };
 
+// Recorded executions: every run (flow page, folder "Run all", CLI) lands in
+// the context's test-runs folder, and these read it back.
+export const testRunsApi = {
+  list: () => api.get('/api/test-runs'),
+  get: (id) => api.get(`/api/test-runs/${encodeURIComponent(id)}`),
+  getFlow: (id, path) =>
+    api.get(`/api/test-runs/${encodeURIComponent(id)}/flow?path=${encodeURIComponent(path)}`),
+  // Run every flow a folder view matches, as one test run
+  start: ({ environment, folder, view, files }: {
+    environment: string;
+    folder?: string;
+    view?: string;
+    files?: string[];
+  }) => api.post('/api/test-runs', { environment, folder, view, files }),
+};
+
 export const applicationsApi = {
   list: () => api.get('/api/applications'),
   create: (name) => api.post('/api/applications', { name }),
