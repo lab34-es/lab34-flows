@@ -14,6 +14,11 @@ Heavily opinionated tool to help you test E2E flows and behaviours.
 > Run on any environment (staging, production, etc).
 > From Async protocols, APIs and databases, to web applications.
 
+|  | Home | Flow | Folder | AI create | AI edit | Settings |
+| --- | --- | --- | --- | --- | --- | --- |
+| Light | [![Home, light theme](website/src/assets/screenshots/home-light.png)](website/src/assets/screenshots/home-light.png) | [![A flow after a run, light theme](website/src/assets/screenshots/flow-light.png)](website/src/assets/screenshots/flow-light.png) | [![A folder as a table, light theme](website/src/assets/screenshots/folder-light.png)](website/src/assets/screenshots/folder-light.png) | [![Create a flow with AI, light theme](website/src/assets/screenshots/ai-create-light.png)](website/src/assets/screenshots/ai-create-light.png) | [![Edit a flow with AI, light theme](website/src/assets/screenshots/ai-edit-light.png)](website/src/assets/screenshots/ai-edit-light.png) | [![Settings, light theme](website/src/assets/screenshots/settings-light.png)](website/src/assets/screenshots/settings-light.png) |
+| Dark | [![Home, dark theme](website/src/assets/screenshots/home-dark.png)](website/src/assets/screenshots/home-dark.png) | [![A flow after a run, dark theme](website/src/assets/screenshots/flow-dark.png)](website/src/assets/screenshots/flow-dark.png) | [![A folder as a table, dark theme](website/src/assets/screenshots/folder-dark.png)](website/src/assets/screenshots/folder-dark.png) | [![Create a flow with AI, dark theme](website/src/assets/screenshots/ai-create-dark.png)](website/src/assets/screenshots/ai-create-dark.png) | [![Edit a flow with AI, dark theme](website/src/assets/screenshots/ai-edit-dark.png)](website/src/assets/screenshots/ai-edit-dark.png) | [![Settings, dark theme](website/src/assets/screenshots/settings-dark.png)](website/src/assets/screenshots/settings-dark.png) |
+
 Features:
 
 - Define flows as **Markdown documents**: write any content — prose, headings, lists — and mark the executable steps as ```` ```step ```` code blocks.
