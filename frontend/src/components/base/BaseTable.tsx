@@ -121,7 +121,7 @@ export function BaseTable({ columns, rows, sort, onToggleSort }) {
                     >
                       <StatusDot status={statusFor(row.path)} />
                       <FileText className="text-muted-foreground size-3.5 shrink-0" />
-                      <span className="text-info truncate group-hover/name:underline">
+                      <span className="text-brass-text truncate group-hover/name:underline">
                         {isEmpty(row.values?.[column.id]) ? row.name : formatValue(row.values[column.id])}
                       </span>
                       {row.hasErrors && (

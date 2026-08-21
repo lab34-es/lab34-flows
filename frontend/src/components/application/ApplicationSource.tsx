@@ -9,6 +9,7 @@ import SourceExplorer from '@/components/application/SourceExplorer';
 import SourceFileDialogs from '@/components/application/SourceFileDialogs';
 import { applicationsApi } from '@/services/api';
 import { useTheme } from '@/context/ThemeContext';
+import { MONACO_FONT_FAMILY } from '@/lib/monaco';
 
 const LANGUAGES = {
   md: 'markdown',
@@ -281,11 +282,12 @@ export function ApplicationSource({ slug, onSaved }) {
               height="100%"
               path={`${slug}/${selected}`}
               language={language}
-              theme={theme === 'dark' ? 'vs-dark' : 'light'}
+              theme={theme === 'dark' ? 'lab34-dark' : 'lab34-light'}
               value={drafts[selected]}
               onChange={(value) => setDrafts((prev) => ({ ...prev, [selected]: value ?? '' }))}
               options={{
                 minimap: { enabled: false },
+                fontFamily: MONACO_FONT_FAMILY,
                 fontSize: 13,
                 wordWrap: 'on',
                 scrollBeyondLastLine: false,

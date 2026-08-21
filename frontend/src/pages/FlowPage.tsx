@@ -16,6 +16,7 @@ import { flowsApi, jiraApi } from '@/services/api';
 import { useAppState } from '@/context/AppStateContext';
 import { useExecutions } from '@/context/ExecutionContext';
 import { useTheme } from '@/context/ThemeContext';
+import { MONACO_FONT_FAMILY } from '@/lib/monaco';
 
 const RUN_STATUS_META = {
   starting: { label: 'Starting…', variant: 'info', Icon: Loader2, iconClass: 'animate-spin' },
@@ -550,11 +551,12 @@ export function FlowPage() {
           <Editor
             height="100%"
             language="markdown"
-            theme={theme === 'dark' ? 'vs-dark' : 'light'}
+            theme={theme === 'dark' ? 'lab34-dark' : 'lab34-light'}
             value={draft}
             onChange={(value) => applyEdit(value ?? '')}
             options={{
               minimap: { enabled: false },
+              fontFamily: MONACO_FONT_FAMILY,
               fontSize: 13,
               wordWrap: 'on',
               scrollBeyondLastLine: false,

@@ -1,95 +1,120 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/400-italic.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
 
 @custom-variant dark (&:is(.dark *));
 
+/* lab34 brand: bone ground, ink type, brass as stroke (rules, rings,
+   underlines — never a fill), grey for secondary text, carbon for dark
+   panels. IBM Plex Sans reads, IBM Plex Mono is anything that speaks as
+   data. Medium 500 is the heaviest weight anywhere. */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --success: oklch(0.627 0.17 149.2);
-  --warning: oklch(0.769 0.15 70.08);
-  --info: oklch(0.623 0.188 259.81);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.3125rem;
+  --bone: #f3f2f2;
+  --ink: #201f1d;
+  --brass: #b68235;
+  --brass-text: #7d5411;
+  --carbon: #2d2b2b;
 
-  --code-string: oklch(0.5 0.14 150);
-  --code-keyword: oklch(0.5 0.19 300);
-  --code-number: oklch(0.55 0.16 60);
-  --code-comment: oklch(0.6 0.02 250);
-  --code-property: oklch(0.48 0.15 250);
-  --code-punctuation: oklch(0.45 0 0);
+  --background: #f3f2f2;
+  --foreground: #201f1d;
+  --card: #ffffff;
+  --card-foreground: #201f1d;
+  --popover: #ffffff;
+  --popover-foreground: #201f1d;
+  --primary: #201f1d;
+  --primary-foreground: #f3f2f2;
+  --secondary: rgba(32, 31, 29, 0.06);
+  --secondary-foreground: #201f1d;
+  --muted: rgba(32, 31, 29, 0.05);
+  --muted-foreground: #7e7a7a;
+  --accent: rgba(32, 31, 29, 0.06);
+  --accent-foreground: #201f1d;
+  --destructive: #a63d33;
+  --destructive-foreground: #f3f2f2;
+  --border: rgba(32, 31, 29, 0.16);
+  --input: rgba(32, 31, 29, 0.16);
+  --ring: #b68235;
+  --success: #3e7a4e;
+  --warning: #7d5411;
+  --info: #3a6ea5;
+  --sidebar: #edebeb;
+  --sidebar-foreground: #201f1d;
+  --sidebar-primary: #201f1d;
+  --sidebar-primary-foreground: #f3f2f2;
+  --sidebar-accent: rgba(32, 31, 29, 0.07);
+  --sidebar-accent-foreground: #201f1d;
+  --sidebar-border: rgba(32, 31, 29, 0.12);
+  --sidebar-ring: #b68235;
+
+  --code-string: #3e7a4e;
+  --code-keyword: #7d5411;
+  --code-number: #8a5a2a;
+  --code-comment: #9b9797;
+  --code-property: #3a6ea5;
+  --code-punctuation: #5c5856;
 
   /* Markdown callouts; the other four reuse info/success/warning/destructive. */
-  --callout-important: oklch(0.53 0.21 302);
+  --callout-important: #6b4fa8;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --success: oklch(0.723 0.19 149.58);
-  --warning: oklch(0.828 0.17 84.43);
-  --info: oklch(0.707 0.165 254.62);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --brass-text: #c99a55;
 
-  --code-string: oklch(0.8 0.14 150);
-  --code-keyword: oklch(0.78 0.14 300);
-  --code-number: oklch(0.82 0.13 60);
-  --code-comment: oklch(0.6 0.02 250);
-  --code-property: oklch(0.78 0.12 250);
-  --code-punctuation: oklch(0.7 0 0);
+  --background: #201f1d;
+  --foreground: #f3f2f2;
+  --card: #292827;
+  --card-foreground: #f3f2f2;
+  --popover: #292827;
+  --popover-foreground: #f3f2f2;
+  --primary: #f3f2f2;
+  --primary-foreground: #201f1d;
+  --secondary: rgba(243, 242, 242, 0.08);
+  --secondary-foreground: #f3f2f2;
+  --muted: rgba(243, 242, 242, 0.06);
+  --muted-foreground: #a5a1a0;
+  --accent: rgba(243, 242, 242, 0.08);
+  --accent-foreground: #f3f2f2;
+  --destructive: #d98a80;
+  --destructive-foreground: #201f1d;
+  --border: rgba(243, 242, 242, 0.14);
+  --input: rgba(243, 242, 242, 0.16);
+  --ring: #c99a55;
+  --success: #7cbe8d;
+  --warning: #c99a55;
+  --info: #7fa9d6;
+  --sidebar: #2d2b2b;
+  --sidebar-foreground: #f3f2f2;
+  --sidebar-primary: #f3f2f2;
+  --sidebar-primary-foreground: #201f1d;
+  --sidebar-accent: rgba(243, 242, 242, 0.07);
+  --sidebar-accent-foreground: #f3f2f2;
+  --sidebar-border: rgba(243, 242, 242, 0.1);
+  --sidebar-ring: #c99a55;
 
-  --callout-important: oklch(0.72 0.16 302);
+  --code-string: #7cbe8d;
+  --code-keyword: #c99a55;
+  --code-number: #d0a06a;
+  --code-comment: #8f8b8a;
+  --code-property: #7fa9d6;
+  --code-punctuation: #b5b1af;
+
+  --callout-important: #a892d9;
 }
 
 @theme inline {
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Medium 500 is the heaviest weight the brand uses — no bold anywhere. */
+  --font-weight-semibold: 500;
+  --font-weight-bold: 500;
+  --color-brass: var(--brass);
+  --color-brass-text: var(--brass-text);
+  --color-carbon: var(--carbon);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -160,8 +185,9 @@
 .markdown-body p {
   @apply text-sm;
 }
+/* Links carry the accent as a stroke: deep-brass text over a brass rule. */
 .markdown-body a {
-  @apply text-info underline underline-offset-4 hover:opacity-80;
+  @apply text-brass-text underline underline-offset-4 decoration-brass/60 hover:decoration-brass;
 }
 .markdown-body ul {
   @apply list-disc pl-6 space-y-1;
@@ -300,7 +326,7 @@ pre[class*="language-"] {
   color: var(--foreground);
   background: none;
   text-shadow: none;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-mono);
   white-space: pre;
   word-break: normal;
   tab-size: 2;
@@ -355,7 +381,7 @@ pre[class*="language-"] {
   color: var(--code-number);
 }
 .token.bold {
-  font-weight: bold;
+  font-weight: 500;
 }
 .token.italic {
   font-style: italic;

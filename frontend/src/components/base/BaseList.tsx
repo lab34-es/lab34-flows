@@ -35,7 +35,7 @@ export function BaseList({ columns, rows }) {
               <div className="flex items-center gap-2">
                 <StatusDot status={statusFor(row.path)} />
                 <FileText className="text-muted-foreground size-4 shrink-0" />
-                <span className="text-info truncate font-medium group-hover/name:underline">{label}</span>
+                <span className="text-brass-text truncate font-medium group-hover/name:underline">{label}</span>
                 {row.hasErrors && (
                   <AlertTriangle className="text-destructive size-3.5 shrink-0" aria-label="has problems" />
                 )}

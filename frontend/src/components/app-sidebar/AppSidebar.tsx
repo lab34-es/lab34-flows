@@ -101,11 +101,18 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" onClick={() => navigate('/')}>
-              <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
+              {/* The tool's own mark: ink panel, bone stroke, brand radius. */}
+              <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-md">
                 <Workflow className="size-4" />
               </div>
               <div className="grid flex-1 text-left leading-tight">
-                <span className="truncate font-semibold">Lab34 Flows</span>
+                {/* The open-source lockup: parent Medium 500, brass slash,
+                    project Regular 400, all lowercase. */}
+                <span className="truncate font-mono text-sm tracking-[-0.04em]">
+                  <span className="font-medium">lab34</span>
+                  <span className="text-brass">/</span>
+                  <span className="font-normal">flows</span>
+                </span>
                 <span className="text-muted-foreground truncate text-xs">E2E flow testing</span>
               </div>
             </SidebarMenuButton>
