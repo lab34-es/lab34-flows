@@ -10,6 +10,7 @@ import {
   Plus,
   RefreshCw,
   Upload,
+  Workflow,
 } from 'lucide-react';
 
 import {
@@ -95,10 +96,9 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" onClick={() => navigate('/')}>
-              {/* The monogram: filled disc at small sizes — ink disc, bone
-                  figures, never brass. */}
-              <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-full font-mono text-[13px] font-medium">
-                34
+              {/* The tool's own mark: ink panel, bone stroke, brand radius. */}
+              <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-md">
+                <Workflow className="size-4" />
               </div>
               <div className="grid flex-1 text-left leading-tight">
                 {/* The open-source lockup: parent Medium 500, brass slash,

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { AppWindow, ArrowRight, BookOpen, FileText, Play } from 'lucide-react';
+import { AppWindow, ArrowRight, BookOpen, FileText, Play, Workflow } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,10 +33,10 @@ export function HomePage() {
   return (
     <div className="mx-auto w-full max-w-4xl space-y-8 p-6">
       <div className="space-y-2 pt-6">
-        {/* The monogram disc and, under it, the open-source lockup: parent
-            Medium 500, brass slash, project Regular 400 — always lowercase. */}
-        <div className="bg-primary text-primary-foreground flex size-12 items-center justify-center rounded-full font-mono text-lg font-medium">
-          34
+        {/* The tool's mark over the open-source lockup: ink panel, bone
+            stroke, brand radius. */}
+        <div className="bg-primary text-primary-foreground flex size-12 items-center justify-center rounded-md">
+          <Workflow className="size-6" />
         </div>
         <h1 className="font-mono text-3xl tracking-[-0.04em]">
           <span className="font-medium">lab34</span>
