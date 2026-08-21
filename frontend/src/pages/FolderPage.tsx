@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   Folder,
   LayoutList,
   MoreHorizontal,
   Pencil,
+  Play,
   Search,
   Sigma,
   Table2,
@@ -31,8 +32,11 @@ import FormulasDialog from '@/components/base/FormulasDialog';
 import PropertiesMenu from '@/components/base/PropertiesMenu';
 import SortMenu from '@/components/base/SortMenu';
 import ViewTabs from '@/components/base/ViewTabs';
-import { viewsApi } from '@/services/api';
+import { viewsApi, testRunsApi } from '@/services/api';
+import { useAppState } from '@/context/AppStateContext';
+import { useExecutions } from '@/context/ExecutionContext';
 import { compareValues, displayName, matchesSearch } from '@/lib/properties';
+import { testRunUrl } from '@/lib/testRuns';
 
 // Which view was last used on a given folder. Views themselves are not tied
 // to a folder — only this preference is, and it stays in the browser so
@@ -52,13 +56,19 @@ const rememberView = (folder, name) => localStorage.setItem(`${VIEW_STORAGE_PREF
  */
 export function FolderPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const folder = searchParams.get('path') || '';
+
+  const { environment } = useAppState();
+  const { anyRunning } = useExecutions();
 
   const [doc, setDoc] = useState<any>(null);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<any>(null);
   const [saveError, setSaveError] = useState<any>(null);
+  const [runAllError, setRunAllError] = useState<any>(null);
+  const [startingRun, setStartingRun] = useState(false);
   const [search, setSearch] = useState('');
   const [activeName, setActiveName] = useState('');
   const [formulasOpen, setFormulasOpen] = useState(false);
@@ -255,6 +265,31 @@ export function FolderPage() {
     });
   }, [result, columns, search, activeView]);
 
+  // ----------------------------------------------------------- run all
+
+  /**
+   * Execute every flow this view is showing — filters and search applied, in
+   * the order on screen — as one test run, and follow it on its page.
+   */
+  const runAll = async () => {
+    if (!environment || !rows.length || startingRun) { return; }
+    setRunAllError(null);
+    setStartingRun(true);
+    try {
+      const response = await testRunsApi.start({
+        environment,
+        folder,
+        view: activeView?.name,
+        files: rows.map((row) => row.relativePath),
+      });
+      navigate(testRunUrl(response.data.run.id));
+    } catch (ex) {
+      setRunAllError(ex.response?.data?.error || ex.message);
+    } finally {
+      setStartingRun(false);
+    }
+  };
+
   // ---------------------------------------------------------- rendering
 
   const folderName = folder ? folder.split('/').pop() : 'All flows';
@@ -342,6 +377,16 @@ export function FolderPage() {
             onChange={(filters) => patchView({ filters })}
           />
 
+          <Button
+            onClick={runAll}
+            disabled={anyRunning || startingRun || !environment || rows.length === 0}
+            title={!environment
+              ? 'Select an environment in the sidebar first'
+              : `Run the ${rows.length} flow${rows.length === 1 ? '' : 's'} this view shows on “${environment}”`}
+          >
+            <Play /> Run all{environment ? ` · ${environment}` : ''}
+          </Button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="View actions">
@@ -404,13 +449,20 @@ export function FolderPage() {
       </div>
 
       {/* Problems */}
-      {(saveError || (result?.errors?.length > 0)) && (
+      {(saveError || runAllError || (result?.errors?.length > 0)) && (
         <div className="space-y-2 px-6 pt-4">
           {saveError && (
             <Alert variant="destructive">
               <AlertCircle />
               <AlertTitle>The view could not be saved</AlertTitle>
               <AlertDescription>{saveError}</AlertDescription>
+            </Alert>
+          )}
+          {runAllError && (
+            <Alert variant="destructive">
+              <AlertCircle />
+              <AlertTitle>The test run could not start</AlertTitle>
+              <AlertDescription>{runAllError}</AlertDescription>
             </Alert>
           )}
           {result?.errors?.length > 0 && (

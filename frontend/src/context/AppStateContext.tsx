@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { flowsApi, applicationsApi, environmentApi, contextApi } from '@/services/api';
+import { flowsApi, applicationsApi, environmentApi, contextApi, testRunsApi } from '@/services/api';
+import { socket } from '@/services/socket';
 import { indexChanges, scopedStatus } from '@/lib/git';
 
 const AppStateContext = createContext<any>(null);
@@ -21,6 +22,7 @@ export function AppStateProvider({ children }) {
     () => localStorage.getItem(ENV_STORAGE_KEY) || ''
   );
   const [contextInfo, setContextInfo] = useState<any>(null);
+  const [testRuns, setTestRuns] = useState<any[]>([]);
 
   const refreshContext = useCallback(async () => {
     try {
@@ -77,12 +79,30 @@ export function AppStateProvider({ children }) {
     localStorage.setItem(ENV_STORAGE_KEY, value);
   }, []);
 
+  const refreshTestRuns = useCallback(async () => {
+    try {
+      const response = await testRunsApi.list();
+      setTestRuns(response.data || []);
+    } catch (error) {
+      console.error('Error loading test runs:', error);
+    }
+  }, []);
+
   useEffect(() => {
     refreshTree();
     refreshApplications();
     refreshEnvironments();
+    refreshTestRuns();
     // refreshTree() reads the context state too
-  }, [refreshTree, refreshApplications, refreshEnvironments]);
+  }, [refreshTree, refreshApplications, refreshEnvironments, refreshTestRuns]);
+
+  // The backend says so every time a run is created, progresses or ends --
+  // a handful of events per run, so re-reading the list is cheap enough
+  useEffect(() => {
+    const onUpdate = () => { refreshTestRuns(); };
+    socket.on('testrun:update', onUpdate);
+    return () => { socket.off('testrun:update', onUpdate); };
+  }, [refreshTestRuns]);
 
   // Poll while the tab is in front, and catch up as soon as it comes back:
   // a background tab has nobody looking at its file decorations.
@@ -123,8 +143,10 @@ export function AppStateProvider({ children }) {
       contextInfo,
       refreshContext,
       gitIndex,
+      testRuns,
+      refreshTestRuns,
     }),
-    [tree, treeLoading, refreshTree, applications, applicationsLoading, refreshApplications, environments, environment, setEnvironment, refreshEnvironments, contextInfo, refreshContext, gitIndex]
+    [tree, treeLoading, refreshTree, applications, applicationsLoading, refreshApplications, environments, environment, setEnvironment, refreshEnvironments, contextInfo, refreshContext, gitIndex, testRuns, refreshTestRuns]
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

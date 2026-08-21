@@ -55,12 +55,16 @@ const ctx = () => ({
   reporter: { playwrightStep: jest.fn() }
 });
 
-/** Write a browser flow and run it. */
-const run = (flow: any, stepParams: any = {}, context = ctx()) => {
+/** Write a browser flow to the context folder and return its file name. */
+const writeFlow = (flow: any) => {
   const file = `flow-${Math.random().toString(36).slice(2)}.yaml`;
   fs.writeFileSync(path.join(CTX_DIR, file), YAML.stringify(flow), 'utf8');
-  return playwright.run(context, file, stepParams);
+  return file;
 };
+
+/** Write a browser flow and run it. */
+const run = (flow: any, stepParams: any = {}, context: any = ctx()) =>
+  playwright.run(context, writeFlow(flow), stepParams);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -339,5 +343,148 @@ describe('playwright.run - step ids', () => {
       ]
     })).resolves.toBeDefined();
     expect(page.click).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('playwright.run - sessions', () => {
+  // Sessions outlive a run by design, so every test has to hand its browser
+  // back -- the next one gets fresh spies and would otherwise drive the old
+  // ones through a session left behind here.
+  afterEach(() => playwright.closeSessions({ force: true }));
+
+  const goto = (url = 'https://x.test') => ({ method: 'goto', parameters: { url } });
+
+  test('a named session is opened once and reused by the next run', async () => {
+    await run({ session: 'shop', steps: [goto()] });
+    await run({ session: 'shop', steps: [goto('https://x.test/cart')] });
+
+    expect(launch).toHaveBeenCalledTimes(1);
+    expect(browser.newContext).toHaveBeenCalledTimes(1);
+    expect(context.newPage).toHaveBeenCalledTimes(1);
+    // Both runs browsed, on the one page the session holds
+    expect(page.goto).toHaveBeenCalledTimes(2);
+  });
+
+  test('without a session every run gets its own browser', async () => {
+    await run({ steps: [goto()] });
+    await run({ steps: [goto()] });
+
+    expect(launch).toHaveBeenCalledTimes(2);
+  });
+
+  test('a sessioned run leaves the browser open', async () => {
+    await run({ session: 'shop', steps: [goto()] });
+
+    expect(context.close).not.toHaveBeenCalled();
+    expect(browser.close).not.toHaveBeenCalled();
+    expect(playwright.hasSession('shop')).toBe(true);
+    expect(playwright.openSessions()).toEqual(['shop']);
+  });
+
+  test('the flow step names the session, through the context', async () => {
+    await run({ steps: [goto()] }, {}, { ...ctx(), session: 'from-the-step' });
+
+    expect(playwright.hasSession('from-the-step')).toBe(true);
+  });
+
+  test('the step parameters can name it too', async () => {
+    await run({ steps: [goto()] }, { session: 'from-the-parameters' });
+
+    expect(playwright.hasSession('from-the-parameters')).toBe(true);
+  });
+
+  test('the step wins over the yaml file', async () => {
+    await run({ session: 'from-the-yaml', steps: [goto()] }, {}, { ...ctx(), session: 'from-the-step' });
+
+    expect(playwright.openSessions()).toEqual(['from-the-step']);
+  });
+
+  test('session: false on the step asks for a throw-away browser', async () => {
+    await run({ session: 'from-the-yaml', steps: [goto()] }, {}, { ...ctx(), session: false });
+
+    expect(playwright.openSessions()).toEqual([]);
+    expect(browser.close).toHaveBeenCalled();
+  });
+
+  test('closeSession ends the session when the run is done', async () => {
+    await run({ session: 'shop', steps: [goto()] });
+    await run({ session: 'shop', closeSession: true, steps: [goto()] });
+
+    expect(browser.close).toHaveBeenCalled();
+    expect(playwright.hasSession('shop')).toBe(false);
+  });
+
+  test('a step can end the session through the context', async () => {
+    await run({ session: 'shop', steps: [goto()] });
+    await run({ steps: [goto()] }, {}, { ...ctx(), session: 'shop', closeSession: true });
+
+    expect(playwright.hasSession('shop')).toBe(false);
+  });
+
+  test('two runs asking at once share one browser', async () => {
+    await Promise.all([
+      run({ session: 'shop', steps: [goto()] }),
+      run({ session: 'shop', steps: [goto()] })
+    ]);
+
+    expect(launch).toHaveBeenCalledTimes(1);
+  });
+
+  test('the next run keeps the browser the session was opened with', async () => {
+    await run({ session: 'shop', browserType: 'chromium', steps: [goto()] });
+    await run({ session: 'shop', browserType: 'firefox', steps: [goto()] });
+
+    expect(launch).toHaveBeenCalledTimes(1);
+  });
+
+  test('a browser that fails to open leaves no session behind', async () => {
+    launch.mockRejectedValueOnce(new Error('no display'));
+
+    await expect(run({ session: 'shop', steps: [goto()] })).rejects.toThrow('no display');
+    expect(playwright.hasSession('shop')).toBe(false);
+  });
+
+  test('scraping still returns what the run collected', async () => {
+    const [, , scraped]: any = await run({
+      session: 'shop',
+      steps: [{ method: 'scrape', parameters: { total: { selector: '#total' } } }]
+    });
+
+    expect(scraped).toEqual({ total: '42 items' });
+  });
+});
+
+describe('playwright.closeSessions', () => {
+  afterEach(() => playwright.closeSessions({ force: true }));
+
+  test('closes every open session and names them', async () => {
+    await playwright.run(ctx(), writeFlow({ session: 'a', steps: [] }), {});
+    await playwright.run(ctx(), writeFlow({ session: 'b', steps: [] }), {});
+
+    await expect(playwright.closeSessions()).resolves.toEqual(['a', 'b']);
+    expect(playwright.openSessions()).toEqual([]);
+    expect(browser.close).toHaveBeenCalledTimes(2);
+  });
+
+  test('a session opened with keepOpen is left running', async () => {
+    await playwright.run(ctx(), writeFlow({ session: 'a', keepOpen: true, steps: [] }), {});
+
+    await playwright.closeSessions();
+
+    expect(browser.close).not.toHaveBeenCalled();
+    // Forgotten all the same: the flow that opened it is over
+    expect(playwright.hasSession('a')).toBe(false);
+  });
+
+  test('force closes it anyway', async () => {
+    await playwright.run(ctx(), writeFlow({ session: 'a', keepOpen: true, steps: [] }), {});
+
+    await playwright.closeSessions({ force: true });
+
+    expect(browser.close).toHaveBeenCalled();
+  });
+
+  test('closing a session nobody opened is not an error', async () => {
+    await expect(playwright.closeSession('nope')).resolves.toBe(false);
   });
 });

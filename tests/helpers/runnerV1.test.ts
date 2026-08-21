@@ -3,6 +3,12 @@ jest.mock('../../src/helpers/paths');
 jest.mock('../../src/helpers/mimicing');
 jest.mock('../../src/helpers/runner/tester');
 
+// The runner closes the browser sessions a flow left open; the real helper
+// would pull playwright itself in for a suite that never opens a browser.
+jest.mock('../../src/helpers/playwright', () => ({
+  closeSessions: jest.fn().mockResolvedValue([])
+}));
+
 // run() builds its own reporter and assigns it onto the flow, so the recorder
 // has to come from the module rather than from the flow we pass in.
 jest.mock('../../src/helpers/reporter', () => {
@@ -26,6 +32,7 @@ import * as mimicing from '../../src/helpers/mimicing';
 import * as tester from '../../src/helpers/runner/tester';
 import * as apps from '../../src/helpers/applications';
 import * as reporterHelper from '../../src/helpers/reporter';
+import * as playwright from '../../src/helpers/playwright';
 import * as v1 from '../../src/helpers/runner/v1';
 
 const recorder = (reporterHelper as any).__recorder;
@@ -369,5 +376,43 @@ describe('v1.run - concurrency and API mode', () => {
     await runCli(flowWith({ application: 'calculator', method: 'add' }));
     const second: any = await runCli(flowWith({ application: 'calculator', method: 'add' }));
     expect(second).toBeDefined();
+  });
+});
+
+describe('v1.run - browser sessions', () => {
+  test('the step tells the application which session it runs in', async () => {
+    await runCli(flowWith({
+      application: 'calculator',
+      method: 'add',
+      session: 'shop',
+      closeSession: true
+    }));
+
+    expect(calculatorAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ session: 'shop', closeSession: true }),
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  test('a step that names no session says so', async () => {
+    await runCli(flowWith({ application: 'calculator', method: 'add' }));
+
+    expect(calculatorAdd.mock.calls[0][0].session).toBeUndefined();
+  });
+
+  test('whatever the flow left open is closed when it ends', async () => {
+    await runCli(flowWith({ application: 'calculator', method: 'add', session: 'shop' }));
+
+    expect(playwright.closeSessions).toHaveBeenCalled();
+  });
+
+  test('a flow that failed still closes its sessions', async () => {
+    calculatorAdd.mockRejectedValue(new Error('nope'));
+
+    await runCli(flowWith({ application: 'calculator', method: 'add', session: 'shop' }))
+      .catch(() => {});
+
+    expect(playwright.closeSessions).toHaveBeenCalled();
   });
 });

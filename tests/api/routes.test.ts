@@ -10,6 +10,7 @@ jest.mock('../../src/helpers/bases');
 jest.mock('../../src/helpers/jira');
 jest.mock('../../src/helpers/applications');
 jest.mock('../../src/helpers/context');
+jest.mock('../../src/helpers/testRuns');
 
 import express from 'express';
 import request from 'supertest';
@@ -20,6 +21,7 @@ import * as bases from '../../src/helpers/bases';
 import * as jira from '../../src/helpers/jira';
 import * as apps from '../../src/helpers/applications';
 import * as contextHelper from '../../src/helpers/context';
+import * as testRuns from '../../src/helpers/testRuns';
 
 import defineRoutes from '../../src/api/routes';
 
@@ -281,6 +283,69 @@ describe('/api/views', () => {
   test('GET /query maps an evaluation failure to 400', async () => {
     (bases.query as jest.Mock).mockRejectedValue(new Error('bad formula'));
     expect((await request(app).get('/api/views/query')).status).toBe(400);
+  });
+});
+
+describe('/api/test-runs', () => {
+  test('GET returns the run list', async () => {
+    (testRuns.list as jest.Mock).mockResolvedValue([{ id: '2026-08-20_10-00-00', status: 'passed' }]);
+    const res = await request(app).get('/api/test-runs');
+    expect(res.status).toBe(200);
+    expect(res.body[0].id).toBe('2026-08-20_10-00-00');
+  });
+
+  test('GET maps a read failure to 500', async () => {
+    (testRuns.list as jest.Mock).mockRejectedValue(new Error('disk gone'));
+    expect((await request(app).get('/api/test-runs')).status).toBe(500);
+  });
+
+  test('POST starts a folder run and answers with it', async () => {
+    (testRuns.startFolderRun as jest.Mock).mockResolvedValue({ id: 'r1', status: 'running' });
+
+    const res = await request(app)
+      .post('/api/test-runs')
+      .send({ environment: 'local', folder: 'payments', view: 'All', files: ['payments/a.md'] });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ run: { id: 'r1', status: 'running' } });
+    expect(testRuns.startFolderRun).toHaveBeenCalledWith(expect.objectContaining({
+      environment: 'local',
+      folder: 'payments',
+      view: 'All',
+      files: ['payments/a.md']
+    }));
+  });
+
+  test('POST maps a refusal to 400', async () => {
+    (testRuns.startFolderRun as jest.Mock).mockRejectedValue(new Error('No flows to run'));
+    const res = await request(app).post('/api/test-runs').send({ environment: 'local' });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'No flows to run' });
+  });
+
+  test('GET /:id answers the run summary', async () => {
+    (testRuns.get as jest.Mock).mockResolvedValue({ id: 'r1', flows: [] });
+    const res = await request(app).get('/api/test-runs/r1');
+    expect(res.status).toBe(200);
+    expect(testRuns.get).toHaveBeenCalledWith('r1');
+  });
+
+  test('GET /:id maps a missing run to 404', async () => {
+    (testRuns.get as jest.Mock).mockRejectedValue(new Error('Test run not found'));
+    const res = await request(app).get('/api/test-runs/nope');
+    expect(res.status).toBe(404);
+  });
+
+  test('GET /:id/flow passes the id and the file through', async () => {
+    (testRuns.getFlow as jest.Mock).mockResolvedValue({ title: 'A', results: {} });
+    const res = await request(app).get('/api/test-runs/r1/flow').query({ path: 'payments/a.md' });
+    expect(res.status).toBe(200);
+    expect(testRuns.getFlow).toHaveBeenCalledWith('r1', 'payments/a.md');
+  });
+
+  test('GET /:id/flow maps a missing copy to 404', async () => {
+    (testRuns.getFlow as jest.Mock).mockRejectedValue(new Error('Flow not found'));
+    expect((await request(app).get('/api/test-runs/r1/flow')).status).toBe(404);
   });
 });
 

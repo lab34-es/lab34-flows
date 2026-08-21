@@ -298,7 +298,12 @@ describe('flows.start', () => {
     expect(apps.loadAll).toHaveBeenCalled();
     expect(run).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Pay with card' }),
-      { environment: 'local', reporter: { cli: false, server: 'socket' } }
+      expect.objectContaining({
+        environment: 'local',
+        reporter: { cli: false, server: 'socket' },
+        // What records the run's test-run copy once the flow is over
+        onFinished: expect.any(Function)
+      })
     );
     expect(result).toEqual({ execution: { id: 'e1' } });
     run.mockRestore();
@@ -310,6 +315,50 @@ describe('flows.start', () => {
 
     await expect(flows.start({ value: MARKDOWN, environment: 'local' }, {}))
       .rejects.toThrow('Another flow is already running. Wait for it to finish.');
+    run.mockRestore();
+  });
+
+  test('records a test run holding the flow copy with its results', async () => {
+    const runsDir = path.join(CONTEXT, 'test-runs');
+    fs.rmSync(runsDir, { recursive: true, force: true });
+
+    const run = jest.spyOn(runner, 'run').mockResolvedValue({ execution: { id: 'e1' } });
+    (apps.loadAll as jest.Mock).mockResolvedValue(undefined);
+
+    await flows.start({ value: MARKDOWN, environment: 'local', path: 'card/pay.md' }, {});
+
+    // The run exists from the moment the flow was started
+    const [runId] = fs.readdirSync(runsDir);
+    let summary = JSON.parse(fs.readFileSync(path.join(runsDir, runId, 'run.json'), 'utf8'));
+    expect(summary.status).toBe('running');
+    expect(summary.trigger).toBe('flow');
+    expect(summary.environment).toBe('local');
+    expect(summary.flows[0]).toMatchObject({ file: 'card/pay.md', status: 'running' });
+
+    // What the runner calls when the flow is over writes the copy
+    const opts = run.mock.calls[0][1] as any;
+    await opts.onFinished({
+      execution: { status: 'passed', times: { start: 1000, end: 2000 } },
+      steps: [{
+        stepIndex: 0,
+        execution: { status: 'passed', times: { start: 1000, end: 1500, duration: 0.5 } },
+        request: { body: { a: 1 } },
+        response: { status: 200, headers: {}, body: { sum: 3 } }
+      }]
+    });
+
+    summary = JSON.parse(fs.readFileSync(path.join(runsDir, runId, 'run.json'), 'utf8'));
+    expect(summary.status).toBe('passed');
+    expect(summary.flows[0]).toMatchObject({
+      status: 'passed',
+      steps: { total: 1, passed: 1, failed: 0 }
+    });
+
+    const copy = fs.readFileSync(path.join(runsDir, runId, 'card', 'pay.md'), 'utf8');
+    expect(copy).toContain('testRun:');
+    expect(copy).toContain('```step-result');
+    expect(copy).toContain('status: passed');
+
     run.mockRestore();
   });
 });

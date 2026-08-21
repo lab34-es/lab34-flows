@@ -314,7 +314,7 @@ export function FlowPage() {
     }
 
     setTab('document');
-    await startRun(flowPath, { value: draft, environment });
+    await startRun(flowPath, { value: draft, environment, path: flowData.relativePath });
   };
 
   /**

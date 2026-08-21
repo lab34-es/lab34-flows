@@ -8,6 +8,10 @@ jest.mock('../src/helpers/applications');
 jest.mock('../src/helpers/flows');
 jest.mock('../src/helpers/markdownFlows');
 jest.mock('../src/helpers/runner/v1');
+jest.mock('../src/helpers/testRuns', () => ({
+  copyFileName: jest.fn(async () => 'a.md'),
+  single: jest.fn(async () => ({ run: { id: 'run-1' }, onFinished: jest.fn(), discard: jest.fn() }))
+}));
 jest.mock('../src/helpers/reporter', () => ({ get: jest.fn(() => ({ server: { emit: jest.fn() } })) }));
 jest.mock('../src/helpers/cli', () => ({ logo: jest.fn(), wisdom: jest.fn(), isInteractive: false }));
 jest.mock('../src/api', () => ({ start: jest.fn().mockResolvedValue(undefined) }));
@@ -22,6 +26,7 @@ import * as applications from '../src/helpers/applications';
 import * as flows from '../src/helpers/flows';
 import * as markdownFlows from '../src/helpers/markdownFlows';
 import * as runner from '../src/helpers/runner/v1';
+import * as testRuns from '../src/helpers/testRuns';
 import * as api from '../src/api';
 
 /** Import cli.ts fresh and let its async main() settle. */
@@ -156,6 +161,29 @@ describe('cli --file', () => {
       expect.objectContaining({ title: 't' }),
       expect.objectContaining({ environment: 'local', cli: true })
     );
+  });
+
+  test('records the run as a test run', async () => {
+    ARGV = { file: 'flows/a.md', env: 'local' };
+    await runCli();
+
+    expect(testRuns.single).toHaveBeenCalledWith(
+      expect.objectContaining({ trigger: 'cli', environment: 'local', file: 'a.md' })
+    );
+    expect(runner.run).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ onFinished: expect.any(Function) })
+    );
+  });
+
+  test('a broken test-run recording does not stop the run', async () => {
+    ARGV = { file: 'flows/a.md', env: 'local' };
+    (testRuns.single as jest.Mock).mockRejectedValueOnce(new Error('disk full'));
+
+    await runCli();
+
+    expect(errored()).toContain('Could not record the test run');
+    expect(runner.run).toHaveBeenCalled();
   });
 
   test('runs a markdown flow through the markdown parser', async () => {

@@ -39,14 +39,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import FlowTree from '@/components/app-sidebar/FlowTree';
 import FlowDialogs from '@/components/app-sidebar/FlowDialogs';
 import ApplicationDialogs from '@/components/app-sidebar/ApplicationDialogs';
+import StatusDot from '@/components/shared/StatusDot';
 import { useAppState } from '@/context/AppStateContext';
 import { flowsApi } from '@/services/api';
 import { folderUrl } from '@/lib/flows';
+import { dotStatus, runLabel, runScore, testRunUrl } from '@/lib/testRuns';
+
+// The sidebar shows the freshest runs; the Test runs page has them all
+const SIDEBAR_RUNS = 10;
 
 export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { tree, treeLoading, refreshTree, applications, applicationsLoading } = useAppState();
+  const { tree, treeLoading, refreshTree, applications, applicationsLoading, testRuns } = useAppState();
 
   const [action, setAction] = useState<any>(null);
   const [applicationAction, setApplicationAction] = useState<any>(null);
@@ -184,6 +189,45 @@ export function AppSidebar() {
               </div>
             ) : (
               <FlowTree tree={tree} onAction={handleAction} />
+            )}
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator />
+
+        {/* ---------------------------- Test runs ---------------------------- */}
+        <SidebarGroup>
+          {/* The label opens the full run history */}
+          <SidebarGroupLabel
+            asChild
+            className="hover:text-sidebar-accent-foreground cursor-pointer"
+          >
+            <button type="button" onClick={() => navigate('/test-runs')} title="Open all test runs">
+              Test runs
+            </button>
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            {testRuns.length === 0 ? (
+              <div className="text-muted-foreground px-2 py-1.5 text-xs">
+                No runs yet. Run a flow — or “Run all” on a folder — and it
+                will be recorded here.
+              </div>
+            ) : (
+              <SidebarMenu>
+                {testRuns.slice(0, SIDEBAR_RUNS).map((run) => (
+                  <SidebarMenuItem key={run.id}>
+                    <SidebarMenuButton
+                      isActive={location.pathname.startsWith(testRunUrl(run.id))}
+                      onClick={() => navigate(testRunUrl(run.id))}
+                      title={`${runLabel(run)} · ${run.environment}${run.view ? ` · ${run.view}` : ''}`}
+                    >
+                      <StatusDot status={dotStatus(run.status)} />
+                      <span>{runLabel(run)}</span>
+                    </SidebarMenuButton>
+                    <SidebarMenuBadge>{runScore(run)}</SidebarMenuBadge>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
             )}
           </SidebarGroupContent>
         </SidebarGroup>

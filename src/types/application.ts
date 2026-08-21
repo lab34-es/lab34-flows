@@ -51,6 +51,15 @@ export interface Context {
   stepId?: string;
   /** Optional case, used to pick `<KEY>_<case>` overrides out of the env. */
   case?: string;
+  /**
+   * The browser session the step asked for, i.e. the `session` of the flow
+   * step. `playwright.run` reads it: a method only has to hand it its
+   * context for the step to browse in the session the flow named. `false`
+   * asks for a throw-away browser even when the yaml file names a session.
+   */
+  session?: string | false;
+  /** Whether this step is the last one that needs the browser session. */
+  closeSession?: boolean;
   [key: string]: unknown;
 }
 
@@ -78,6 +87,10 @@ export interface Step {
   test?: Record<string, any>;
   retry?: { times: number; delay?: number };
   mimic?: Array<Record<string, any>>;
+  /** The browser session the step browses in, kept open between steps. */
+  session?: string | false;
+  /** Close that session once this step is done with it. */
+  closeSession?: boolean;
   [key: string]: any;
 }
 

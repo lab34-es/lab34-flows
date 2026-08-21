@@ -45,6 +45,225 @@ const BROWSER_TYPES = {
   webkit
 };
 
+/**
+ * A browser kept alive between runs.
+ *
+ * Everything a step needs to carry on where the previous one stopped: the
+ * same browser, the same context (so cookies and storage survive) and the
+ * same page (so the URL, the scroll and whatever was typed survive too).
+ * `browserType` and `device` are kept to tell the author when a later step
+ * asks for a browser the session cannot give it.
+ */
+interface Session {
+  name: string;
+  browser: any;
+  context: any;
+  page: any;
+  browserType: string;
+  device: string;
+  keepOpen: boolean;
+}
+
+/**
+ * The open sessions, by name.
+ *
+ * Without a session every `run` launches a browser and closes it when its
+ * steps are done, so a flow that browses in three steps opens three browsers
+ * and each one starts from a blank page. A named session keeps the browser
+ * here instead, and the next run asking for the same name gets the page the
+ * previous one left behind.
+ *
+ * A promise, not a session, is stored: it goes in before the browser has
+ * finished launching, so two runs asking for the same name at once share one
+ * browser rather than racing to open two.
+ *
+ * The runner closes what is left here when the flow finishes -- see
+ * `closeSessions`.
+ */
+const sessions = new Map<string, Promise<Session>>();
+
+/**
+ * Which session a run belongs to, from the most specific source to the least:
+ * the argument given to `run`, the `session` of the flow step (the runner
+ * puts it on the context), the step parameters, and finally the yaml file's
+ * own `session`. `session: false` anywhere in that order opts out, so a step
+ * can ask for its own throw-away browser even when the yaml names a session.
+ *
+ * @returns {string|null} The session name, or null to run on a fresh browser.
+ */
+const sessionName = (ctx, flow, stepParams, options) => {
+  const candidates = [
+    options && options.session,
+    ctx && ctx.session,
+    stepParams && stepParams.session,
+    flow && flow.session
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate === false) {return null;}
+    if (typeof candidate === 'string' && candidate.trim()) {return candidate.trim();}
+  }
+
+  return null;
+};
+
+/**
+ * Launch a browser, give it a context and a page, and return the three.
+ *
+ * @param {Object} flow - The parsed yaml file, for its launch and context options
+ * @param {string} browserType - chromium, firefox or webkit
+ * @param {string} device - A key of playwright's `devices`
+ */
+const openBrowser = async (flow, browserType, device) => {
+  const { launchOptions = {} } = flow;
+
+  // Setup with enhanced launch options
+  const defaultLaunchOptions = {
+    headless: false,
+    args: [],
+    ignoreHTTPSErrors: true,
+    timeout: 30000,
+    ...launchOptions
+  };
+
+  debug('Launching browser with options: %O', defaultLaunchOptions);
+  const browser = await BROWSER_TYPES[browserType].launch(defaultLaunchOptions);
+
+  const constextOptions = {
+    ...devices[device],
+    viewport: devices[device].viewport,
+    locale: 'en-US',
+    timezoneId: 'Europe/Brussels',
+    permissions: [],
+    // geolocation: null,
+    ...flow.contextOptions
+  };
+
+  debug('Creating browser context with options: %O', constextOptions);
+  const context = await browser.newContext(constextOptions);
+
+  const page = await context.newPage();
+
+  // Enhanced error handling and logging
+  page.on('console', msg => console.log('Browser console:', msg.text()));
+  page.on('pageerror', err => console.error('Browser page error:', err));
+
+  // The actual interesting bit
+  await context.route('**.jpg', route => route.abort());
+
+  return { browser, context, page };
+};
+
+/**
+ * The session called `name`, opening its browser if this is the first step
+ * that asks for it.
+ */
+const acquireSession = (name, flow, browserType, device): Promise<Session> => {
+  const existing = sessions.get(name);
+
+  if (existing) {
+    debug('Reusing session "%s"', name);
+    return existing.then(session => {
+      // The browser is already open: a later step asking for a different one
+      // gets the one it was given, which is worth saying out loud
+      if (session.browserType !== browserType || session.device !== device) {
+        debug(
+          'Session "%s" runs on %s/%s; the %s/%s this step asks for is ignored',
+          name, session.browserType, session.device, browserType, device
+        );
+      }
+      return session;
+    });
+  }
+
+  debug('Opening session "%s" on %s/%s', name, browserType, device);
+
+  const created = openBrowser(flow, browserType, device)
+    .then(({ browser, context, page }) => ({
+      name,
+      browser,
+      context,
+      page,
+      browserType,
+      device,
+      keepOpen: Boolean(flow.keepOpen)
+    }));
+
+  // Stored before it resolves, so a second run asking for the same name waits
+  // for this browser instead of opening another one
+  sessions.set(name, created);
+
+  // A browser that never opened must not stay behind as a poisoned entry
+  created.catch(() => {
+    if (sessions.get(name) === created) {sessions.delete(name);}
+  });
+
+  return created;
+};
+
+/**
+ * Close a session and forget it. Closing one that does not exist is not an
+ * error: it is what a flow that already closed it does.
+ *
+ * @param {string} name
+ * @returns {Promise<boolean>} Whether there was a session to close
+ */
+export const closeSession = async (name) => {
+  const pending = sessions.get(name);
+  if (!pending) {return false;}
+
+  // Out of the map first: whatever happens below, no step gets a browser
+  // that is on its way out
+  sessions.delete(name);
+
+  try {
+    const session = await pending;
+    debug('Closing session "%s"', name);
+    await session.context.close();
+    await session.browser.close();
+  }
+  catch (ex) {
+    // A browser that died on its own is already as closed as we need it
+    debug('Could not close session "%s": %s', name, ex.message);
+  }
+
+  return true;
+};
+
+/**
+ * Close every open session. The runner calls this when a flow finishes, so a
+ * browser a flow left open does not outlive it.
+ *
+ * @param {Object} [opts]
+ * @param {boolean} [opts.force] - Close even the sessions opened with
+ *                                 `keepOpen`, which are otherwise left
+ *                                 running for whoever asked to look at them
+ * @returns {Promise<string[]>} The names of the sessions that were open
+ */
+export const closeSessions = async ({ force = false } = {}) => {
+  const names = [...sessions.keys()];
+
+  for (const name of names) {
+    const session = await (sessions.get(name) || Promise.resolve(null)).catch(() => null);
+
+    if (session && session.keepOpen && !force) {
+      debug('Leaving session "%s" open: it was opened with keepOpen', name);
+      sessions.delete(name);
+      continue;
+    }
+
+    await closeSession(name);
+  }
+
+  return names;
+};
+
+/** Whether a session is open, for an application that branches on it. */
+export const hasSession = (name) => sessions.has(name);
+
+/** The names of the open sessions. */
+export const openSessions = () => [...sessions.keys()];
+
 const error = (ctx, yamlFile, error) => {
   const message = `Error in ${yamlFile}: ${error}`;
   console.error(message);
@@ -143,13 +362,36 @@ const buildData = (data, vars, _index) => {
   return data;
 };
 
-export const run = (ctx, yamlFile, stepParams) => {
+/**
+ * Run a browser flow.
+ *
+ * @param {Object} ctx - The application context. `ctx.session` is the session
+ *                       the flow step asked for, and `ctx.closeSession` says
+ *                       the step is the last one that needs it.
+ * @param {string} yamlFile - The yaml file, relative to the application folder
+ * @param {Object} stepParams - The parameters of the flow step
+ * @param {Object} [options] - Overrides for what the step said
+ * @param {string|false} [options.session] - Run on this session, or on a
+ *                                           throw-away browser when false
+ * @param {boolean} [options.closeSession] - Close the session when the run ends
+ */
+export const run = (ctx, yamlFile, stepParams, options: Record<string, any> = {}) => {
   const yamlPath = path.join(ctx.path, yamlFile);
   const yaml = fs.readFileSync(yamlPath, 'utf8');
 
   const flow = YAML.parse(yaml);
-  const { keepOpen, browserType = 'chromium', launchOptions = {} } = flow;
+  const { keepOpen, browserType = 'chromium' } = flow;
   let { device, steps } = flow;
+
+  // Which browser this run gets: a named one that outlives it, or its own
+  const session = sessionName(ctx, flow, stepParams, options);
+
+  // And whether this run is the one that ends the session
+  const endSession = Boolean(
+    options.closeSession !== undefined ? options.closeSession
+      : ctx.closeSession !== undefined ? ctx.closeSession
+        : flow.closeSession
+  );
 
   steps = buildSteps(steps);
 
@@ -176,39 +418,12 @@ export const run = (ctx, yamlFile, stepParams) => {
 
   return new Promise(async (resolve, reject) => {
     try {
-      // Setup with enhanced launch options
-      const defaultLaunchOptions = {
-        headless: false,
-        args: [],
-        ignoreHTTPSErrors: true,
-        timeout: 30000,
-        ...launchOptions
-      };
-
-      debug('Launching browser with options: %O', defaultLaunchOptions);
-      const browser = await BROWSER_TYPES[browserType].launch(defaultLaunchOptions);
-
-      const constextOptions = {
-        ...devices[device],
-        viewport: devices[device].viewport,
-        locale: 'en-US',
-        timezoneId: 'Europe/Brussels',
-        permissions: [],
-        // geolocation: null,
-        ...flow.contextOptions
-      };
-
-      debug('Creating browser context with options: %O', constextOptions);
-      const context = await browser.newContext(constextOptions);
-      
-      const page = await context.newPage();
-
-      // Enhanced error handling and logging
-      page.on('console', msg => console.log('Browser console:', msg.text()));
-      page.on('pageerror', err => console.error('Browser page error:', err));
-
-      // The actual interesting bit
-      await context.route('**.jpg', route => route.abort());
+      // A sessioned run browses in the browser the session already has open,
+      // on the page the previous step left behind. Everything below is the
+      // same either way: the steps cannot tell the difference.
+      const { browser, context, page } = session
+        ? await acquireSession(session, flow, browserType, device)
+        : await openBrowser(flow, browserType, device);
 
       let currentStep = 0;
 
@@ -361,7 +576,15 @@ export const run = (ctx, yamlFile, stepParams) => {
       }
 
       // Teardown
-      if (!keepOpen) {
+      if (session) {
+        // The browser belongs to the session, not to this run: it closes when
+        // the step says so, or when the runner ends the flow
+        if (endSession) {
+          await closeSession(session);
+        } else {
+          debug('Leaving session "%s" open for the next step', session);
+        }
+      } else if (!keepOpen) {
         debug('Closing browser context and browser');
         await context.close();
         await browser.close();
