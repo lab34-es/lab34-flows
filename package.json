@@ -43,7 +43,7 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE.md"
   ],
   "dependencies": {
     "@anthropic-ai/sdk": "0.117.1",
