@@ -389,16 +389,15 @@ const processor = async (flow, opts) => {
         };
       }
     }
-    
+
     // Report the error if we have a reporter
     if (flow.reporter && typeof flow.reporter.execution === 'function') {
       flow.reporter.execution();
     }
 
-    // Re-throw the error to be handled by the caller
-    if (opts.cli) {
-      process.exit(1);
-    }
+    // The caller decides what a failure means: the CLI exits with it, the
+    // API path swallows it -- but both only after the run was recorded
+    throw error;
   }
 };
 
@@ -408,6 +407,11 @@ const processor = async (flow, opts) => {
  * @param {Object} opts
  * @param {String} opts.environment
  * @param {Boolean} opts.cli
+ * @param {Function} [opts.onFinished] - Called exactly once when the run is
+ *                   over (passed or failed), with the executed flow. This is
+ *                   how test runs get recorded, so it runs after the lock is
+ *                   released -- a caller chaining flows can start the next one
+ *                   from inside it.
  * @param {Function} release - Called when the flow finishes, to free the
  *                             single-run lock
  */
@@ -432,22 +436,43 @@ const run = async (flow, opts, release) => {
   // Report it
   flow.reporter.execution();
 
+  // Recording must never take the run down with it
+  const settle = async () => {
+    if (typeof opts.onFinished !== 'function') { return; }
+    try {
+      await opts.onFinished(flow);
+    }
+    catch (ex) {
+      console.error('Error recording the finished flow:', ex);
+    }
+  };
+
   // API request must reply with basic execution information; the processor
   // keeps running in the background and frees the lock when it finishes
   if (!cli) {
     Promise.resolve()
       .then(() => processor(flow, opts))
       .catch(() => {})
-      .finally(release);
+      .finally(() => {
+        release();
+        return settle();
+      });
     return { execution: flow.execution };
   }
 
   // Invokations based on CLI must wait for processor to complete
   try {
-    return await processor(flow, opts);
-  }
-  finally {
+    const result = await processor(flow, opts);
     release();
+    await settle();
+    return result;
+  }
+  catch {
+    release();
+    await settle();
+    // The processor already reported the failure; exit with it, but only
+    // now that the run is on disk
+    process.exit(1);
   }
 };
 
@@ -486,4 +511,12 @@ const runExclusive = async (flow, opts) => {
   }
 };
 
-export { steps, runExclusive as run };
+/**
+ * Whether a flow is being run right now. Callers that would create state for
+ * a run (a test-run folder, say) check this first instead of finding out
+ * from a refused start.
+ * @returns {boolean}
+ */
+const isRunning = () => running;
+
+export { steps, runExclusive as run, isRunning };

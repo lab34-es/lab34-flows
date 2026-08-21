@@ -5,6 +5,7 @@ import * as paths from './paths';
 import * as apps from './applications';
 import * as aiFlows from './aiFlows';
 import * as markdownFlows from './markdownFlows';
+import * as testRuns from './testRuns';
 
 /**
  * A node of the flows tree: either a folder (with children) or a flow file.
@@ -500,7 +501,8 @@ export const remove = async (relativePath) => {
 export const start = async (body, opts) => {
   const {
     value,
-    environment
+    environment,
+    path: flowRelativePath // where the flow lives, so the test run can name its copy
   } = body;
 
   const {
@@ -526,16 +528,41 @@ export const start = async (body, opts) => {
 
   const runner = require(`./runner/v${flowAsJson.version || '1'}`);
 
-  const result = await runner.run(flowAsJson, {
+  if (typeof runner.isRunning === 'function' && runner.isRunning()) {
+    return Promise.reject(new Error('Another flow is already running. Wait for it to finish.'));
+  }
+
+  // Deciding to run is what creates the test run; the copy with the results
+  // is written by onFinished when the runner is done
+  const file = await testRuns.copyFileName({ relativePath: flowRelativePath, title: flowAsJson.title });
+  const record = await testRuns.single({
+    trigger: 'flow',
     environment,
-    reporter: {
-      cli: false,
-      server: io
-    }
+    file,
+    title: flowAsJson.title,
+    content: value,
+    io
   });
+
+  let result;
+  try {
+    result = await runner.run(flowAsJson, {
+      environment,
+      reporter: {
+        cli: false,
+        server: io
+      },
+      onFinished: record.onFinished
+    });
+  }
+  catch (ex) {
+    record.discard();
+    throw ex;
+  }
 
   // The runner refuses to start when another flow is already running
   if (!result) {
+    record.discard();
     return Promise.reject(new Error('Another flow is already running. Wait for it to finish.'));
   }
 

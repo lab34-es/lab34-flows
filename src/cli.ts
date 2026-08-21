@@ -45,6 +45,7 @@ import * as bootstrap from './helpers/bootstrap';
 import * as cli from './helpers/cli';
 import * as reporter from './helpers/reporter';
 import * as flows from './helpers/flows';
+import * as testRuns from './helpers/testRuns';
 
 /**
  * Print error message and exit with error code
@@ -171,13 +172,12 @@ async function validateFilePath(filePath) {
 }
 
 /**
- * Parse a Markdown flow file
- * @param {string} filePath - Path to the flow file
+ * Parse a Markdown flow document
+ * @param {string} content - The flow file's content
  * @returns {Object} Parsed flow definition
  */
-async function parseFlowFile(filePath) {
+function parseFlowContent(content) {
   try {
-    const content = fs.readFileSync(filePath, 'utf8');
     const markdownFlows = require('./helpers/markdownFlows');
     return markdownFlows.toFlow(content);
   } catch (error) {
@@ -290,15 +290,33 @@ async function main() {
     // Validate file path
     const flowFilePath = await validateFilePath(args.file);
     // Parse the flow file
-    const flowConfig = await parseFlowFile(flowFilePath);
+    const flowContent = fs.readFileSync(flowFilePath, 'utf8');
+    const flowConfig = parseFlowContent(flowContent);
 
     // Set up options
-    const options = {
+    const options: Record<string, any> = {
       environment: args.env,
       reporter: reporter.get({ cli: true, flow: null, server: null }),
       cli: true,
       debug: args.debug
     };
+
+    // Every execution is recorded as a test run under the context's
+    // test-runs folder, CLI runs included -- the copy with the results is
+    // written when the runner finishes, even when the flow fails
+    try {
+      const file = await testRuns.copyFileName({ absolutePath: flowFilePath, title: flowConfig.title });
+      const record = await testRuns.single({
+        trigger: 'cli',
+        environment: args.env,
+        file,
+        title: flowConfig.title,
+        content: flowContent
+      });
+      options.onFinished = record.onFinished;
+    } catch (error) {
+      console.error(`Could not record the test run: ${error.message}`);
+    }
 
     // Run the flow
     await runFlow(flowConfig, options);

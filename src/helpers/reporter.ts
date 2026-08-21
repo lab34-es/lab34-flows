@@ -26,6 +26,11 @@ let _flow;
  * @returns - The input with sensitive data removed.
  */
 const sensitive = (input) => {
+  // typeof null is 'object': without this a null becomes {} below
+  if (input === null || input === undefined) {
+    return input;
+  }
+
   if (Array.isArray(input)) {
     return input.map(sensitive);
   }
@@ -527,5 +532,8 @@ const get = function ({ flow, cli, server }): Reporter {
 };
 
 export {
-  get
+  get,
+  // Test runs persist requests and responses to disk, and they must be
+  // masked exactly like the console and the socket mask them
+  sensitive
 };

@@ -132,14 +132,16 @@ export function ExecutionProvider({ children }) {
     };
   }, [applyEvent]);
 
-  const startRun = useCallback(async (flowPath, { value, environment }) => {
+  const startRun = useCallback(async (flowPath, { value, environment, path }) => {
     setExecutions((prev) => ({
       ...prev,
       [flowPath]: { steps: {}, stepOrder: [], inputs: {}, status: 'starting', environment },
     }));
 
     try {
-      const response = await flowsApi.start({ value, environment });
+      // `path` tells the backend which file this is, so the test run it
+      // records can store the copy under the flow's own name
+      const response = await flowsApi.start({ value, environment, path });
       const execution = response.data.execution;
 
       idToPath.current[execution.id] = flowPath;

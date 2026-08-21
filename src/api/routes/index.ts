@@ -4,6 +4,7 @@ import environment from './environment';
 import settings from './settings';
 import jira from './jira';
 import views from './views';
+import testRuns from './testRuns';
 import contextRoutes from './context';
 
 export default (app) => {
@@ -18,6 +19,7 @@ export default (app) => {
 
   app.use('/api/flows', flows);
   app.use('/api/views', views);
+  app.use('/api/test-runs', testRuns);
   app.use('/api/applications', applications);
   app.use('/api/environment', environment);
   app.use('/api/settings', settings);
