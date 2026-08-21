@@ -12,6 +12,7 @@ import * as paths from '../paths';
 import * as reporterHelper from '../reporter';
 import * as errors from '../errors';
 import * as inputs from '../inputs';
+import * as playwright from '../playwright';
 
 let steps: Record<string, any>[] = [];
 const applications = apps.applications;
@@ -96,7 +97,12 @@ const executeStep = async (flow, step, attemptNumber = 0) => {
       reporter: flow.reporter,
       // Which step is running, for helpers that report against it -- an
       // input request has to appear under the step that asked for it
-      stepId: step.id
+      stepId: step.id,
+      // Which browser session the step browses in, and whether it is the one
+      // that ends it. Both are the step's own keys, passed through untouched
+      // so an application only has to hand its context to `playwright.run`
+      session: step.session,
+      closeSession: step.closeSession
     },
     params,
     flow
@@ -462,6 +468,12 @@ const runExclusive = async (flow, opts) => {
     // A request nobody answered must not outlive the run that made it: the
     // step waiting on it is gone, and the UI would keep offering the field
     inputs.cancelAll('The flow finished before the input was answered');
+
+    // Neither must a browser: a session stays open from step to step, and the
+    // flow ending is what it was staying open for. Sessions opened with
+    // keepOpen are the exception -- they were asked to outlive the run.
+    playwright.closeSessions().catch(ex => console.error('Could not close the browser sessions:', ex));
+
     running = false;
   };
 
