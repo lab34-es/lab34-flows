@@ -28,13 +28,14 @@ export function ContextIndicator() {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
       <FolderOpen className="text-muted-foreground size-4 shrink-0" />
-      <span className="max-w-56 truncate text-sm font-medium" title={title}>
-        {contextInfo?.path || 'Lab34 Flows'}
+      {/* A filesystem path speaks as data, so it is set in the mono voice */}
+      <span className="max-w-56 truncate font-mono text-[13px] font-medium" title={title}>
+        {contextInfo?.path || 'lab34/flows'}
       </span>
 
       {git && (
         <span
-          className="text-muted-foreground ml-1 hidden items-center gap-1 text-xs sm:inline-flex"
+          className="text-muted-foreground ml-1 hidden items-center gap-1 font-mono text-xs sm:inline-flex"
           title={trackingLabel(git)}
         >
           <GitBranch className="size-3" />

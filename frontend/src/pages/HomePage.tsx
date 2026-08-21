@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { AppWindow, ArrowRight, BookOpen, FileText, Play, Workflow } from 'lucide-react';
+import { AppWindow, ArrowRight, BookOpen, FileText, Play } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,10 +33,16 @@ export function HomePage() {
   return (
     <div className="mx-auto w-full max-w-4xl space-y-8 p-6">
       <div className="space-y-2 pt-6">
-        <div className="bg-primary text-primary-foreground flex size-12 items-center justify-center rounded-xl">
-          <Workflow className="size-6" />
+        {/* The monogram disc and, under it, the open-source lockup: parent
+            Medium 500, brass slash, project Regular 400 — always lowercase. */}
+        <div className="bg-primary text-primary-foreground flex size-12 items-center justify-center rounded-full font-mono text-lg font-medium">
+          34
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">Lab34 Flows</h1>
+        <h1 className="font-mono text-3xl tracking-[-0.04em]">
+          <span className="font-medium">lab34</span>
+          <span className="text-brass">/</span>
+          <span className="font-normal">flows</span>
+        </h1>
         <p className="text-muted-foreground max-w-2xl text-sm">
           Flows are <strong>Markdown documents</strong>: write anything — prose, headings, lists —
           and turn any part into an executable step with a <code className="bg-muted rounded px-1.5 py-0.5 font-mono text-xs">```step</code> code
@@ -48,7 +54,7 @@ export function HomePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <FileText className="text-info size-4" /> Flows
+              <FileText className="text-muted-foreground size-4" /> Flows
               <Badge variant="secondary">{flowsCount}</Badge>
             </CardTitle>
             <CardDescription>
@@ -60,7 +66,7 @@ export function HomePage() {
             {firstFlow ? (
               <Link
                 to={flowUrl(firstFlow)}
-                className="text-info inline-flex items-center gap-1 text-sm hover:underline"
+                className="text-brass-text inline-flex items-center gap-1 text-sm underline-offset-4 hover:underline"
               >
                 <Play className="size-3.5" /> Open “{firstFlow.title || firstFlow.name}” <ArrowRight className="size-3.5" />
               </Link>
@@ -73,7 +79,7 @@ export function HomePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <AppWindow className="text-info size-4" /> Applications
+              <AppWindow className="text-muted-foreground size-4" /> Applications
               <Badge variant="secondary">{applications.length}</Badge>
             </CardTitle>
             <CardDescription>
@@ -85,7 +91,7 @@ export function HomePage() {
             {applications[0] ? (
               <Link
                 to={`/applications/${applications[0].slug}`}
-                className="text-info inline-flex items-center gap-1 text-sm hover:underline"
+                className="text-brass-text inline-flex items-center gap-1 text-sm underline-offset-4 hover:underline"
               >
                 <BookOpen className="size-3.5" /> Browse “{applications[0].name}” <ArrowRight className="size-3.5" />
               </Link>
